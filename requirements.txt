@@ -1,2 +1,5 @@
-﻿ortools
-pytest
+﻿ortools==9.15.6755
+gurobipy==13.0.3
+cplex==22.2.0.1
+docplex==2.32.264
+pytest==9.1.1
