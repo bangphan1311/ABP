@@ -262,6 +262,21 @@ def test_unsupported_abp_encoding_raises():
         solve_sat(generator.path(4), Config(method="sat", abp_encoding="order"))
 
 
+def test_decision_unsupported_abp_encoding_raises():
+    with pytest.raises(ValueError, match="abp_encoding"):
+        solve_decision(generator.path(4), 2, Config(method="sat", abp_encoding="bogus"))
+
+
+@pytest.mark.parametrize("bad_n", [True, 4.0])
+def test_decision_non_integer_n_raises(bad_n):
+    instance = Instance(
+        id="bad-n", name="Bad n", n=bad_n, edges=((0, 1),), source="test", tier="toy"
+    )
+
+    with pytest.raises(ValueError, match="số nguyên"):
+        solve_decision(instance, 2)
+
+
 @pytest.mark.parametrize(
     "edges",
     [

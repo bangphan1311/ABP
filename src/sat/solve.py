@@ -212,8 +212,14 @@ def solve_decision(
     """
     cfg = config or Config(method=METHOD)
     _warn_ignored_config(cfg)
+    abp_encoding = cfg.abp_encoding or DEFAULT_ABP_ENCODING
     amo_encoding = cfg.amo_encoding or DEFAULT_AMO_ENCODING
     solver_name = cfg.sat_solver or DEFAULT_SOLVER
+
+    if abp_encoding not in ABP_ENCODINGS:
+        raise ValueError(
+            f"abp_encoding '{abp_encoding}' chưa hỗ trợ; chọn {ABP_ENCODINGS}."
+        )
     _validate_instance(instance)
 
     status, solution, _cnf, _t_encode, _t_solve = _probe(
@@ -301,6 +307,8 @@ def _validate_instance(instance: Instance) -> None:
         ValueError: Nếu đồ thị rỗng, hoặc một đỉnh trong cạnh không phải số
             nguyên / nằm ngoài ``0..n-1`` (không để ``KeyError`` từ ``build_cnf``).
     """
+    if isinstance(instance.n, bool) or not isinstance(instance.n, int):
+        raise ValueError(f"n phải là số nguyên: {instance.n!r}.")
     if instance.n < 1:
         raise ValueError("Đồ thị phải có ít nhất một đỉnh.")
     if not instance.edges:
