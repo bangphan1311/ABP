@@ -36,21 +36,23 @@ INTERRUPTIBLE_FAMILIES = frozenset(
     }
 )
 
-# Family chỉ có conf_budget() (CaDiCaL, Kissat): interrupt() ném NotImplementedError.
+# Family chỉ có conf_budget() (CaDiCaL): interrupt() ném NotImplementedError.
 # Timeout thực hiện bằng vòng lặp ngân sách xung đột tăng dần (xem docs/sat_tooling.md).
-# Lưu ý: Kissat của PySAT 1.9.dev15 crash khi nạp clause -> chưa dùng được,
-# xem docs/sat_tooling.md.
-BUDGETED_FAMILIES = frozenset(
-    {"cadical103", "cadical153", "cadical195", "cadical300", "kissat404"}
-)
+# Kissat KHÔNG nằm ở đây: family kissat404 của PySAT crash khi nạp clause, đi qua
+# binary ngoài ở src/sat/kissat.py (xem docs/sat_tooling.md mục 7).
+BUDGETED_FAMILIES = frozenset({"cadical103", "cadical153", "cadical195", "cadical300"})
+
+# Family Kissat trong PySAT 1.9.dev15: access violation khi nạp clause (giết process).
+# Chặn ngay trong add_clause thay vì để native crash.
+PYSAT_KISSAT_FAMILIES = frozenset({"kissat404"})
 
 # Ngân sách xung đột khởi điểm cho mỗi lần gọi solve_limited; tăng gấp đôi mỗi vòng.
 CONFLICT_BUDGET_START = 1000
 
 # Tên solver gợi ý cho người dùng: tất cả đều dựng được bằng Solver(name=...) và
 # nạp được clause trên PySAT 1.9.dev15. Lưu ý 'minisat-gh' phải gọi qua alias 'mgh'.
-# 'kissat' cố ý KHÔNG có mặt: dựng được nhưng crash process khi nạp clause
-# (xem docs/sat_tooling.md mục 7).
+# 'kissat' cố ý KHÔNG có mặt: family kissat404 của PySAT crash process khi nạp clause
+# (xem docs/sat_tooling.md mục 7); dùng binary ngoài qua src/sat/kissat.py.
 SUPPORTED_SOLVERS = (
     "cadical103",
     "cadical153",
@@ -75,6 +77,25 @@ class BackendError(RuntimeError):
     """Lỗi khởi tạo/điều khiển backend SAT (pipeline map sang status ERR)."""
 
 
+def validate_clause(clause: Sequence[int]) -> list[int]:
+    """Chuẩn hóa và kiểm tra một clause; dùng chung cho mọi backend.
+
+    Raises:
+        ValueError: Nếu clause rỗng, hoặc có literal ``0`` / không phải ``int``.
+    """
+    literals = list(clause)
+
+    if not literals:
+        raise ValueError("Clause rỗng không hợp lệ.")
+    for literal in literals:
+        if isinstance(literal, bool) or not isinstance(literal, int):
+            raise ValueError(f"Literal phải là số nguyên khác 0: {literal!r}.")
+        if literal == 0:
+            raise ValueError("Literal 0 không hợp lệ.")
+
+    return literals
+
+
 def solver_family(solver_name: str) -> str:
     """Family của một tên/alias solver (``g4`` -> ``glucose4``)."""
     name = solver_name.lower()
@@ -89,8 +110,9 @@ def solver_family(solver_name: str) -> str:
 def supported_solvers() -> tuple[str, ...]:
     """Tên solver gợi ý, tất cả đều nạp được clause và giới hạn được thời gian.
 
-    Không gồm ``kissat``: dựng được nhưng crash process khi nạp clause
-    (xem ``docs/sat_tooling.md`` mục 7).
+    Không gồm ``kissat``: family của PySAT crash process khi nạp clause. Kissat đi qua
+    binary ngoài (``src/sat/kissat.py``) với ``Config(sat_solver='kissat')`` — xem
+    ``docs/sat_tooling.md`` mục 7.
     """
     return SUPPORTED_SOLVERS
 
@@ -137,18 +159,19 @@ class SatBackend:
     # --- nạp CNF --------------------------------------------------------
 
     def add_clause(self, clause: Sequence[int]) -> None:
-        """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên."""
-        literals = list(clause)
+        """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên.
 
-        if not literals:
-            raise ValueError("Clause rỗng không hợp lệ.")
-        for literal in literals:
-            if isinstance(literal, bool) or not isinstance(literal, int):
-                raise ValueError(f"Literal phải là số nguyên khác 0: {literal!r}.")
-            if literal == 0:
-                raise ValueError("Literal 0 không hợp lệ.")
+        Family Kissat của PySAT bị chặn ở đây: nạp clause vào nó giết process
+        (access violation) thay vì báo lỗi.
+        """
+        if self.family in PYSAT_KISSAT_FAMILIES:
+            raise BackendError(
+                f"PySAT family '{self.family}' crash process khi nạp clause; "
+                "dùng binary ngoài: Config(sat_solver='kissat') "
+                "(xem docs/sat_tooling.md mục 7)."
+            )
 
-        self._solver.add_clause(literals)
+        self._solver.add_clause(validate_clause(clause))
         self._n_clauses += 1
 
     def add_clauses(self, clauses: Iterable[Sequence[int]]) -> None:

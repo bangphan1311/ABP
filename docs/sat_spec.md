@@ -111,6 +111,9 @@ status, labeling = solve_decision(instance, k=5, config=cfg)  # ("SAT"|"UNSAT"|"
 `amo_encoding` (mặc định `"pairwise"`), `sat_solver` (mặc định `"cadical195"`),
 `time_limit` (giây, `None` = không giới hạn). `method` chỉ mang tính nhãn ở W1.
 
+`sat_solver="kissat"` chạy binary Kissat **ngoài** process (file DIMACS + subprocess), không
+qua PySAT; thiếu binary → `ERR` với thông báo rõ, không crash. Xem `docs/sat_tooling.md` mục 7.
+
 **Phạm vi `time_limit`**: ngân sách cho **cả chuỗi K**, gồm encode CNF (`build_cnf`), nạp
 clause (`add_clauses`) và giải (`solve`) của mọi lần dò. Deadline được kiểm tra trước mỗi
 pha và phần thời gian còn lại được truyền vào solver. Pha đang chạy khi hết giờ vẫn hoàn

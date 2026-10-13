@@ -14,6 +14,7 @@ from time import perf_counter
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
 from src.sat.backend import DEFAULT_SOLVER, BackendError, SatBackend
+from src.sat.kissat import SOLVER_NAME as KISSAT_SOLVER, KissatBackend
 from src.sat.pairwise import (
     DEFAULT_ABP_ENCODING,
     DEFAULT_AMO_ENCODING,
@@ -215,6 +216,13 @@ def solve_decision(
     return status, solution
 
 
+def _open_backend(solver_name: str) -> SatBackend | KissatBackend:
+    """Backend cho ``solver_name``: Kissat đi qua binary ngoài, còn lại là PySAT."""
+    if solver_name.lower() == KISSAT_SOLVER:
+        return KissatBackend()
+    return SatBackend(solver_name)
+
+
 def _probe(
     instance: Instance,
     k: int,
@@ -239,7 +247,7 @@ def _probe(
     cnf = build_cnf(instance, k, amo_encoding=amo_encoding)
     t_encode = perf_counter() - t0
 
-    backend = SatBackend(solver_name)
+    backend = _open_backend(solver_name)
     try:
         backend.add_clauses(cnf.clauses)
         remaining = None if time_limit is None else time_limit - (perf_counter() - t0)
