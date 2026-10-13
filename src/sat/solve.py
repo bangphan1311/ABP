@@ -205,7 +205,24 @@ def _summarise(
 
 
 def _validate_instance(instance: Instance) -> None:
+    """Kiểm tra biên của ``Instance`` dựng tay (loader đã kiểm tra cùng điều kiện).
+
+    Raises:
+        ValueError: Nếu đồ thị rỗng, hoặc một đỉnh trong cạnh không phải số
+            nguyên / nằm ngoài ``0..n-1`` (không để ``KeyError`` từ ``build_cnf``).
+    """
     if instance.n < 1:
         raise ValueError("Đồ thị phải có ít nhất một đỉnh.")
     if not instance.edges:
         raise ValueError("ABP không xác định khi đồ thị không có cạnh.")
+
+    for u, v in instance.edges:
+        for endpoint in (u, v):
+            if isinstance(endpoint, bool) or not isinstance(endpoint, int):
+                raise ValueError(
+                    f"Đỉnh trong cạnh ({u}, {v}) phải là số nguyên: {endpoint!r}."
+                )
+            if not 0 <= endpoint < instance.n:
+                raise ValueError(
+                    f"Cạnh ({u}, {v}) chứa đỉnh ngoài khoảng 0..{instance.n - 1}."
+                )

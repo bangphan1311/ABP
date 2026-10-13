@@ -159,3 +159,24 @@ def test_summarise_status_mapping():
 def test_unsupported_abp_encoding_raises():
     with pytest.raises(ValueError, match="abp_encoding"):
         solve_sat(generator.path(4), Config(method="sat", abp_encoding="order"))
+
+
+@pytest.mark.parametrize(
+    "edges",
+    [
+        ((0, 9),),  # đỉnh ngoài khoảng 0..n-1
+        ((-1, 1),),  # đỉnh âm
+        ((0, "1"),),  # đỉnh không phải số nguyên
+        ((0, True),),  # bool không phải đỉnh hợp lệ
+    ],
+)
+def test_invalid_edge_endpoint_raises_value_error(edges):
+    # Instance dựng tay: phải ValueError (như loader và verify), không KeyError.
+    instance = Instance(
+        id="bad-edges", name="Bad edges", n=4, edges=edges, source="test", tier="toy"
+    )
+
+    with pytest.raises(ValueError):
+        solve_sat(instance)
+    with pytest.raises(ValueError):
+        solve_decision(instance, 2)
