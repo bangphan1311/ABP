@@ -26,7 +26,13 @@ ABP_ENCODINGS = (DEFAULT_ABP_ENCODING,)
 
 
 def solve_sat(instance: Instance, config: Config | None = None) -> Result:
-    """Giải ABP bằng SAT; trả ``Result`` theo CONTRACT.md."""
+    """Giải ABP bằng SAT; trả ``Result`` theo CONTRACT.md.
+
+    ``Config.time_limit`` chỉ chặn phần **giải** của solver: thời gian encode CNF
+    (``build_cnf``) và nạp clause (``add_clauses``) không tính vào deadline, nên
+    ``t_total`` có thể vượt ``time_limit`` — đo được tới ~20 lần khi ``time_limit``
+    nhỏ. W1 không cắt cứng theo giây; xem ``docs/sat_tooling.md`` mục 4.
+    """
     cfg = config or Config(method=METHOD)
 
     abp_encoding = cfg.abp_encoding or DEFAULT_ABP_ENCODING

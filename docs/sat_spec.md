@@ -98,6 +98,11 @@ status, labeling = solve_decision(instance, k=5, config=cfg)  # ("SAT"|"UNSAT"|"
 `amo_encoding` (mặc định `"pairwise"`), `sat_solver` (mặc định `"cadical195"`),
 `time_limit` (giây, `None` = không giới hạn). `method` chỉ mang tính nhãn ở W1.
 
+**Phạm vi `time_limit`**: chỉ chặn phần giải của solver. Thời gian encode CNF và nạp
+clause vào solver không tính vào deadline, nên `t_total` có thể vượt `time_limit` — đo
+được tới ~20 lần khi `time_limit` nhỏ (`grid(8,8)`, `time_limit=0.05` → `t_total ≈ 1.09 s`).
+W1 không cắt cứng theo giây; xem `docs/sat_tooling.md` mục 4.
+
 ## 8. Format instance (loader)
 
 JSON, một file một instance:

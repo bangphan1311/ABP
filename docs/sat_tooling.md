@@ -70,6 +70,12 @@ solver (đọc mã nguồn `pysat/solvers.py` để xác nhận, không suy đo�
   vừa xong thì lần `solve` **kế tiếp trên cùng backend** có thể trả `UNKNOWN`. Pipeline
   W1 luôn dựng backend mới cho mỗi ngưỡng K nên ảnh hưởng cục bộ, và hướng sai là
   "thận trọng" (`FEAS`/`TO` thay vì `OPT`), không bao giờ cho nghiệm sai.
+- **Phạm vi của `time_limit`**: nó chỉ chặn phần **giải** (solver search). Thời gian
+  `build_cnf(...)` (encode) và `add_clauses(...)` (nạp clause vào solver) **không** bị
+  tính vào deadline, nên `t_total` có thể vượt `time_limit` khá xa khi `time_limit` nhỏ —
+  đo thực tế tới **~20 lần**: `grid(8,8)` với `time_limit=0.05` cho `t_total ≈ 1.09 s`
+  (encode 0.38 s + nạp clause/decode 0.49 s + solve 0.22 s). W1 **không** cắt cứng theo
+  giây; ai cần cắt cứng phải đo lại ở W2 (subprocess hoặc kiểm `remaining` trước khi encode).
 - `time_limit` ≤ 0 → `UNKNOWN` ngay, không gọi solver.
 
 ## 5. Assumptions
