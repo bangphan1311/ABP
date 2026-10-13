@@ -64,10 +64,11 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     Tìm K theo WORK BREAKDOWN §5 / Quang.md §3.3: ``K ← B + 1`` từ cận dưới, dừng ở
     lần UNSAT đầu tiên (ngưỡng đó chứng minh ``B`` tối ưu).
 
-    ``Config.time_limit`` chỉ chặn phần **giải** của solver: thời gian encode CNF
-    (``build_cnf``) và nạp clause (``add_clauses``) không tính vào deadline, nên
-    ``t_total`` có thể vượt ``time_limit`` — đo được tới ~20 lần khi ``time_limit``
-    nhỏ. W1 không cắt cứng theo giây; xem ``docs/sat_tooling.md`` mục 4.
+    ``Config.time_limit`` là ngân sách cho **cả chuỗi K**: bao gồm ``build_cnf`` (encode),
+    ``add_clauses`` (nạp clause) và ``solve`` của mọi lần dò. Deadline được kiểm tra trước
+    mỗi pha và phần còn lại được truyền vào solver; pha đang chạy khi hết giờ vẫn hoàn
+    thành nên ``t_total`` vượt ``time_limit`` một khoảng nhỏ (xem ``docs/sat_tooling.md``
+    mục 4).
     """
     cfg = config or Config(method=METHOD)
     _warn_ignored_config(cfg)
@@ -198,7 +199,10 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
 def solve_decision(
     instance: Instance, k: int, config: Config | None = None
 ) -> tuple[str, dict[int, int] | None]:
-    """Bài toán quyết định tại một ngưỡng ``k``: ``(status, labeling)``."""
+    """Bài toán quyết định tại một ngưỡng ``k``: ``(status, labeling)``.
+
+    ``Config.time_limit`` là ngân sách cho cả ``build_cnf``, ``add_clauses`` và ``solve``.
+    """
     cfg = config or Config(method=METHOD)
     _warn_ignored_config(cfg)
     amo_encoding = cfg.amo_encoding or DEFAULT_AMO_ENCODING
@@ -218,9 +222,18 @@ def _probe(
     solver_name: str,
     time_limit: float | None,
 ) -> tuple[str, dict[int, int] | None, CNF | None, float, float]:
-    """Dựng CNF, giải, decode; trả ``(status, labeling, cnf, t_encode, t_solve)``."""
+    """Dựng CNF, giải, decode; trả ``(status, labeling, cnf, t_encode, t_solve)``.
+
+    ``time_limit`` là ngân sách còn lại cho **cả** ``build_cnf``, ``add_clauses`` và
+    ``solve`` (WORK BREAKDOWN §5: runtime gồm tạo model/encoding và mọi lần gọi
+    solver). Hết ngân sách trước khi encode → ``UNKNOWN``, không dựng CNF; hết ngân
+    sách sau khi nạp clause → ``solve`` nhận phần thời gian còn lại.
+    """
     if trivial_unsat(instance.n, k):
         return "UNSAT", None, None, 0.0, 0.0
+
+    if time_limit is not None and time_limit <= 0:
+        return "UNKNOWN", None, None, 0.0, 0.0
 
     t0 = perf_counter()
     cnf = build_cnf(instance, k, amo_encoding=amo_encoding)
@@ -229,8 +242,9 @@ def _probe(
     backend = SatBackend(solver_name)
     try:
         backend.add_clauses(cnf.clauses)
+        remaining = None if time_limit is None else time_limit - (perf_counter() - t0)
         t1 = perf_counter()
-        status = backend.solve(time_limit=time_limit)
+        status = backend.solve(time_limit=remaining)
         t_solve = perf_counter() - t1
 
         solution = decode_model(cnf, backend.get_model()) if status == "SAT" else None

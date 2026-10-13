@@ -150,6 +150,18 @@ def test_time_limited_run_is_feas_or_to_and_consistent():
         assert result.gap == result.ub - result.lb
 
 
+def test_time_limit_covers_encoding_and_solve():
+    # B3: deadline là ngân sách cho cả build_cnf, add_clauses và solve của cả chuỗi K.
+    instance = generator.grid(10, 10)
+    limit = 1.0
+
+    result = solve_sat(instance, Config(method="sat", time_limit=limit))
+
+    assert result.status in ("FEAS", "TO")
+    # Pha đang chạy khi hết giờ vẫn hoàn thành: cho phép vượt, nhưng không vượt xa.
+    assert result.t_total < 2 * limit + 0.5
+
+
 def test_solution_never_violates_proven_unsat_threshold():
     # K = 3 là UNSAT trên path4, nên không được có OPT với lb >= 3.
     result = solve_sat(generator.path(4))

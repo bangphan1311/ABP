@@ -70,13 +70,16 @@ solver (đọc mã nguồn `pysat/solvers.py` để xác nhận, không suy đo�
   vừa xong thì lần `solve` **kế tiếp trên cùng backend** có thể trả `UNKNOWN`. Pipeline
   W1 luôn dựng backend mới cho mỗi ngưỡng K nên ảnh hưởng cục bộ, và hướng sai là
   "thận trọng" (`FEAS`/`TO` thay vì `OPT`), không bao giờ cho nghiệm sai.
-- **Phạm vi của `time_limit`**: nó chỉ chặn phần **giải** (solver search). Thời gian
-  `build_cnf(...)` (encode) và `add_clauses(...)` (nạp clause vào solver) **không** bị
-  tính vào deadline, nên `t_total` có thể vượt `time_limit` khá xa khi `time_limit` nhỏ —
-  đo thực tế tới **~20 lần**: `grid(8,8)` với `time_limit=0.05` cho `t_total ≈ 1.09 s`
-  (encode 0.38 s + nạp clause/decode 0.49 s + solve 0.22 s). W1 **không** cắt cứng theo
-  giây; ai cần cắt cứng phải đo lại ở W2 (subprocess hoặc kiểm `remaining` trước khi encode).
-- `time_limit` ≤ 0 → `UNKNOWN` ngay, không gọi solver.
+- **Phạm vi của `time_limit`**: ngân sách cho **cả chuỗi K** (WORK BREAKDOWN §5), gồm
+  `build_cnf` (encode), `add_clauses` (nạp clause) và `solve` của mọi lần dò. `_probe`
+  kiểm phần thời gian còn lại trước khi encode và sau khi nạp clause thì truyền phần còn
+  lại vào solver. Pha đang chạy khi hết giờ vẫn hoàn thành, nên `t_total` chỉ vượt
+  `time_limit` một khoảng nhỏ — đo trên máy dev (`cadical195`, `.venv` Python 3.11):
+  `grid(10,10)` limit 1.0 s → `t_total` **1.19 s** (`TO`); `grid(8,8)` limit 1.0 s →
+  **1.10 s** (`FEAS`), limit 2.0 s → **2.29 s** (`FEAS`). Test dùng cận
+  `t_total < 2 * time_limit + 0.5` (`tests/sat/test_solve.py`).
+- `time_limit` ≤ 0 → hết ngân sách trước khi encode: không dựng CNF, `UNKNOWN` ngay
+  (`TO` nếu chưa có nghiệm nào).
 
 ## 5. Assumptions
 

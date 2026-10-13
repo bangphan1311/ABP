@@ -111,10 +111,11 @@ status, labeling = solve_decision(instance, k=5, config=cfg)  # ("SAT"|"UNSAT"|"
 `amo_encoding` (mặc định `"pairwise"`), `sat_solver` (mặc định `"cadical195"`),
 `time_limit` (giây, `None` = không giới hạn). `method` chỉ mang tính nhãn ở W1.
 
-**Phạm vi `time_limit`**: chỉ chặn phần giải của solver. Thời gian encode CNF và nạp
-clause vào solver không tính vào deadline, nên `t_total` có thể vượt `time_limit` — đo
-được tới ~20 lần khi `time_limit` nhỏ (`grid(8,8)`, `time_limit=0.05` → `t_total ≈ 1.09 s`).
-W1 không cắt cứng theo giây; xem `docs/sat_tooling.md` mục 4.
+**Phạm vi `time_limit`**: ngân sách cho **cả chuỗi K**, gồm encode CNF (`build_cnf`), nạp
+clause (`add_clauses`) và giải (`solve`) của mọi lần dò. Deadline được kiểm tra trước mỗi
+pha và phần thời gian còn lại được truyền vào solver. Pha đang chạy khi hết giờ vẫn hoàn
+thành nên `t_total` có thể vượt `time_limit` một khoảng nhỏ (`grid(10,10)`, `time_limit=1.0`
+→ `t_total ≈ 1.19 s`); xem `docs/sat_tooling.md` mục 4.
 
 `memory_limit`, `search_mode`, `symmetry`, `warm_start`, `seed` **chưa được cài đặt** ở W1:
 `memory_limit` để `None` nên status `MO` không bao giờ xuất hiện; ba field còn lại thuộc P3.
