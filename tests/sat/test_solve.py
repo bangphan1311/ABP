@@ -180,3 +180,29 @@ def test_invalid_edge_endpoint_raises_value_error(edges):
         solve_sat(instance)
     with pytest.raises(ValueError):
         solve_decision(instance, 2)
+
+
+def test_ignored_config_fields_emit_one_warning():
+    # W1 chưa cài đặt memory_limit/search_mode/symmetry/warm_start/seed -> phải cảnh báo.
+    config = Config(
+        method="sat",
+        memory_limit=1.0,
+        search_mode="staircase",
+        symmetry=True,
+        warm_start=True,
+        seed=7,
+    )
+
+    with pytest.warns(UserWarning, match="memory_limit") as record:
+        solve_sat(generator.path(4), config)
+
+    assert len(record) == 1
+    message = str(record[0].message)
+    for name in ("memory_limit", "search_mode", "symmetry", "warm_start", "seed"):
+        assert name in message
+
+
+def test_default_config_fields_emit_no_warning(recwarn):
+    solve_sat(generator.path(4))
+
+    assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]

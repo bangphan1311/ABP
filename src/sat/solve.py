@@ -7,6 +7,7 @@ Mọi nghiệm đều qua ``verify()`` trước khi vào ``Result``.
 
 from __future__ import annotations
 
+import warnings
 from time import perf_counter
 
 from src.common.models import Config, Instance, Result
@@ -24,6 +25,37 @@ from src.sat.pairwise import (
 METHOD = "sat"
 ABP_ENCODINGS = (DEFAULT_ABP_ENCODING,)
 
+# Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.
+IGNORED_CONFIG_FIELDS = (
+    "memory_limit",
+    "search_mode",
+    "symmetry",
+    "warm_start",
+    "seed",
+)
+_CONFIG_DEFAULTS = {
+    name: getattr(Config(method=METHOD), name) for name in IGNORED_CONFIG_FIELDS
+}
+
+
+def _warn_ignored_config(cfg: Config) -> None:
+    """Cảnh báo một lần nếu caller đặt field Config mà W1 bỏ qua (không im lặng)."""
+    ignored = [
+        name
+        for name in IGNORED_CONFIG_FIELDS
+        if getattr(cfg, name) != _CONFIG_DEFAULTS[name]
+    ]
+    if not ignored:
+        return
+
+    warnings.warn(
+        "W1 bỏ qua các field Config: "
+        + ", ".join(ignored)
+        + " (memory_limit chưa cài đặt nên status MO không bao giờ xuất hiện; "
+        "search_mode/symmetry/warm_start/seed thuộc P3).",
+        stacklevel=2,
+    )
+
 
 def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     """Giải ABP bằng SAT; trả ``Result`` theo CONTRACT.md.
@@ -34,6 +66,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     nhỏ. W1 không cắt cứng theo giây; xem ``docs/sat_tooling.md`` mục 4.
     """
     cfg = config or Config(method=METHOD)
+    _warn_ignored_config(cfg)
 
     abp_encoding = cfg.abp_encoding or DEFAULT_ABP_ENCODING
     amo_encoding = cfg.amo_encoding or DEFAULT_AMO_ENCODING
@@ -147,6 +180,7 @@ def solve_decision(
 ) -> tuple[str, dict[int, int] | None]:
     """Bài toán quyết định tại một ngưỡng ``k``: ``(status, labeling)``."""
     cfg = config or Config(method=METHOD)
+    _warn_ignored_config(cfg)
     amo_encoding = cfg.amo_encoding or DEFAULT_AMO_ENCODING
     solver_name = cfg.sat_solver or DEFAULT_SOLVER
     _validate_instance(instance)

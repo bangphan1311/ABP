@@ -103,6 +103,11 @@ clause vào solver không tính vào deadline, nên `t_total` có thể vượt 
 được tới ~20 lần khi `time_limit` nhỏ (`grid(8,8)`, `time_limit=0.05` → `t_total ≈ 1.09 s`).
 W1 không cắt cứng theo giây; xem `docs/sat_tooling.md` mục 4.
 
+`memory_limit`, `search_mode`, `symmetry`, `warm_start`, `seed` **chưa được cài đặt** ở W1:
+`memory_limit` để `None` nên status `MO` không bao giờ xuất hiện; ba field còn lại thuộc P3.
+Đặt chúng khác giá trị mặc định thì `solve_sat`/`solve_decision` phát `UserWarning` một lần
+(không bỏ qua im lặng).
+
 ## 8. Format instance (loader)
 
 JSON, một file một instance:
