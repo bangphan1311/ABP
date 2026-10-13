@@ -38,12 +38,37 @@ def test_sat_reports_verified_value_and_encoding_size():
 
     assert result.lb == 2
     assert verify(instance, result.solution) == 2
+    # Kích thước CNF là của lần dò đầu tiên (K=1), xem docs/sat_spec.md mục 6.
     assert result.variables == 16
-    assert result.clauses == 74  # encoding của ngưỡng tốt nhất
+    assert result.clauses == 56
     assert result.metadata["k_best"] == 2
     assert result.metadata["abp_encoding_stats"]["distance"] == 18
-    assert [probe["k"] for probe in result.metadata["probes"]] == [1, 2, 3]
+    probes = result.metadata["probes"]
+    assert [probe["k"] for probe in probes] == [1, 2, 3]
+    assert [probe["clauses"] for probe in probes] == [56, 74, 86]
+    assert probes[0]["variables"] == 16
+    assert probes[0]["t_encode"] > 0.0
     assert result.t_total > 0.0
+
+
+def test_cnf_size_is_reported_even_when_no_sat_probe(monkeypatch):
+    # S2/RQ1: hết giờ trước khi solver kết luận vẫn phải có kích thước CNF.
+    from src.sat.backend import SatBackend
+    from src.sat.pairwise import build_cnf
+
+    monkeypatch.setattr(SatBackend, "solve", lambda self, time_limit=None: "UNKNOWN")
+
+    instance = generator.grid(6, 6)
+    result = solve_sat(instance, Config(method="sat", time_limit=60.0))
+
+    assert result.status == "TO"
+    assert result.lb is None
+    assert result.solution is None
+
+    first_probe = build_cnf(instance, 1)
+    assert result.variables == first_probe.n_vars
+    assert result.clauses == len(first_probe.clauses)
+    assert result.metadata["probes"][0]["clauses"] == result.clauses
 
 
 def test_k_search_increases_from_lower_bound_and_stops_at_first_unsat():

@@ -185,7 +185,9 @@ tự bỏ skip.
   `t_encode` của PySAT (`CardEnc`) nằm trong `t_encode`; thời gian `add_clauses` hiện **không**
   nằm trong `t_encode` lẫn `t_solve`, chỉ có trong `t_total` — cần tách riêng ở W2 nếu muốn
   so sánh chi phí encode.
-- Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "t_solve"}, ...]`.
+- Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "b", "t_encode",
+  "t_solve", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là của lần
+  dò đầu tiên (xem `docs/sat_spec.md` mục 6).
 - `peak_memory`: **chưa đo ở W1**, để `None`. Cách đo đề xuất cho chạy chính thức:
   `psutil.Process().memory_info().rss` (bắt cả bộ nhớ native của solver) hoặc
   `tracemalloc` (chỉ bộ nhớ Python — **không** thấy bộ nhớ native, nên không đủ). `psutil`

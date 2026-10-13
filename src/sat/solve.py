@@ -92,6 +92,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     unsat_source = "counting:lệch nhãn tối đa n-1"
     best_solution: dict[int, int] | None = None
     best_cnf: CNF | None = None
+    first_cnf: CNF | None = None  # CNF của lần dò đầu tiên (số liệu RQ1)
     probes: list[dict[str, object]] = []
     t_encode = 0.0
     t_solve = 0.0
@@ -112,6 +113,8 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
 
         t_encode += probe_encode
         t_solve += probe_solve
+        if first_cnf is None and cnf is not None:
+            first_cnf = cnf
 
         value: int | None = None
         if status == "SAT":
@@ -133,7 +136,10 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
                 "k": k,
                 "status": status,
                 "b": value,
+                "t_encode": round(probe_encode, 6),
                 "t_solve": round(probe_solve, 6),
+                "variables": cnf.n_vars if cnf is not None else None,
+                "clauses": len(cnf.clauses) if cnf is not None else None,
             }
         )
 
@@ -189,8 +195,8 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         t_encode=t_encode,
         t_solve=t_solve,
         t_total=t_total,
-        variables=best_cnf.n_vars if best_cnf else None,
-        clauses=len(best_cnf.clauses) if best_cnf else None,
+        variables=first_cnf.n_vars if first_cnf else None,
+        clauses=len(first_cnf.clauses) if first_cnf else None,
         peak_memory=None,  # chưa đo ở W1, xem docs/sat_tooling.md
         solution=best_solution if status in ("OPT", "FEAS") else None,
         metadata=metadata,

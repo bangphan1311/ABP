@@ -76,8 +76,8 @@ Mỗi ngưỡng dựng CNF mới và dùng backend mới; không dùng increment
 UNSAT nào, chỉ xảy ra khi hết giờ) hoặc `lo + 1` (đã chứng minh tối ưu → `OPT`).
 
 Mỗi lần dò được ghi vào `Result.metadata["probes"]`:
-`{"k", "status", "b", "t_solve"}` (`b` = antibandwidth thực tế của nghiệm, `None` khi
-không SAT).
+`{"k", "status", "b", "t_encode", "t_solve", "variables", "clauses"}` (`b` = antibandwidth
+thực tế của nghiệm, `None` khi không SAT).
 
 ## 6. Status, lb, ub, gap
 
@@ -93,8 +93,14 @@ không SAT).
 `hi` luôn là ngưỡng đã **chứng minh UNSAT** (đếm nhãn hoặc solver), nên cận trên hợp lệ là
 `ub = hi - 1`; khi chưa có lần dò UNSAT nào thì `hi = n` và `ub = n - 1` (hệ quả của đếm nhãn).
 Nghiệm chỉ được gán vào `Result.solution` khi status là `OPT` hoặc `FEAS`.
-`variables`/`clauses` là kích thước CNF của ngưỡng tốt nhất (`lo`), khi chưa có nghiệm
-thì là `None`. `peak_memory` chưa đo ở W1 (xem `docs/sat_tooling.md`).
+`variables`/`clauses` là kích thước CNF của **lần dò đầu tiên** (`K = 1`), không phải của
+ngưỡng tốt nhất — đây là quy ước tổng hợp duy nhất cho RQ1, để số liệu kích thước encoding
+có mặt **kể cả khi hết giờ** (`FEAS`/`TO`). Nếu deadline hết trước khi dựng CNF (ví dụ
+`time_limit ≤ 0`) thì không có lần dò nào dựng CNF và hai trường là `None`.
+`metadata["probes"]` giữ kích thước từng lần dò (`variables`, `clauses`, `t_encode`,
+`t_solve`) nên vẫn phân tích được độ phức tạp encoding theo `K`; `metadata["abp_encoding_stats"]`
+là phân bố clause theo nhóm ràng buộc của CNF tốt nhất (`lo`). `peak_memory` chưa đo ở W1
+(xem `docs/sat_tooling.md`).
 
 ## 7. Interface
 
