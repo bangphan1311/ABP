@@ -73,12 +73,14 @@ Mỗi ngưỡng dựng CNF mới và dùng backend mới; không dùng increment
 | Tình huống | `status` | `lb` | `ub` | `gap` |
 |---|---|---|---|---|
 | `lo + 1 == hi` (đã chứng minh tối ưu) | `OPT` | `verify(solution)` | như `lb` | `0.0` |
-| Hết giờ nhưng đã có nghiệm verify | `FEAS` | `verify(solution)` | `hi` | `ub - lb` |
+| Hết giờ nhưng đã có nghiệm verify | `FEAS` | `verify(solution)` | `hi - 1` | `ub - lb` |
 | Hết giờ, chưa có nghiệm nào | `TO` | `None` | `None` | `None` |
 | Lỗi backend/khởi tạo (kể cả lỗi giấy phép) | `ERR` | `None` | `None` | `None` |
 | Nghiệm mâu thuẫn bằng chứng UNSAT/OPT | `ERR` | `None` | `None` | `None` |
 
 `lb` luôn là giá trị `verify()` tính lại từ labeling và đồ thị gốc, không phải `K`.
+`hi` luôn là ngưỡng đã **chứng minh UNSAT** (đếm nhãn hoặc solver), nên cận trên hợp lệ là
+`ub = hi - 1`; khi chưa có lần dò UNSAT nào thì `hi = n` và `ub = n - 1` (hệ quả của đếm nhãn).
 Nghiệm chỉ được gán vào `Result.solution` khi status là `OPT` hoặc `FEAS`.
 `variables`/`clauses` là kích thước CNF của ngưỡng tốt nhất (`lo`), khi chưa có nghiệm
 thì là `None`. `peak_memory` chưa đo ở W1 (xem `docs/sat_tooling.md`).

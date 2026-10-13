@@ -152,8 +152,9 @@ def test_summarise_status_mapping():
     status, lb, ub, gap, value = _summarise(instance, 2, 3, solution, False, False)
     assert (status, lb, ub, gap, value) == ("OPT", 2, 2, 0.0, 2)
 
+    # hi = 4 đã chứng minh UNSAT -> ub = hi - 1 = 3.
     status, lb, ub, gap, value = _summarise(instance, 2, 4, solution, True, False)
-    assert (status, lb, ub, gap, value) == ("FEAS", 2, 4, 2.0, 2)
+    assert (status, lb, ub, gap, value) == ("FEAS", 2, 3, 1.0, 2)
 
 
 def test_unsupported_abp_encoding_raises():

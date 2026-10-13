@@ -241,7 +241,9 @@ def _summarise(
     if lo + 1 == hi:  # đã chứng minh K = lo tối ưu
         return "OPT", value, value, 0.0, value
 
-    return "FEAS", value, hi, float(hi - value), value
+    # ``hi`` là ngưỡng đã chứng minh UNSAT, nên ab_opt <= hi - 1.
+    ub = hi - 1
+    return "FEAS", value, ub, float(ub - value), value
 
 
 def _validate_instance(instance: Instance) -> None:
