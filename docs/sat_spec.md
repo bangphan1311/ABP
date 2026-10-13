@@ -127,7 +127,7 @@ thành nên `t_total` có thể vượt `time_limit` một khoảng nhỏ (`grid
 → `t_total ≈ 1.19 s`); xem `docs/sat_tooling.md` mục 4.
 
 `memory_limit`, `search_mode`, `symmetry`, `warm_start`, `seed` **chưa được cài đặt** ở W1:
-`memory_limit` để `None` nên status `MO` không bao giờ xuất hiện; ba field còn lại thuộc P3.
+`memory_limit` để `None` nên status `MO` không bao giờ xuất hiện; bốn field còn lại thuộc P3.
 Đặt chúng khác giá trị mặc định thì `solve_sat`/`solve_decision` phát `UserWarning` một lần
 (không bỏ qua im lặng).
 
