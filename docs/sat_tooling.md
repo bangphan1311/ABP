@@ -192,3 +192,19 @@ tự bỏ skip.
   `psutil.Process().memory_info().rss` (bắt cả bộ nhớ native của solver) hoặc
   `tracemalloc` (chỉ bộ nhớ Python — **không** thấy bộ nhớ native, nên không đủ). `psutil`
   chưa nằm trong `requirements.txt`; quyết định thêm hay không để P3 chốt ở `PROTOCOL.md`.
+
+## 9. Chạy test (venv Python 3.11 của repo)
+
+Lệnh (đúng như đã chạy, `.venv` của repo là Python `3.11.15`; `docs/ENV.md` ghi `3.11.17`
+cho env conda của P1 — cùng minor, khác patch):
+
+```
+.\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1
+```
+
+Kết quả 2026-10-13: `75 passed, 2 skipped in 2.40s`. Hai test skip là các test cần binary
+Kissat thật (`tests/sat/test_kissat.py`, mục 7.4); phần còn lại của `tests/sat/test_kissat.py`
+(parser, DIMACS, đường lỗi) vẫn chạy.
+
+- `python-sat==1.9.dev15` trên venv này: import được, `pysat.__version__ = '1.9.dev15'`
+  (khớp `requirements.txt`).
