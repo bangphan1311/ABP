@@ -1,6 +1,7 @@
 """Test pipeline `src/sat/solve.py`: khớp oracle, quyết định SAT/UNSAT, status."""
 
 import random
+from time import sleep
 
 import pytest
 
@@ -8,8 +9,7 @@ from src.common.models import Config, Instance
 from src.common.verify import verify
 from src.exact.oracle import solve_oracle
 from src.sat import generator
-from src.sat.solve import solve_decision, solve_sat
-from src.sat.solve import _summarise
+from src.sat.solve import summarise_result, solve_decision, solve_sat
 
 TOY_INSTANCES = (
     generator.path(4),
@@ -152,21 +152,60 @@ def test_time_limited_run_is_feas_or_to_and_consistent():
 
 def test_time_limit_covers_encoding_and_solve():
     # B3: deadline là ngân sách cho cả build_cnf, add_clauses và solve của cả chuỗi K.
-    instance = generator.grid(10, 10)
-    limit = 1.0
+    # Encode của grid(8,8) K=1 (258k clause) đã lớn hơn limit này, nên lần dò đầu
+    # không kịp vào solver.
+    instance = generator.grid(8, 8)
+    limit = 0.05
 
     result = solve_sat(instance, Config(method="sat", time_limit=limit))
 
-    assert result.status in ("FEAS", "TO")
-    # Pha đang chạy khi hết giờ vẫn hoàn thành: cho phép vượt, nhưng không vượt xa.
-    assert result.t_total < 2 * limit + 0.5
+    assert result.status in ("TO", "FEAS")
+    # Pha đang chạy khi hết giờ vẫn hoàn thành -> cho phép vượt, nhưng không vượt xa.
+    assert result.t_total < 2 * limit + 2.0
+
+
+def test_probe_passes_remaining_budget_to_solver_after_loading(monkeypatch):
+    # Kiểm tra tất định: add_clauses tiêu hết ngân sách -> solve nhận số âm và
+    # không chạy (UNKNOWN), dù CNF đã dựng xong.
+    from src.sat import solve as solve_module
+    from src.sat.backend import SatBackend
+
+    budget_seen: list[float | None] = []
+    original_solve = SatBackend.solve
+
+    def slow_add_clauses(self, clauses):
+        list(clauses)
+        sleep(0.2)
+
+    def spy_solve(self, time_limit=None):
+        budget_seen.append(time_limit)
+        return original_solve(self, time_limit=time_limit)
+
+    monkeypatch.setattr(SatBackend, "add_clauses", slow_add_clauses)
+    monkeypatch.setattr(SatBackend, "solve", spy_solve)
+
+    status, solution, cnf, t_encode, t_solve = solve_module._probe(
+        generator.path(4), 2, "pairwise", "cadical195", 0.05
+    )
+
+    assert status == "UNKNOWN"
+    assert solution is None
+    assert cnf is not None, "CNF vẫn phải được giữ lại cho số liệu RQ1"
+    assert len(budget_seen) == 1 and budget_seen[0] < 0
 
 
 def test_solution_never_violates_proven_unsat_threshold():
-    # K = 3 là UNSAT trên path4, nên không được có OPT với lb >= 3.
-    result = solve_sat(generator.path(4))
+    # path4: ab = 2 và K = 3 đã chứng minh UNSAT -> OPT với lb = ub = 2, không hơn.
+    instance = generator.path(4)
 
-    assert result.lb < 3
+    result = solve_sat(instance)
+
+    assert result.status == "OPT"
+    assert (result.lb, result.ub, result.gap) == (2, 2, 0.0)
+    assert verify(instance, result.solution) == 2
+    assert solve_decision(instance, 3) == ("UNSAT", None)
+    assert result.metadata["k_unsat"] == 3
+    assert result.metadata["unsat_source"] == "solver"
 
 
 def test_summarise_status_mapping():
@@ -175,15 +214,21 @@ def test_summarise_status_mapping():
     solution = {0: 2, 1: 4, 2: 1, 3: 3}
     assert verify(instance, solution) == 2
 
-    assert _summarise(instance, 0, 4, None, True, False) == ("TO", None, None, None, None)
-    assert _summarise(instance, 0, 4, None, False, False)[0] == "ERR"
-    assert _summarise(instance, 4, 4, solution, False, True)[0] == "ERR"
+    assert summarise_result(instance, 0, 4, None, True, False) == (
+        "TO",
+        None,
+        None,
+        None,
+        None,
+    )
+    assert summarise_result(instance, 0, 4, None, False, False)[0] == "ERR"
+    assert summarise_result(instance, 4, 4, solution, False, True)[0] == "ERR"
 
-    status, lb, ub, gap, value = _summarise(instance, 2, 3, solution, False, False)
+    status, lb, ub, gap, value = summarise_result(instance, 2, 3, solution, False, False)
     assert (status, lb, ub, gap, value) == ("OPT", 2, 2, 0.0, 2)
 
     # hi = 4 đã chứng minh UNSAT -> ub = hi - 1 = 3.
-    status, lb, ub, gap, value = _summarise(instance, 2, 4, solution, True, False)
+    status, lb, ub, gap, value = summarise_result(instance, 2, 4, solution, True, False)
     assert (status, lb, ub, gap, value) == ("FEAS", 2, 3, 1.0, 2)
 
 

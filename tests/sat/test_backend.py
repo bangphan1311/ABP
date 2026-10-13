@@ -1,7 +1,5 @@
 """Test cho `src/sat/backend.py`: SAT/UNSAT, model, giới hạn thời gian, input biên."""
 
-from time import monotonic
-
 import pytest
 from pysat.examples.genhard import PHP
 
@@ -62,22 +60,28 @@ def test_zero_time_limit_returns_unknown_without_solving():
 # PHP(13 lỗ) không giải được trong 0.3 giây: dùng để kiểm tra timeout thật.
 @pytest.mark.parametrize("solver_name", ["glucose4", "cadical195"])
 def test_time_limit_stops_hard_instance(solver_name):
+    limit = 0.3
     backend = SatBackend(solver_name)
     try:
         backend.add_clauses(PHP(nof_holes=13).clauses)
 
-        start = monotonic()
-        assert backend.solve(time_limit=0.3) == "UNKNOWN"
-        assert monotonic() - start < 3.0
+        assert backend.solve(time_limit=limit) == "UNKNOWN"
+        # Không assert giây tuyệt đối (máy nhanh/chậm khác nhau): thời gian giải
+        # phải bám theo limit đã truyền.
+        assert backend.solve_time < 2 * limit + 1.0
     finally:
         backend.delete()
 
 
-def test_kissat_is_constructible_but_unusable_for_loading():
-    # PySAT 1.9.dev15 (Windows/py3.14): Kissat crash access violation khi nạp
-    # clause -> chỉ khởi tạo được, xem docs/sat_tooling.md mục Kissat.
+def test_pysat_kissat_family_refuses_loading_instead_of_crashing():
+    # PySAT 1.9.dev15 (Windows): nạp clause vào kissat là access violation.
+    # Backend phải chặn bằng BackendError để không giết process.
     with SatBackend("kissat") as backend:
         assert backend.n_vars == 0
+        with pytest.raises(BackendError, match="kissat"):
+            backend.add_clause([1])
+        with pytest.raises(BackendError, match="kissat"):
+            backend.add_clauses([[1, 2]])
 
 
 def test_supported_solvers_are_constructible():

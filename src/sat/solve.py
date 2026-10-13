@@ -142,7 +142,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
 
     t_total = perf_counter() - start
 
-    status, lb, ub, gap, verified = _summarise(
+    status, lb, ub, gap, verified = summarise_result(
         instance, lo, hi, best_solution, timed_out, error is not None
     )
 
@@ -261,7 +261,7 @@ def _probe(
         backend.delete()
 
 
-def _summarise(
+def summarise_result(
     instance: Instance,
     lo: int,
     hi: int,
