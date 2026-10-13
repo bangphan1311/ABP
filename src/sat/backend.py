@@ -47,8 +47,10 @@ BUDGETED_FAMILIES = frozenset(
 # Ngân sách xung đột khởi điểm cho mỗi lần gọi solve_limited; tăng gấp đôi mỗi vòng.
 CONFLICT_BUDGET_START = 1000
 
-# Tên solver gợi ý cho người dùng: tất cả đều dựng được bằng Solver(name=...) trên
-# PySAT 1.9.dev15. Lưu ý 'minisat-gh' phải gọi qua alias 'mgh'.
+# Tên solver gợi ý cho người dùng: tất cả đều dựng được bằng Solver(name=...) và
+# nạp được clause trên PySAT 1.9.dev15. Lưu ý 'minisat-gh' phải gọi qua alias 'mgh'.
+# 'kissat' cố ý KHÔNG có mặt: dựng được nhưng crash process khi nạp clause
+# (xem docs/sat_tooling.md mục 7).
 SUPPORTED_SOLVERS = (
     "cadical103",
     "cadical153",
@@ -66,7 +68,6 @@ SUPPORTED_SOLVERS = (
     "maplechrono",
     "maplecm",
     "mergesat3",
-    "kissat",
 )
 
 
@@ -86,7 +87,11 @@ def solver_family(solver_name: str) -> str:
 
 
 def supported_solvers() -> tuple[str, ...]:
-    """Tên solver gợi ý, tất cả đều giới hạn được thời gian."""
+    """Tên solver gợi ý, tất cả đều nạp được clause và giới hạn được thời gian.
+
+    Không gồm ``kissat``: dựng được nhưng crash process khi nạp clause
+    (xem ``docs/sat_tooling.md`` mục 7).
+    """
     return SUPPORTED_SOLVERS
 
 

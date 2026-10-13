@@ -110,8 +110,9 @@ python -c "from pysat.solvers import Solver; s = Solver(name='kissat', bootstrap
 
   Kết quả: không in gì, process thoát với `-1073741819`. `add_clause` tăng dần crash tương
   tự; chỉ `Solver(name='kissat')` rồi `delete()` là an toàn.
-- Vì vậy `docs/sat_spec.md` và `SatBackend` dùng CaDiCaL. `kissat` vẫn nằm trong
-  `SUPPORTED_SOLVERS` ở mức *dựng được* để P3 biết đã thử, nhưng đường khuyến nghị là CaDiCaL.
+- Vì vậy `docs/sat_spec.md` và `SatBackend` dùng CaDiCaL. `kissat` **không** nằm trong
+  `supported_solvers()` (API công khai) vì P3 lặp qua danh sách đó sẽ mất process; chỉ
+  `Solver(name='kissat')` rồi `delete()` là an toàn, không phải đường dùng được.
 - Cách khác nếu W2 cần Kissat: gọi binary `kissat` bên ngoài (DIMACS vào/ra), đo thời gian
   bằng subprocess — **chưa làm ở W1**.
 
