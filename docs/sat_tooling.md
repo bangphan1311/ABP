@@ -119,8 +119,10 @@ python -c "from pysat.solvers import Solver; s = Solver(name='kissat', bootstrap
 
 - `t_encode`: `perf_counter()` bọc `build_cnf(...)` trong `src/sat/solve.py::_probe`, cộng dồn
   qua các ngưỡng K, trả ở `Result.t_encode`. `t_solve` đo tương tự quanh `backend.solve(...)`;
-  `t_total` bao cả hai cộng overhead của vòng lặp tìm K. Ghi chú: `t_encode` của PySAT
-  (`CardEnc`) nằm trong `t_encode`, còn thời gian nạp clause vào solver nằm trong `t_solve`.
+  `t_total` bao cả hai cộng phần còn lại (nạp clause vào solver, vòng lặp tìm K).
+  `t_encode` của PySAT (`CardEnc`) nằm trong `t_encode`; thời gian `add_clauses` hiện **không**
+  nằm trong `t_encode` lẫn `t_solve`, chỉ có trong `t_total` — cần tách riêng ở W2 nếu muốn
+  so sánh chi phí encode.
 - Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "t_solve"}, ...]`.
 - `peak_memory`: **chưa đo ở W1**, để `None`. Cách đo đề xuất cho chạy chính thức:
   `psutil.Process().memory_info().rss` (bắt cả bộ nhớ native của solver) hoặc
