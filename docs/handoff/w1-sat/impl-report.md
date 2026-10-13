@@ -123,3 +123,41 @@ OK: solve_sat matches solve_oracle on all 4 toy instances
    tay. Chưa có model counting / kiểm chứng độc lập ở n=8..12 (đề xuất W2).
 5. **`Config.method`** hiện chỉ là nhãn; chưa có runner phân nhánh theo method (P3 sở hữu).
 6. **Kissat** chỉ dùng được nếu gọi binary ngoài; PySAT 1.9.dev15 wheel này không dùng được.
+
+## QA fixes (theo `docs/handoff/w1-sat/test-report.md`)
+
+Owner: P2. Branch `p2/w1-sat`, 4 commit riêng, chưa push/PR.
+
+| WARN | Commit | Nội dung |
+|---|---|---|
+| WARN-2 (trust boundary) | `b56a3c4` `fix(sat): raise ValueError on invalid edge endpoints` | `_validate_instance` kiểm mọi đầu mút cạnh phải là `int` trong `0..n-1`; trước đây instance dựng tay làm `build_cnf` ném `KeyError` |
+| WARN-4 (Kissat) | `b21286f` `fix(sat): drop kissat from supported solvers` | `kissat` ra khỏi `SUPPORTED_SOLVERS`/`supported_solvers()` (crash process khi nạp clause); kết luận "chưa hỗ trợ" giữ ở `docs/sat_tooling.md` mục 7 |
+| WARN-1 (time_limit) | `10a09d0` `docs(sat): state time_limit scope` | Ghi rõ `time_limit` chỉ chặn phần solve; encode + nạp clause không tính vào deadline, vượt đo được tới ~20 lần — trong `docs/sat_tooling.md` mục 4, `docs/sat_spec.md` mục 7, docstring `solve_sat`. **Không** thêm deadline logic mới |
+| WARN-3 (field bị bỏ qua) | `67739ab` `fix(sat): warn on ignored config fields` | `memory_limit`/`search_mode`/`symmetry`/`warm_start`/`seed` khác mặc định → một `UserWarning` từ `solve_sat`/`solve_decision`; ghi chú ở `docs/sat_spec.md` mục 7 |
+
+Test mới: 4 ca `test_invalid_edge_endpoint_raises_value_error` (ngoài khoảng, âm, không phải
+`int`, `bool`) + `test_ignored_config_fields_emit_one_warning` +
+`test_default_config_fields_emit_no_warning` (`tests/sat/test_solve.py`).
+
+Đếm test (Python 3.14.6, PySAT 1.9.dev15, `.venv`):
+
+```
+$ .\.venv\Scripts\python.exe -m pytest tests/sat -q
+52 passed in 1.38s          # trước QA: 46
+
+$ .\.venv\Scripts\python.exe -m pytest tests -q
+64 passed in 1.83s          # trước QA: 58
+```
+
+Kiểm chứng WARN-2 bằng tay (trước đây `KeyError`):
+
+```
+ValueError: Cạnh (0, 9) chứa đỉnh ngoài khoảng 0..3.
+ValueError: Đỉnh trong cạnh (0, 1) phải là số nguyên: '1'.
+ValueError: Cạnh (-1, 1) chứa đỉnh ngoài khoảng 0..3.
+```
+
+Không đụng `src/common/`, `src/exact/`, `docs/ENV.md` (`git diff main --name-only` giữ nguyên
+13 file như trên). Các NOTE của QA (đặc biệt NOTE 2 mất số đo khi `ERR`, NOTE 4 comment test
+`K = n`, NOTE 5 phạm vi lỗi Kissat, NOTE 7 `pyproject.toml`/`.python-version` untracked)
+**chưa** xử lý — ngoài phạm vi 4 WARN này.
