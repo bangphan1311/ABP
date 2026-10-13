@@ -50,23 +50,34 @@ tổng 74 clause (khớp `tests/sat/test_pairwise.py`).
 
 ## 5. Chiến lược duyệt K
 
-Tìm kiếm nhị phân trên `[1, n]` dùng tính đơn điệu (SAT tại `K` ⇒ SAT tại mọi `K' ≤ K`):
+Theo `WORK BREAKDOWN.md` §5 và `Quang.md` §2.1, §3.3: duyệt K tăng dần từ cận dưới
+(`K ← B + 1`), dừng ở lần UNSAT đầu tiên. Không dùng tìm kiếm nhị phân (các ngưỡng cao
+là UNSAT khó nhất).
 
 ```
-lo = 0            # ngưỡng lớn nhất đã có nghiệm verify được
-hi = n            # ngưỡng đã biết UNSAT (chặn trên bằng đếm nhãn)
+lo = 0            # B tốt nhất đã verify (0 = chưa có nghiệm)
+hi = n            # ngưỡng đã biết UNSAT (đếm nhãn: lệch tối đa n - 1)
 while lo + 1 < hi:
-    mid = (lo + hi) // 2
-    giải bài toán quyết định tại mid
-    SAT   -> lo = mid, lưu nghiệm
-    UNSAT -> hi = mid
-    UNKNOWN (hết giờ) -> dừng
+    K = lo + 1    # cận dưới: ngưỡng nhỏ nhất chưa bị bác
+    giải bài toán quyết định tại K
+    SAT     -> decode, verify, B = antibandwidth thực tế; lo = B  (K kế tiếp = B + 1)
+    UNSAT   -> hi = K; B = K - 1 là tối ưu, dừng
+    UNKNOWN (hết giờ) -> dừng, trả FEAS/TO
 ```
+
+`K ← B + 1` (không phải `K ← K + 1`): model SAT tại `K` có thể đạt `B > K`, nên bước
+nhảy tới `B + 1` không bỏ sót ngưỡng nào. Nếu `verify()` cho `B < K` thì model không
+thỏa ràng buộc → `ERR` (mâu thuẫn encoding), không lặp vô hạn.
 
 Mỗi ngưỡng dựng CNF mới và dùng backend mới; không dùng incremental/assumption ở W1.
 `hi = n` ban đầu là UNSAT theo lập luận đếm nhãn (`metadata["unsat_source"] =
 "counting:lệch nhãn tối đa n-1"`), các lần `hi` về sau là bằng chứng solver
-(`"solver"`).
+(`"solver"`). Vì dừng ở UNSAT đầu tiên, `hi` chỉ nhận hai giá trị: `n` (chưa có lần dò
+UNSAT nào, chỉ xảy ra khi hết giờ) hoặc `lo + 1` (đã chứng minh tối ưu → `OPT`).
+
+Mỗi lần dò được ghi vào `Result.metadata["probes"]`:
+`{"k", "status", "b", "t_solve"}` (`b` = antibandwidth thực tế của nghiệm, `None` khi
+không SAT).
 
 ## 6. Status, lb, ub, gap
 

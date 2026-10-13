@@ -1,8 +1,9 @@
 """Pipeline SAT cho ABP: ``Instance + K → CNF → CaDiCaL → decode → verify() → Result``.
 
-Chiến lược ngưỡng: tìm K lớn nhất mà bài toán quyết định là SAT, bằng tìm kiếm
-nhị phân trên ``[1, n]`` (``K = n`` đã biết UNSAT vì lệch nhãn tối đa là ``n - 1``).
-Mọi nghiệm đều qua ``verify()`` trước khi vào ``Result``.
+Chiến lược ngưỡng (WORK BREAKDOWN §5): tìm K lớn nhất mà bài toán quyết định là SAT.
+Bắt đầu từ cận dưới ``K = lo + 1`` (``lo`` = nghiệm tốt nhất đã verify, khởi đầu 0); mỗi
+lần SAT thì decode, verify, lấy antibandwidth thực tế ``B`` rồi đặt ``K ← B + 1``; gặp
+UNSAT thì ``K - 1 = B`` là tối ưu. Mọi nghiệm đều qua ``verify()`` trước khi vào ``Result``.
 """
 
 from __future__ import annotations
@@ -60,6 +61,9 @@ def _warn_ignored_config(cfg: Config) -> None:
 def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     """Giải ABP bằng SAT; trả ``Result`` theo CONTRACT.md.
 
+    Tìm K theo WORK BREAKDOWN §5 / Quang.md §3.3: ``K ← B + 1`` từ cận dưới, dừng ở
+    lần UNSAT đầu tiên (ngưỡng đó chứng minh ``B`` tối ưu).
+
     ``Config.time_limit`` chỉ chặn phần **giải** của solver: thời gian encode CNF
     (``build_cnf``) và nạp clause (``add_clauses``) không tính vào deadline, nên
     ``t_total`` có thể vượt ``time_limit`` — đo được tới ~20 lần khi ``time_limit``
@@ -93,12 +97,12 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     timed_out = False
 
     while lo + 1 < hi:
-        mid = (lo + hi) // 2
+        k = lo + 1  # cận dưới: ngưỡng nhỏ nhất chưa bị bác
         remaining = None if deadline is None else deadline - perf_counter()
 
         try:
             status, solution, cnf, probe_encode, probe_solve = _probe(
-                instance, mid, amo_encoding, solver_name, remaining
+                instance, k, amo_encoding, solver_name, remaining
             )
         except BackendError as exc:  # lỗi backend/giấy phép -> ERR
             error = str(exc)
@@ -106,16 +110,32 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
 
         t_encode += probe_encode
         t_solve += probe_solve
-        probes.append(
-            {"k": mid, "status": status, "t_solve": round(probe_solve, 6)}
-        )
 
+        value: int | None = None
         if status == "SAT":
-            lo, best_solution, best_cnf = mid, solution, cnf
+            value = verify(instance, solution)  # B thực tế, có thể > K
+            if value < k:  # model SAT không thỏa ngưỡng -> lỗi encoding
+                error = (
+                    f"Nghiệm tại K={k} chỉ đạt {value} < K: mâu thuẫn encoding."
+                )
+                break
+            lo, best_solution, best_cnf = value, solution, cnf
         elif status == "UNSAT":
-            hi, unsat_source = mid, "solver"
+            # Ngưỡng K = lo + 1 đã bị bác -> B = lo là tối ưu.
+            hi, unsat_source = k, "solver"
         else:
             timed_out = True
+
+        probes.append(
+            {
+                "k": k,
+                "status": status,
+                "b": value,
+                "t_solve": round(probe_solve, 6),
+            }
+        )
+
+        if timed_out:
             break
 
     t_total = perf_counter() - start
@@ -124,7 +144,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         instance, lo, hi, best_solution, timed_out, error is not None
     )
 
-    # Nghiệm phải khớp bằng chứng của tìm kiếm nhị phân, nếu không là lỗi encoding.
+    # Nghiệm phải khớp bằng chứng của vòng dò K, nếu không là lỗi encoding.
     if status == "OPT" and verified != lo:
         error = (
             f"Nghiệm có giá trị {verified} khác ngưỡng {lo} đã chứng minh tối ưu: "
@@ -151,7 +171,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         "amo_encoding": amo_encoding,
         "sat_solver": solver_name,
         "probes": probes,
-        "k_best": lo or None,
+        "k_best": lo or None,  # B tốt nhất đã verify (= ngưỡng chứng minh được)
         "k_unsat": hi,
         "unsat_source": unsat_source,
         "abp_encoding_stats": dict(best_cnf.stats) if best_cnf else None,

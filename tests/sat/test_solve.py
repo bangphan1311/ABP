@@ -42,8 +42,26 @@ def test_sat_reports_verified_value_and_encoding_size():
     assert result.clauses == 74  # encoding của ngưỡng tốt nhất
     assert result.metadata["k_best"] == 2
     assert result.metadata["abp_encoding_stats"]["distance"] == 18
-    assert [probe["k"] for probe in result.metadata["probes"]] == [2, 3]
+    assert [probe["k"] for probe in result.metadata["probes"]] == [1, 2, 3]
     assert result.t_total > 0.0
+
+
+def test_k_search_increases_from_lower_bound_and_stops_at_first_unsat():
+    # Quang.md §3.3: K ← B + 1 từ cận dưới; UNSAT đầu tiên chốt B tối ưu.
+    instance = generator.path(6)
+
+    result = solve_sat(instance)
+
+    probes = result.metadata["probes"]
+    assert probes[0]["k"] == 1
+    assert all(probe["status"] == "SAT" for probe in probes[:-1])
+    assert probes[-1]["status"] == "UNSAT"  # dừng ngay ở UNSAT đầu tiên
+
+    for previous, current in zip(probes, probes[1:]):
+        assert current["k"] == previous["b"] + 1, "K kế tiếp phải là B + 1"
+
+    assert result.status == "OPT"
+    assert result.lb == result.ub == probes[-1]["k"] - 1
 
 
 def test_decision_problem_at_k():
