@@ -38,21 +38,13 @@ INTERRUPTIBLE_FAMILIES = frozenset(
 
 # Family chỉ có conf_budget() (CaDiCaL): interrupt() ném NotImplementedError.
 # Timeout thực hiện bằng vòng lặp ngân sách xung đột tăng dần (xem docs/sat_tooling.md).
-# Kissat không nằm ở đây: family kissat404 của PySAT crash khi nạp clause (xem
-# docs/sat_tooling.md mục 7). Kissat đã bị bỏ khỏi phạm vi.
 BUDGETED_FAMILIES = frozenset({"cadical103", "cadical153", "cadical195", "cadical300"})
-
-# Family Kissat trong PySAT 1.9.dev15: access violation khi nạp clause (giết process).
-# Chặn ngay trong add_clause thay vì để native crash.
-PYSAT_KISSAT_FAMILIES = frozenset({"kissat404"})
 
 # Ngân sách xung đột khởi điểm cho mỗi lần gọi solve_limited; tăng gấp đôi mỗi vòng.
 CONFLICT_BUDGET_START = 1000
 
 # Tên solver gợi ý cho người dùng: tất cả đều dựng được bằng Solver(name=...) và
 # nạp được clause trên PySAT 1.9.dev15. Lưu ý 'minisat-gh' phải gọi qua alias 'mgh'.
-# 'kissat' cố ý KHÔNG có mặt: family kissat404 của PySAT crash process khi nạp clause
-# (xem docs/sat_tooling.md mục 7).
 SUPPORTED_SOLVERS = (
     "cadical103",
     "cadical153",
@@ -123,6 +115,13 @@ class SatBackend:
         self.solver_name = (solver_name or DEFAULT_SOLVER).lower()
         self.family = solver_family(self.solver_name)
 
+        # Chặn từ lúc khởi tạo: family Kissat của PySAT giết process khi nạp clause.
+        if self.family in PYSAT_KISSAT_FAMILIES:
+            raise BackendError(
+                f"PySAT family '{self.family}' crash process khi nạp clause; "
+                "Kissat chưa được hỗ trợ ở W1 (xem docs/sat_tooling.md mục 7)."
+            )
+
         try:
             self._solver = Solver(name=self.solver_name, use_timer=use_timer)
         except Exception as exc:  # tên sai, build native hỏng hoặc lỗi giấy phép -> ERR
@@ -160,15 +159,7 @@ class SatBackend:
     def add_clause(self, clause: Sequence[int]) -> None:
         """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên.
 
-        Family Kissat của PySAT bị chặn ở đây thay vì để process bị giết
-        (access violation).
         """
-        if self.family in PYSAT_KISSAT_FAMILIES:
-            raise BackendError(
-                f"PySAT family '{self.family}' crash process khi nạp clause; "
-                "Kissat chưa được hỗ trợ ở W1 (xem docs/sat_tooling.md mục 7)."
-            )
-
         self._solver.add_clause(validate_clause(clause))
         self._n_clauses += 1
 
