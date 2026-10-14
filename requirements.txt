@@ -2,4 +2,5 @@
 gurobipy==13.0.3
 cplex==22.2.0.1
 docplex==2.32.264
+python-sat==1.9.dev15
 pytest==9.1.1
