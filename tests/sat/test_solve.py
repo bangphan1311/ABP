@@ -49,7 +49,6 @@ def test_sat_reports_verified_value_and_encoding_size():
     # (xem docs/sat_spec.md mục 6).
     assert result.variables == probes[-1]["variables"] == 16
     assert result.clauses == probes[-1]["clauses"] == 86
-    assert result.metadata["t_io"] == 0.0  # PySAT nạp clause ở add_clauses, không có I/O
     assert result.t_total > 0.0
 
 
@@ -228,7 +227,7 @@ def test_probe_passes_remaining_budget_to_solver_after_loading(monkeypatch):
     monkeypatch.setattr(SatBackend, "add_clauses", slow_add_clauses)
     monkeypatch.setattr(SatBackend, "solve", spy_solve)
 
-    status, solution, cnf, t_encode, t_solve, t_io = solve_module._probe(
+    status, solution, cnf, t_encode, t_solve = solve_module._probe(
         generator.path(4), 2, "pairwise", "cadical195", 0.05
     )
 

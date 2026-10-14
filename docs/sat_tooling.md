@@ -10,7 +10,7 @@ Mỗi mục dưới đây có kết luận hoặc ghi rõ **"chưa hỗ trợ"**
   `1.9.dev15` và **không có bản stable nào** (không có release khác ngoài `dev`), nên giữ
   pin bản dev; đổi sang stable khi PySAT phát hành.
 - PySAT là bản Python ship sẵn nhiều solver native; không cần cài solver ngoài cho W1
-  (Kissat là ngoại lệ, xem mục 7).
+  (Kissat đã bỏ khỏi phạm vi, xem mục 7).
 - `pysat.solvers.Solver(name=...)` chọn solver. Tên hợp lệ và alias nằm trong
   `pysat.solvers.SolverNames` (ví dụ `glucose4 = ('g4', 'g41', 'glucose4', 'glucose41')`).
 - Solver dựng được trong wheel này (đã thử `Solver(name=...)` rồi `delete()`):
@@ -24,7 +24,7 @@ Mỗi mục dưới đây có kết luận hoặc ghi rõ **"chưa hỗ trợ"**
   family. Nếu PySAT đổi tên, family lạ sẽ không nằm trong hai danh sách timeout → `BackendError`
   khi có `time_limit`, không im lặng trả kết quả sai.
 - Mặc định của backend: `cadical195` (`SatBackend.DEFAULT_SOLVER`), đổi qua
-  `Config.sat_solver`. `sat_solver="kissat"` đi qua binary ngoài (mục 7).
+  `Config.sat_solver`. `sat_solver="kissat"` trả `ERR` với thông báo chưa hỗ trợ (mục 7).
 
 ## 2. Interface backend
 
@@ -47,8 +47,7 @@ phải số clause thêm tăng dần (trả `0` sau `add_clause`). `n_clauses` v
 `Solver.nof_vars()` cập nhật đúng theo biến lớn nhất đã thấy.
 
 `validate_clause(clause)` là hàm dùng chung kiểm tra clause (rỗng, literal `0`, không phải
-`int`) cho mọi backend. `src/sat/kissat.py::KissatBackend` cài lại **cùng interface** đó cho
-binary Kissat ngoài (mục 7), nên `src/sat/solve.py` không cần biết đang dùng backend nào.
+`int`) cho backend.
 
 ## 3. Lấy model
 
@@ -119,8 +118,14 @@ Số clause cho `m = 3` literal (đo thực tế):
 
 ## 7. Kissat
 
-**Trạng thái: đã có adapter gọi binary ngoài; máy dev hiện không có binary Kissat nên
-vẫn "chưa hỗ trợ" để chạy thật** — không giả lập hành vi.
+**Quyết định: BỎ KISSAT khỏi phạm vi W1/W2 (tạm thời, không phải Core).** Lý do: không có
+binary Windows chính thức, không có toolchain build trên máy dev, và PySAT giết process
+khi nạp clause. RQ2 chỉ so CaDiCaL và Glucose; xem `docs/sat_spec.md` mục 9 (hạn chế).
+Adapter binary ngoài (`src/sat/kissat.py`) và test của nó đã xóa khỏi PR. Các mục 7.1–7.4
+dưới đây là ghi nhận điều tra, không còn là đường chạy.
+
+Điều kiện mở lại: có binary Kissat chạy được trên máy chạy chính thức, và nhóm thống nhất
+đưa lại vào RQ2 trước M2 (giữa W4). Lúc đó phải thêm lại adapter và test.
 
 ### 7.1 Vì sao không dùng Kissat của PySAT
 
@@ -187,17 +192,10 @@ tự bỏ skip.
 - `t_solve`: `perf_counter()` bọc `backend.solve(...)` trong `_probe` (thời gian **do pipeline
   đo**, gồm cả chi phí gọi). Chính xác gồm những gì **khác nhau theo backend**:
   - PySAT (`SatBackend`): thân `SatBackend.solve` — lời gọi solver, và với CaDiCaL là cả vòng
-    lặp `conf_budget` (mục 3). Không có I/O; backend để `io_time = 0.0`.
-  - Kissat (`KissatBackend`): cả `subprocess.run` = **khởi động process + giải**. Thời gian
-    dựng/ghi file DIMACS đã tách sang `io_time` (`metadata["t_io"]`, mục 7.2), nhưng khởi động
-    process **không** tách được khỏi phần giải, nên **không** đo cùng đại lượng với PySAT:
-    RQ2 chỉ so trạng thái và số ca `OPT`, không so trực tiếp `t_solve`
-    (`docs/sat_spec.md` mục 9).
+    lặp `conf_budget` (mục 3). Không có I/O.
 - Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "b", "t_encode",
-  "t_solve", "t_io", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là
-  của lần dò **cuối cùng** (`docs/sat_spec.md` mục 6). `metadata["t_io"]` là tổng thời gian
-  I/O ngoài `solve`: `KissatBackend` ghi file DIMACS (không tính vào `t_solve`, xem mục 7),
-  PySAT để `0.0` vì nạp clause nằm ở `add_clauses`.
+  "t_solve", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là
+  của lần dò **cuối cùng** (`docs/sat_spec.md` mục 6).
 - `peak_memory`: **chưa đo ở W1**, để `None`. Cách đo đề xuất cho chạy chính thức:
   `psutil.Process().memory_info().rss` (bắt cả bộ nhớ native của solver) hoặc
   `tracemalloc` (chỉ bộ nhớ Python — **không** thấy bộ nhớ native, nên không đủ). `psutil`
@@ -213,8 +211,7 @@ cho env conda của P1 — cùng minor, khác patch):
 ```
 
 Kết quả 2026-10-14 (review lần 2 — đã thêm test R1/R2): `80 passed, 2 skipped in 5.08s`.
-Hai test skip là các test cần binary Kissat thật (`tests/sat/test_kissat.py`, mục 7.4); phần
-còn lại của `tests/sat/test_kissat.py` (parser, DIMACS, đường lỗi, binary giả) vẫn chạy.
+Sau khi bỏ Kissat (mục 7): `72 passed` (2026-10-14, `tests/sat/test_kissat.py` đã xóa).
 
 - `python-sat==1.9.dev15` trên venv này: import được, `pysat.__version__ = '1.9.dev15'`
   (khớp `requirements.txt`).

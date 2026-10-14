@@ -38,8 +38,8 @@ INTERRUPTIBLE_FAMILIES = frozenset(
 
 # Family chỉ có conf_budget() (CaDiCaL): interrupt() ném NotImplementedError.
 # Timeout thực hiện bằng vòng lặp ngân sách xung đột tăng dần (xem docs/sat_tooling.md).
-# Kissat KHÔNG nằm ở đây: family kissat404 của PySAT crash khi nạp clause, đi qua
-# binary ngoài ở src/sat/kissat.py (xem docs/sat_tooling.md mục 7).
+# Kissat không nằm ở đây: family kissat404 của PySAT crash khi nạp clause (xem
+# docs/sat_tooling.md mục 7). Kissat đã bị bỏ khỏi phạm vi.
 BUDGETED_FAMILIES = frozenset({"cadical103", "cadical153", "cadical195", "cadical300"})
 
 # Family Kissat trong PySAT 1.9.dev15: access violation khi nạp clause (giết process).
@@ -52,7 +52,7 @@ CONFLICT_BUDGET_START = 1000
 # Tên solver gợi ý cho người dùng: tất cả đều dựng được bằng Solver(name=...) và
 # nạp được clause trên PySAT 1.9.dev15. Lưu ý 'minisat-gh' phải gọi qua alias 'mgh'.
 # 'kissat' cố ý KHÔNG có mặt: family kissat404 của PySAT crash process khi nạp clause
-# (xem docs/sat_tooling.md mục 7); dùng binary ngoài qua src/sat/kissat.py.
+# (xem docs/sat_tooling.md mục 7).
 SUPPORTED_SOLVERS = (
     "cadical103",
     "cadical153",
@@ -110,9 +110,8 @@ def solver_family(solver_name: str) -> str:
 def supported_solvers() -> tuple[str, ...]:
     """Tên solver gợi ý, tất cả đều nạp được clause và giới hạn được thời gian.
 
-    Không gồm ``kissat``: family của PySAT crash process khi nạp clause. Kissat đi qua
-    binary ngoài (``src/sat/kissat.py``) với ``Config(sat_solver='kissat')`` — xem
-    ``docs/sat_tooling.md`` mục 7.
+    Không gồm ``kissat``: family của PySAT crash process khi nạp clause (xem
+    ``docs/sat_tooling.md`` mục 7).
     """
     return SUPPORTED_SOLVERS
 
@@ -149,11 +148,6 @@ class SatBackend:
         return self._solve_time
 
     @property
-    def io_time(self) -> float:
-        """Thời gian I/O ngoài ``solve``; PySAT nạp clause ở ``add_clauses`` nên là ``0.0``."""
-        return 0.0
-
-    @property
     def n_vars(self) -> int:
         return self._solver.nof_vars()
 
@@ -166,14 +160,13 @@ class SatBackend:
     def add_clause(self, clause: Sequence[int]) -> None:
         """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên.
 
-        Family Kissat của PySAT bị chặn ở đây: nạp clause vào nó giết process
-        (access violation) thay vì báo lỗi.
+        Family Kissat của PySAT bị chặn ở đây thay vì để process bị giết
+        (access violation).
         """
         if self.family in PYSAT_KISSAT_FAMILIES:
             raise BackendError(
                 f"PySAT family '{self.family}' crash process khi nạp clause; "
-                "dùng binary ngoài: Config(sat_solver='kissat') "
-                "(xem docs/sat_tooling.md mục 7)."
+                "Kissat chưa được hỗ trợ ở W1 (xem docs/sat_tooling.md mục 7)."
             )
 
         self._solver.add_clause(validate_clause(clause))

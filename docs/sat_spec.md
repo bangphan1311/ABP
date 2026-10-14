@@ -76,7 +76,7 @@ Mỗi ngưỡng dựng CNF mới và dùng backend mới; không dùng increment
 UNSAT nào, chỉ xảy ra khi hết giờ) hoặc `lo + 1` (đã chứng minh tối ưu → `OPT`).
 
 Mỗi lần dò được ghi vào `Result.metadata["probes"]`:
-`{"k", "status", "b", "t_encode", "t_solve", "t_io", "variables", "clauses"}` (`b` = antibandwidth
+`{"k", "status", "b", "t_encode", "t_solve", "variables", "clauses"}` (`b` = antibandwidth
 thực tế của nghiệm, `None` khi không SAT).
 
 ## 6. Status, lb, ub, gap
@@ -104,9 +104,9 @@ K lớn nhất đã thử. Quy ước này giữ số liệu kích thước có 
 nào có CNF và hai trường là `None`.
 
 `metadata["probes"]` giữ số liệu **từng** lần dò (`variables`, `clauses`, `t_encode`,
-`t_solve`, `t_io`) nên vẫn phân tích được độ phức tạp encoding theo `K`;
-`metadata["abp_encoding_stats"]` là phân bố clause theo nhóm ràng buộc của CNF tốt nhất (`lo`);
-`metadata["t_io"]` là tổng thời gian I/O ngoài solver (mục 9). `peak_memory` chưa đo ở W1
+`t_solve`) nên vẫn phân tích được độ phức tạp encoding theo `K`;
+`metadata["abp_encoding_stats"]` là phân bố clause theo nhóm ràng buộc của CNF tốt nhất (`lo`).
+`peak_memory` chưa đo ở W1
 (xem `docs/sat_tooling.md`).
 
 ## 7. Interface
@@ -124,8 +124,8 @@ status, labeling = solve_decision(instance, k=5, config=cfg)  # ("SAT"|"UNSAT"|"
 `amo_encoding` (mặc định `"pairwise"`), `sat_solver` (mặc định `"cadical195"`),
 `time_limit` (giây, `None` = không giới hạn). `method` chỉ mang tính nhãn ở W1.
 
-`sat_solver="kissat"` chạy binary Kissat **ngoài** process (file DIMACS + subprocess), không
-qua PySAT; thiếu binary → `ERR` với thông báo rõ, không crash. Xem `docs/sat_tooling.md` mục 7.
+`sat_solver="kissat"` **chưa được hỗ trợ** ở W1/W2: trả `ERR` với thông báo rõ, không crash.
+Xem `docs/sat_tooling.md` mục 7.
 
 **Phạm vi `time_limit`**: ngân sách cho **cả chuỗi K**, gồm encode CNF (`build_cnf`), nạp
 clause (`add_clauses`) và giải (`solve`) của mọi lần dò. Deadline được kiểm tra trước mỗi
@@ -164,12 +164,9 @@ Quy ước số liệu cho phần thực nghiệm, để RQ1 và RQ2 đo đúng 
 - **RQ1 (kích thước encoding)**: `Result.variables`/`clauses` là kích thước CNF của lần dò
   **cuối cùng** (mục 6) — tức K cuối đã thử, nơi có mệnh đề khoảng cách; per-K ở
   `metadata["probes"]`. Hai encoding (`pairwise`, `order`) phải so trên cùng một dãy K.
-- **RQ2 (so solver)**: `t_solve` của Kissat **không** đo cùng đại lượng với `t_solve` của
-  PySAT, nên RQ2 **không** so sánh trực tiếp `t_solve` với Kissat: chỉ so trạng thái
-  (`OPT`/`FEAS`/`TO`/`ERR`) và số ca `OPT`. Lý do: Kissat chạy qua binary ngoài nên
-  `t_solve` còn bao khởi động process, mà `subprocess` không tách được khởi động khỏi phần
-  giải; thời gian ghi file DIMACS thì đã tách riêng ở `metadata["t_io"]` (không tính vào
-  `t_solve`). Chi tiết cách đo: `docs/sat_tooling.md` mục 7.
+- **RQ2 (so solver)**: chỉ so **CaDiCaL và Glucose**, cùng cách đo `t_solve` (PySAT). Kissat
+  đã bỏ khỏi phạm vi (`docs/sat_tooling.md` mục 7): đây là **hạn chế** của RQ2 và phải nêu
+  trong bài viết. Không có cơ sở để so sánh thời gian với một solver không chạy được.
 - **Ngân sách**: `time_limit` là ngân sách cho cả chuỗi K, gồm encode và mọi lần gọi solver
   (mục 5, mục 7).
 - **Bộ nhớ**: `peak_memory = None` ở W1 (`docs/sat_tooling.md` mục 8).
