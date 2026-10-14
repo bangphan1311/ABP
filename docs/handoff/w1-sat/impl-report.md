@@ -122,7 +122,8 @@ OK: solve_sat matches solve_oracle on all 4 toy instances
 4. **Chất lượng encoding** chỉ được kiểm chứng trên graph nhỏ (n ≤ 7 vs oracle) và đếm clause
    tay. Chưa có model counting / kiểm chứng độc lập ở n=8..12 (đề xuất W2).
 5. **`Config.method`** hiện chỉ là nhãn; chưa có runner phân nhánh theo method (P3 sở hữu).
-6. **Kissat** chỉ dùng được nếu gọi binary ngoài; PySAT 1.9.dev15 wheel này không dùng được.
+6. **Kissat** gác sang W2: PySAT 1.9.dev15 wheel này crash khi nạp clause, máy dev không có
+   binary/toolchain; `Config(sat_solver="kissat")` ném `ValueError` (chi tiết `docs/sat_tooling.md` mục 7).
 
 ## QA fixes (theo `docs/handoff/w1-sat/test-report.md`)
 
@@ -149,15 +150,16 @@ $ .\.venv\Scripts\python.exe -m pytest tests -q
 64 passed in 1.83s          # trước QA: 58
 ```
 
-Đếm lại sau review PR #3 (lần 2) — head `20f8b25`, `.venv` Python `3.11.15`, PySAT `1.9.dev15`:
+Đếm lại sau khi bỏ Kissat (branch `p2/w1-sat`, `.venv` Python `3.11.15`, PySAT `1.9.dev15`):
 
 ```
 $ .\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1
-80 passed, 2 skipped in 5.09s
+72 passed in 3.06s
 ```
 
-Đây là **số đúng** (2 skip = test cần binary Kissat thật). Các số `64`/`58` và `75 passed,
-2 skipped in 2.40s` ghi ở các báo cáo trước là ảnh chụp cũ, thiếu test thêm sau đó.
+Số `80 passed, 2 skipped` ở bản trước còn adapter/test Kissat (2 skip = test cần binary
+Kissat thật). Các số `64`/`58` và `75 passed, 2 skipped in 2.40s` ghi ở các báo cáo trước là
+ảnh chụp cũ.
 
 Kiểm chứng WARN-2 bằng tay (trước đây `KeyError`):
 

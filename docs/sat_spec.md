@@ -124,7 +124,8 @@ status, labeling = solve_decision(instance, k=5, config=cfg)  # ("SAT"|"UNSAT"|"
 `amo_encoding` (mặc định `"pairwise"`), `sat_solver` (mặc định `"cadical195"`),
 `time_limit` (giây, `None` = không giới hạn). `method` chỉ mang tính nhãn ở W1.
 
-`sat_solver="kissat"` **chưa được hỗ trợ** ở W1/W2: trả `ERR` với thông báo rõ, không crash.
+`sat_solver="kissat"` **chưa được hỗ trợ** ở W1; gác sang W2: `solve_sat`/`solve_decision`
+ném `ValueError` (`"kissat chưa hỗ trợ ở W1; gác sang W2."`) trước khi dựng backend.
 Xem `docs/sat_tooling.md` mục 7.
 
 **Phạm vi `time_limit`**: ngân sách cho **cả chuỗi K**, gồm encode CNF (`build_cnf`), nạp
@@ -164,9 +165,9 @@ Quy ước số liệu cho phần thực nghiệm, để RQ1 và RQ2 đo đúng 
 - **RQ1 (kích thước encoding)**: `Result.variables`/`clauses` là kích thước CNF của lần dò
   **cuối cùng** (mục 6) — tức K cuối đã thử, nơi có mệnh đề khoảng cách; per-K ở
   `metadata["probes"]`. Hai encoding (`pairwise`, `order`) phải so trên cùng một dãy K.
-- **RQ2 (so solver)**: chỉ so **CaDiCaL và Glucose**, cùng cách đo `t_solve` (PySAT). Kissat
-  đã bỏ khỏi phạm vi (`docs/sat_tooling.md` mục 7): đây là **hạn chế** của RQ2 và phải nêu
-  trong bài viết. Không có cơ sở để so sánh thời gian với một solver không chạy được.
+- **RQ2 (so solver)**: chỉ so **CaDiCaL và Glucose**, cùng cách đo `t_solve` (PySAT). So sánh
+  với Kissat là **hạn chế đã ghi, gác sang W2** (`docs/sat_tooling.md` mục 7): chưa có binary
+  chạy được nên chưa có cơ sở so thời gian. Phải nêu hạn chế này trong bài viết.
 - **Ngân sách**: `time_limit` là ngân sách cho cả chuỗi K, gồm encode và mọi lần gọi solver
   (mục 5, mục 7).
 - **Bộ nhớ**: `peak_memory = None` ở W1 (`docs/sat_tooling.md` mục 8).

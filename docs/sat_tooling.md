@@ -10,7 +10,7 @@ Mỗi mục dưới đây có kết luận hoặc ghi rõ **"chưa hỗ trợ"**
   `1.9.dev15` và **không có bản stable nào** (không có release khác ngoài `dev`), nên giữ
   pin bản dev; đổi sang stable khi PySAT phát hành.
 - PySAT là bản Python ship sẵn nhiều solver native; không cần cài solver ngoài cho W1
-  (Kissat đã bỏ khỏi phạm vi, xem mục 7).
+  (Kissat gác sang W2, xem mục 7).
 - `pysat.solvers.Solver(name=...)` chọn solver. Tên hợp lệ và alias nằm trong
   `pysat.solvers.SolverNames` (ví dụ `glucose4 = ('g4', 'g41', 'glucose4', 'glucose41')`).
 - Solver dựng được trong wheel này (đã thử `Solver(name=...)` rồi `delete()`):
@@ -24,7 +24,8 @@ Mỗi mục dưới đây có kết luận hoặc ghi rõ **"chưa hỗ trợ"**
   family. Nếu PySAT đổi tên, family lạ sẽ không nằm trong hai danh sách timeout → `BackendError`
   khi có `time_limit`, không im lặng trả kết quả sai.
 - Mặc định của backend: `cadical195` (`SatBackend.DEFAULT_SOLVER`), đổi qua
-  `Config.sat_solver`. `sat_solver="kissat"` trả `ERR` với thông báo chưa hỗ trợ (mục 7).
+  `Config.sat_solver`. `sat_solver="kissat"` bị chặn bằng `ValueError` (chưa hỗ trợ ở W1,
+  gác sang W2 — mục 7).
 
 ## 2. Interface backend
 
@@ -118,69 +119,24 @@ Số clause cho `m = 3` literal (đo thực tế):
 
 ## 7. Kissat
 
-**Quyết định: BỎ KISSAT khỏi phạm vi W1/W2 (tạm thời, không phải Core).** Lý do: không có
-binary Windows chính thức, không có toolchain build trên máy dev, và PySAT giết process
-khi nạp clause. RQ2 chỉ so CaDiCaL và Glucose; xem `docs/sat_spec.md` mục 9 (hạn chế).
-Adapter binary ngoài (`src/sat/kissat.py`) và test của nó đã xóa khỏi PR. Các mục 7.1–7.4
-dưới đây là ghi nhận điều tra, không còn là đường chạy.
+**Trạng thái W1: chưa hỗ trợ — gác sang W2.** W1 chỉ dùng CaDiCaL (mặc định `cadical195`)
+và Glucose; RQ2 chỉ so hai solver này (`docs/sat_spec.md` mục 9).
 
-Điều kiện mở lại: có binary Kissat chạy được trên máy chạy chính thức, và nhóm thống nhất
-đưa lại vào RQ2 trước M2 (giữa W4). Lúc đó phải thêm lại adapter và test.
+Lý do gác:
 
-### 7.1 Vì sao không dùng Kissat của PySAT
+- Family `kissat404` của PySAT giết process khi nạp clause: wheel `1.9.dev15` trên Windows
+  báo `Windows fatal exception: access violation` (exit code `-1073741819` = `0xC0000005`).
+- Đường chạy binary ngoài **chưa kiểm chứng** được trên máy dev: không có binary Kissat và
+  không có toolchain C để build.
+- Release upstream `arminbiere/kissat` (`rel-4.0.4`) chỉ ship `apple-amd64`, `apple-arm64`,
+  `linux-amd64` — **không có bản Windows**; `winget`/scoop/conda-forge/PyPI đều không có.
 
-`Solver(name="kissat")` (alias của `kissat404`) **dựng được**, nhưng wheel PySAT
-`1.9.dev15` trên Windows giết process khi nạp clause:
-`Windows fatal exception: access violation` (exit code `-1073741819` = `0xC0000005`).
+Chọn `Config(sat_solver="kissat")` bị chặn ngay bằng `ValueError`
+(`"kissat chưa hỗ trợ ở W1; gác sang W2."`) trong `src/sat/solve.py`, không để native crash.
+Adapter binary ngoài (`src/sat/kissat.py`) và test của nó đã xóa; không còn đường chạy Kissat.
 
-```
-python -c "from pysat.solvers import Solver; s = Solver(name='kissat', bootstrap_with=[[1, 2], [-1]]); print(s.solve())"
-```
-
-Kết quả: không in gì, process thoát với `-1073741819`. Vì vậy `SatBackend.add_clause`
-**chặn** family `kissat404` bằng `BackendError` (thay vì để native crash), `kissat`
-không nằm trong `supported_solvers()`, và Kissat đi qua binary ngoài.
-
-### 7.2 Adapter `src/sat/kissat.py`
-
-Cùng interface với `SatBackend` (`add_clause(s)`, `solve(time_limit)`, `get_model`,
-`status`, `n_vars`, `n_clauses`, `delete`), nên pipeline `src/sat/solve.py` không phải
-sửa gì: `Config(sat_solver="kissat")` → `_open_backend()` trả `KissatBackend`.
-
-| Việc | Cách làm |
-|---|---|
-| Nạp CNF | giữ clause trong RAM, `solve` ghi ra file DIMACS (`p cnf <maxvar> <nclauses>`) trong `TemporaryDirectory` |
-| Chạy | `subprocess.run([binary, cnf_path])`, không truyền option nào của Kissat |
-| Kết quả | mã thoát `10` = SAT (đọc model ở các dòng `v`), `20` = UNSAT, mã khác = `BackendError` → `ERR` |
-| Timeout | `subprocess` timeout phía Python; hết giờ thì process bị cắt và trả `UNKNOWN`. **Không** dựa vào option `--time` của Kissat (chưa kiểm chứng được trên Windows) |
-| Không có binary | `BackendError("Không tìm thấy binary Kissat...")` → status `ERR`, không crash |
-| Đo thời gian | `io_time` = dựng + ghi file DIMACS (đo bằng `perf_counter`), **không** tính vào `solve_time`; `solve_time`/`t_solve` = `subprocess` (khởi động process + giải). Vì khởi động process **không** tách được khỏi phần giải, `t_solve` của Kissat **không** so sánh trực tiếp được với `t_solve` của PySAT: RQ2 chỉ so trạng thái và số ca OPT (`docs/sat_spec.md` mục 9). `t_encode` vẫn là `build_cnf` |
-
-### 7.3 Cách cài / trỏ tới binary
-
-1. Cài Kissat (cần trình biên dịch C):
-   - Linux/WSL: `git clone https://github.com/arminbiere/kissat && cd kissat && ./configure && make` → binary `build/kissat`.
-   - Windows + MSVC: build từ source (Visual Studio Build Tools; Kissat dùng `configure`/`make`, thực tế dễ nhất là WSL).
-   - Kiểm tra: `kissat --version`.
-2. Trỏ adapter: đặt `ABP_KISSAT` = đường dẫn đầy đủ tới binary, hoặc để `kissat` trên `PATH`.
-   Biến `ABP_KISSAT` trỏ tới file không tồn tại bị coi là **không có** (không đoán).
-
-### 7.4 Đã thử trên máy dev (2026-10-13) — kết luận: chưa chạy được
-
-| Nguồn | Kết quả |
-|---|---|
-| Release upstream `arminbiere/kissat` (`rel-4.0.4`) | chỉ có `apple-amd64`, `apple-arm64`, `linux-amd64` — **không có bản Windows** |
-| `winget search kissat` | `No package found matching input criteria` |
-| scoop main bucket (`bucket/kissat.json`) | không có manifest; `scoop` còn bị ExecutionPolicy chặn trên máy này |
-| conda-forge `kissat` | API trả về danh sách file rỗng (không có `win-64`) |
-| PyPI `kissat` / `pykissat` | 404 |
-| Build từ source | không có `cl`, `gcc`, `clang`, `conda` trên `PATH` |
-| PySAT `kissat404` | access violation khi nạp clause (mục 7.1) |
-
-Vì vậy W1/W2 vẫn dùng CaDiCaL (+ Glucose); Kissat **chưa hỗ trợ trên máy này**, lý do cụ
-thể là không có binary Windows và không có toolchain để build. Khi có binary, đặt
-`ABP_KISSAT` là chạy được: test `tests/sat/test_kissat.py::test_kissat_matches_oracle_on_toy_instances`
-tự bỏ skip.
+Mở lại ở W2: cần binary Kissat chạy được trên máy chạy chính thức và một adapter mới; nếu
+không, giữ nguyên đây là hạn chế đã ghi của RQ2.
 
 ## 8. Đo `t_encode`, `t_solve`, memory
 
@@ -190,9 +146,8 @@ tự bỏ skip.
   `t_encode`; thời gian `add_clauses` hiện **không** nằm trong `t_encode` lẫn `t_solve`, chỉ có
   trong `t_total` — cần tách riêng ở W2 nếu muốn so sánh chi phí encode.
 - `t_solve`: `perf_counter()` bọc `backend.solve(...)` trong `_probe` (thời gian **do pipeline
-  đo**, gồm cả chi phí gọi). Chính xác gồm những gì **khác nhau theo backend**:
-  - PySAT (`SatBackend`): thân `SatBackend.solve` — lời gọi solver, và với CaDiCaL là cả vòng
-    lặp `conf_budget` (mục 3). Không có I/O.
+  đo**, gồm cả chi phí gọi). Với backend PySAT (`SatBackend`) là thân `SatBackend.solve` — lời
+  gọi solver, và với CaDiCaL là cả vòng lặp `conf_budget` (mục 3); không có I/O.
 - Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "b", "t_encode",
   "t_solve", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là
   của lần dò **cuối cùng** (`docs/sat_spec.md` mục 6).
@@ -210,8 +165,8 @@ cho env conda của P1 — cùng minor, khác patch):
 .\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1
 ```
 
-Kết quả 2026-10-14 (review lần 2 — đã thêm test R1/R2): `80 passed, 2 skipped in 5.08s`.
-Sau khi bỏ Kissat (mục 7): `72 passed` (2026-10-14, `tests/sat/test_kissat.py` đã xóa).
+Kết quả 2026-10-14 (bỏ Kissat khỏi W1, gác sang W2 — mục 7): `72 passed in 3.06s`
+(`tests/sat/test_kissat.py` đã xóa; `Config(sat_solver="kissat")` → `ValueError`).
 
 - `python-sat==1.9.dev15` trên venv này: import được, `pysat.__version__ = '1.9.dev15'`
   (khớp `requirements.txt`).
