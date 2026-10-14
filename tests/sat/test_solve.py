@@ -38,9 +38,6 @@ def test_sat_reports_verified_value_and_encoding_size():
 
     assert result.lb == 2
     assert verify(instance, result.solution) == 2
-    # Kích thước CNF là của lần dò đầu tiên (K=1), xem docs/sat_spec.md mục 6.
-    assert result.variables == 16
-    assert result.clauses == 56
     assert result.metadata["k_best"] == 2
     assert result.metadata["abp_encoding_stats"]["distance"] == 18
     probes = result.metadata["probes"]
@@ -48,6 +45,11 @@ def test_sat_reports_verified_value_and_encoding_size():
     assert [probe["clauses"] for probe in probes] == [56, 74, 86]
     assert probes[0]["variables"] == 16
     assert probes[0]["t_encode"] > 0.0
+    # R1: kích thước CNF của Result là của lần dò CUỐI (K=3), không phải K=1
+    # (xem docs/sat_spec.md mục 6).
+    assert result.variables == probes[-1]["variables"] == 16
+    assert result.clauses == probes[-1]["clauses"] == 86
+    assert result.metadata["t_io"] == 0.0  # PySAT nạp clause ở add_clauses, không có I/O
     assert result.t_total > 0.0
 
 
@@ -65,10 +67,26 @@ def test_cnf_size_is_reported_even_when_no_sat_probe(monkeypatch):
     assert result.lb is None
     assert result.solution is None
 
-    first_probe = build_cnf(instance, 1)
-    assert result.variables == first_probe.n_vars
-    assert result.clauses == len(first_probe.clauses)
-    assert result.metadata["probes"][0]["clauses"] == result.clauses
+    last_probe = result.metadata["probes"][-1]
+    last_probe_cnf = build_cnf(instance, last_probe["k"])
+    assert result.variables == last_probe_cnf.n_vars == last_probe["variables"]
+    assert result.clauses == len(last_probe_cnf.clauses) == last_probe["clauses"]
+
+
+def test_reported_cnf_size_comes_from_last_probed_k():
+    # R1: Result.variables/clauses lấy từ CNF ở K cuối cùng đã dò — K đó có mệnh đề
+    # khoảng cách, còn K=1 thì không (56 clause), nên hai số phải khác nhau.
+    from src.sat.pairwise import build_cnf
+
+    instance = generator.path(4)
+    result = solve_sat(instance)
+    last_k = result.metadata["probes"][-1]["k"]
+
+    assert last_k == 3, "path4 dừng ở lần UNSAT đầu tiên K=3"
+    last_cnf = build_cnf(instance, last_k)
+    assert result.variables == last_cnf.n_vars
+    assert result.clauses == len(last_cnf.clauses) == 86
+    assert result.clauses != len(build_cnf(instance, 1).clauses)
 
 
 def test_k_search_increases_from_lower_bound_and_stops_at_first_unsat():
@@ -168,7 +186,8 @@ def test_time_limited_run_is_feas_or_to_and_consistent():
 
     result = solve_sat(instance, Config(method="sat", time_limit=0.05))
 
-    assert result.status in ("FEAS", "TO")
+    # OPT cũng là kết quả hợp lệ: máy đủ nhanh thì kịp chứng minh tối ưu trong limit.
+    assert result.status in ("OPT", "FEAS", "TO")
     if result.status == "FEAS":
         assert verify(instance, result.solution) == result.lb
         assert result.ub > result.lb
@@ -184,7 +203,7 @@ def test_time_limit_covers_encoding_and_solve():
 
     result = solve_sat(instance, Config(method="sat", time_limit=limit))
 
-    assert result.status in ("TO", "FEAS")
+    assert result.status in ("OPT", "TO", "FEAS")
     # Pha đang chạy khi hết giờ vẫn hoàn thành -> cho phép vượt, nhưng không vượt xa.
     assert result.t_total < 2 * limit + 2.0
 
@@ -209,7 +228,7 @@ def test_probe_passes_remaining_budget_to_solver_after_loading(monkeypatch):
     monkeypatch.setattr(SatBackend, "add_clauses", slow_add_clauses)
     monkeypatch.setattr(SatBackend, "solve", spy_solve)
 
-    status, solution, cnf, t_encode, t_solve = solve_module._probe(
+    status, solution, cnf, t_encode, t_solve, t_io = solve_module._probe(
         generator.path(4), 2, "pairwise", "cadical195", 0.05
     )
 

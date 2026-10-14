@@ -149,6 +149,11 @@ class SatBackend:
         return self._solve_time
 
     @property
+    def io_time(self) -> float:
+        """Thời gian I/O ngoài ``solve``; PySAT nạp clause ở ``add_clauses`` nên là ``0.0``."""
+        return 0.0
+
+    @property
     def n_vars(self) -> int:
         return self._solver.nof_vars()
 

@@ -17,7 +17,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from time import monotonic
+from time import perf_counter
 from typing import Iterable, Sequence
 
 from src.sat.backend import BackendError, SolveStatus, validate_clause
@@ -83,9 +83,11 @@ def parse_kissat_output(
 class KissatBackend:
     """Kissat ngoài process, cùng interface với ``SatBackend``.
 
-    Khác biệt đã biết: thời gian ghi file DIMACS nằm trong ``solve_time`` (với PySAT
-    nó nằm trong ``add_clauses``), và timeout do phía Python cắt (``subprocess``
-    timeout), không dựa vào option thời gian của Kissat.
+    Khác biệt đã biết: thời gian ghi file DIMACS nằm ở ``io_time``, **không** nằm
+    trong ``solve_time``; nhưng ``solve_time`` vẫn bao khởi động process (không tách
+    được với ``subprocess``), nên nó **không** so sánh trực tiếp được với ``t_solve``
+    của PySAT (xem ``docs/sat_tooling.md`` mục 7). Timeout do phía Python cắt
+    (``subprocess`` timeout), không dựa vào option thời gian của Kissat.
     """
 
     def __init__(self, binary: str | None = None):
@@ -101,6 +103,7 @@ class KissatBackend:
         self._n_vars = 0
         self._status: SolveStatus = "UNKNOWN"
         self._solve_time = 0.0
+        self._io_time = 0.0
         self._model: list[int] | None = None
 
     # --- trạng thái -----------------------------------------------------
@@ -112,8 +115,13 @@ class KissatBackend:
 
     @property
     def solve_time(self) -> float:
-        """Thời gian (giây) của lần gọi ``solve`` gần nhất."""
+        """Thời gian ``subprocess`` (khởi động + giải) của lần ``solve`` gần nhất."""
         return self._solve_time
+
+    @property
+    def io_time(self) -> float:
+        """Thời gian dựng/ghi file DIMACS của lần ``solve`` gần nhất (không tính vào ``solve_time``)."""
+        return self._io_time
 
     @property
     def n_vars(self) -> int:
@@ -142,17 +150,25 @@ class KissatBackend:
 
         ``time_limit`` là số giây; ``None`` là không giới hạn. Quá thời gian thì
         process bị cắt và trả ``"UNKNOWN"``.
+
+        ``solve_time`` chỉ đo ``subprocess`` (khởi động process + giải), không gồm
+        thời gian dựng/ghi file DIMACS (nằm ở ``io_time``). Xem
+        ``docs/sat_tooling.md`` mục 7 về giới hạn của cách đo này.
         """
         if time_limit is not None and time_limit <= 0:
-            self._status, self._solve_time, self._model = "UNKNOWN", 0.0, None
+            self._status, self._model = "UNKNOWN", None
+            self._io_time, self._solve_time = 0.0, 0.0
             return self._status
 
+        io_start = perf_counter()
         text = dimacs(max(1, self._n_vars), self._clauses)
-        start = monotonic()
+        start = perf_counter()
         try:
             with TemporaryDirectory() as tmp:
                 cnf_path = Path(tmp) / "probe.cnf"
                 cnf_path.write_text(text, encoding="ascii")
+                self._io_time = perf_counter() - io_start
+                start = perf_counter()  # t_solve chỉ từ đây: ghi file không tính
 
                 try:
                     proc = subprocess.run(
@@ -174,7 +190,7 @@ class KissatBackend:
                 f"Không chạy được binary kissat '{self.binary}': {exc}"
             ) from exc
         finally:
-            self._solve_time = monotonic() - start
+            self._solve_time = perf_counter() - start
 
         return self._status
 

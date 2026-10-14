@@ -92,10 +92,11 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     unsat_source = "counting:lệch nhãn tối đa n-1"
     best_solution: dict[int, int] | None = None
     best_cnf: CNF | None = None
-    first_cnf: CNF | None = None  # CNF của lần dò đầu tiên (số liệu RQ1)
+    last_cnf: CNF | None = None  # CNF của lần dò cuối cùng (số liệu RQ1)
     probes: list[dict[str, object]] = []
     t_encode = 0.0
     t_solve = 0.0
+    t_io = 0.0
     error: str | None = None
     timed_out = False
 
@@ -104,7 +105,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         remaining = None if deadline is None else deadline - perf_counter()
 
         try:
-            status, solution, cnf, probe_encode, probe_solve = _probe(
+            status, solution, cnf, probe_encode, probe_solve, probe_io = _probe(
                 instance, k, amo_encoding, solver_name, remaining
             )
         except BackendError as exc:  # lỗi backend/giấy phép -> ERR
@@ -113,8 +114,9 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
 
         t_encode += probe_encode
         t_solve += probe_solve
-        if first_cnf is None and cnf is not None:
-            first_cnf = cnf
+        t_io += probe_io
+        if cnf is not None:
+            last_cnf = cnf
 
         value: int | None = None
         if status == "SAT":
@@ -138,6 +140,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
                 "b": value,
                 "t_encode": round(probe_encode, 6),
                 "t_solve": round(probe_solve, 6),
+                "t_io": round(probe_io, 6),
                 "variables": cnf.n_vars if cnf is not None else None,
                 "clauses": len(cnf.clauses) if cnf is not None else None,
             }
@@ -179,6 +182,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         "amo_encoding": amo_encoding,
         "sat_solver": solver_name,
         "probes": probes,
+        "t_io": t_io,  # thời gian I/O riêng của backend (Kissat ghi DIMACS); PySAT = 0.0
         "k_best": lo or None,  # B tốt nhất đã verify (= ngưỡng chứng minh được)
         "k_unsat": hi,
         "unsat_source": unsat_source,
@@ -195,8 +199,8 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         t_encode=t_encode,
         t_solve=t_solve,
         t_total=t_total,
-        variables=first_cnf.n_vars if first_cnf else None,
-        clauses=len(first_cnf.clauses) if first_cnf else None,
+        variables=last_cnf.n_vars if last_cnf else None,
+        clauses=len(last_cnf.clauses) if last_cnf else None,
         peak_memory=None,  # chưa đo ở W1, xem docs/sat_tooling.md
         solution=best_solution if status in ("OPT", "FEAS") else None,
         metadata=metadata,
@@ -222,7 +226,7 @@ def solve_decision(
         )
     _validate_instance(instance)
 
-    status, solution, _cnf, _t_encode, _t_solve = _probe(
+    status, solution, _cnf, _t_encode, _t_solve, _t_io = _probe(
         instance, k, amo_encoding, solver_name, cfg.time_limit
     )
     return status, solution
@@ -241,19 +245,23 @@ def _probe(
     amo_encoding: str,
     solver_name: str,
     time_limit: float | None,
-) -> tuple[str, dict[int, int] | None, CNF | None, float, float]:
-    """Dựng CNF, giải, decode; trả ``(status, labeling, cnf, t_encode, t_solve)``.
+) -> tuple[str, dict[int, int] | None, CNF | None, float, float, float]:
+    """Dựng CNF, giải, decode; trả ``(status, labeling, cnf, t_encode, t_solve, t_io)``.
 
     ``time_limit`` là ngân sách còn lại cho **cả** ``build_cnf``, ``add_clauses`` và
     ``solve`` (WORK BREAKDOWN §5: runtime gồm tạo model/encoding và mọi lần gọi
     solver). Hết ngân sách trước khi encode → ``UNKNOWN``, không dựng CNF; hết ngân
     sách sau khi nạp clause → ``solve`` nhận phần thời gian còn lại.
+
+    ``t_io`` là thời gian I/O nằm ngoài solver (``KissatBackend`` ghi file DIMACS);
+    ``0.0`` với backend PySAT, nơi phần đó nằm ở ``add_clauses``. Xem
+    ``docs/sat_tooling.md`` mục 7.
     """
     if trivial_unsat(instance.n, k):
-        return "UNSAT", None, None, 0.0, 0.0
+        return "UNSAT", None, None, 0.0, 0.0, 0.0
 
     if time_limit is not None and time_limit <= 0:
-        return "UNKNOWN", None, None, 0.0, 0.0
+        return "UNKNOWN", None, None, 0.0, 0.0, 0.0
 
     t0 = perf_counter()
     cnf = build_cnf(instance, k, amo_encoding=amo_encoding)
@@ -268,7 +276,7 @@ def _probe(
         t_solve = perf_counter() - t1
 
         solution = decode_model(cnf, backend.get_model()) if status == "SAT" else None
-        return status, solution, cnf, t_encode, t_solve
+        return status, solution, cnf, t_encode, t_solve, backend.io_time
     finally:
         backend.delete()
 
