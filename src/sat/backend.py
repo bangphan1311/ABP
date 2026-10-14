@@ -40,6 +40,9 @@ INTERRUPTIBLE_FAMILIES = frozenset(
 # Timeout thực hiện bằng vòng lặp ngân sách xung đột tăng dần (xem docs/sat_tooling.md).
 BUDGETED_FAMILIES = frozenset({"cadical103", "cadical153", "cadical195", "cadical300"})
 
+# Family Kissat của PySAT: nạp clause là access violation (giết process). Chặn khi khởi tạo.
+PYSAT_KISSAT_FAMILIES = frozenset({"kissat404"})
+
 # Ngân sách xung đột khởi điểm cho mỗi lần gọi solve_limited; tăng gấp đôi mỗi vòng.
 CONFLICT_BUDGET_START = 1000
 
