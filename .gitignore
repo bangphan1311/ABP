@@ -10,3 +10,4 @@ gurobi.lic
 results/raw/
 .DS_Store
 .pytest_cache/
+.codegraph/
