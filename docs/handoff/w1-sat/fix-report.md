@@ -2,7 +2,9 @@
 
 Owner: P2. Ngày: 2026-10-13. Branch: `p2/w1-sat` (push lên cùng PR #3).
 Verify cuối: `.\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1`
-→ **`75 passed, 2 skipped in 2.40s`** (2 skip = test cần binary Kissat thật).
+→ **`80 passed, 2 skipped`** (2 skip = test cần binary Kissat thật). Số `75 passed, 2 skipped
+in 2.40s` ghi ở bản trước là **thiếu test**: review lần 2 đếm `78 passed, 2 skipped`, sau khi
+thêm test R1/R2 là `80 passed, 2 skipped`.
 
 ## Blocker
 
@@ -68,6 +70,8 @@ Verify cuối: `.\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovide
 - Commit: `aeb739a`. `Result.variables/clauses` = CNF của **lần dò đầu tiên** (`K = 1`);
   `metadata["probes"]` ghi thêm `variables`, `clauses`, `t_encode` cho từng lần dò. Quy ước ghi
   rõ ở `docs/sat_spec.md` mục 6 và `docs/sat_tooling.md` mục 8.
+  **Đã bị R1 thay (review lần 2)**: `Result.variables/clauses` nay lấy từ CNF ở lần dò **cuối
+  cùng** trước khi chốt kết quả — quy ước hiện hành ở `docs/sat_spec.md` mục 6.
 - Verify: path4 → `clauses` per probe `[56, 74, 86]` cho `K = [1, 2, 3]`;
   `test_cnf_size_is_reported_even_when_no_sat_probe` (solve bị giả lập trả `UNKNOWN` → `TO`,
   vẫn có `variables`/`clauses`).
@@ -78,8 +82,8 @@ Verify cuối: `.\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovide
   (`https://pypi.org/pypi/python-sat/json`): bản mới nhất là `1.9.dev15`, **không có bản stable
   nào** → giữ pin `python-sat==1.9.dev15`.
 - Đã chạy toàn bộ suite trên venv 3.11 của repo, lệnh + kết quả ghi ở `docs/sat_tooling.md` mục 9:
-  `75 passed, 2 skipped in 2.40s` (Python `3.11.15`; `docs/ENV.md` ghi `3.11.17` cho env conda
-  của P1 — cùng minor).
+  `80 passed, 2 skipped` (Python `3.11.15`; `docs/ENV.md` ghi `3.11.17` cho env conda
+  của P1 — cùng minor). Số `75 passed, 2 skipped in 2.40s` ghi ở bản trước là thiếu test.
 - `solver_family()` vẫn đọc `vars(SolverNames)`; đã ghi rõ hệ quả (family lạ → `BackendError`
   khi có `time_limit`, không im lặng trả sai) ở `docs/sat_tooling.md` mục 1.
 

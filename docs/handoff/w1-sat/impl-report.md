@@ -149,6 +149,16 @@ $ .\.venv\Scripts\python.exe -m pytest tests -q
 64 passed in 1.83s          # trước QA: 58
 ```
 
+Đếm lại sau review PR #3 (lần 2) — head `20f8b25`, `.venv` Python `3.11.15`, PySAT `1.9.dev15`:
+
+```
+$ .\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1
+80 passed, 2 skipped in 5.09s
+```
+
+Đây là **số đúng** (2 skip = test cần binary Kissat thật). Các số `64`/`58` và `75 passed,
+2 skipped in 2.40s` ghi ở các báo cáo trước là ảnh chụp cũ, thiếu test thêm sau đó.
+
 Kiểm chứng WARN-2 bằng tay (trước đây `KeyError`):
 
 ```
