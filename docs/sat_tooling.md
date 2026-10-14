@@ -180,11 +180,19 @@ tự bỏ skip.
 ## 8. Đo `t_encode`, `t_solve`, memory
 
 - `t_encode`: `perf_counter()` bọc `build_cnf(...)` trong `src/sat/solve.py::_probe`, cộng dồn
-  qua các ngưỡng K, trả ở `Result.t_encode`. `t_solve` đo tương tự quanh `backend.solve(...)`;
-  `t_total` bao cả hai cộng phần còn lại (nạp clause vào solver, vòng lặp tìm K).
-  `t_encode` của PySAT (`CardEnc`) nằm trong `t_encode`; thời gian `add_clauses` hiện **không**
-  nằm trong `t_encode` lẫn `t_solve`, chỉ có trong `t_total` — cần tách riêng ở W2 nếu muốn
-  so sánh chi phí encode.
+  qua các ngưỡng K, trả ở `Result.t_encode`. `t_total` bao cả `t_encode` + `t_solve` cộng phần
+  còn lại (nạp clause vào solver, vòng lặp tìm K). `t_encode` của PySAT (`CardEnc`) nằm trong
+  `t_encode`; thời gian `add_clauses` hiện **không** nằm trong `t_encode` lẫn `t_solve`, chỉ có
+  trong `t_total` — cần tách riêng ở W2 nếu muốn so sánh chi phí encode.
+- `t_solve`: `perf_counter()` bọc `backend.solve(...)` trong `_probe` (thời gian **do pipeline
+  đo**, gồm cả chi phí gọi). Chính xác gồm những gì **khác nhau theo backend**:
+  - PySAT (`SatBackend`): thân `SatBackend.solve` — lời gọi solver, và với CaDiCaL là cả vòng
+    lặp `conf_budget` (mục 3). Không có I/O; backend để `io_time = 0.0`.
+  - Kissat (`KissatBackend`): cả `subprocess.run` = **khởi động process + giải**. Thời gian
+    dựng/ghi file DIMACS đã tách sang `io_time` (`metadata["t_io"]`, mục 7.2), nhưng khởi động
+    process **không** tách được khỏi phần giải, nên **không** đo cùng đại lượng với PySAT:
+    RQ2 chỉ so trạng thái và số ca `OPT`, không so trực tiếp `t_solve`
+    (`docs/sat_spec.md` mục 9).
 - Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "b", "t_encode",
   "t_solve", "t_io", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là
   của lần dò **cuối cùng** (`docs/sat_spec.md` mục 6). `metadata["t_io"]` là tổng thời gian
