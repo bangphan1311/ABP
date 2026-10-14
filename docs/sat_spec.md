@@ -76,7 +76,7 @@ Mỗi ngưỡng dựng CNF mới và dùng backend mới; không dùng increment
 UNSAT nào, chỉ xảy ra khi hết giờ) hoặc `lo + 1` (đã chứng minh tối ưu → `OPT`).
 
 Mỗi lần dò được ghi vào `Result.metadata["probes"]`:
-`{"k", "status", "b", "t_encode", "t_solve", "variables", "clauses"}` (`b` = antibandwidth
+`{"k", "status", "b", "t_encode", "t_solve", "t_io", "variables", "clauses"}` (`b` = antibandwidth
 thực tế của nghiệm, `None` khi không SAT).
 
 ## 6. Status, lb, ub, gap
@@ -93,13 +93,20 @@ thực tế của nghiệm, `None` khi không SAT).
 `hi` luôn là ngưỡng đã **chứng minh UNSAT** (đếm nhãn hoặc solver), nên cận trên hợp lệ là
 `ub = hi - 1`; khi chưa có lần dò UNSAT nào thì `hi = n` và `ub = n - 1` (hệ quả của đếm nhãn).
 Nghiệm chỉ được gán vào `Result.solution` khi status là `OPT` hoặc `FEAS`.
-`variables`/`clauses` là kích thước CNF của **lần dò đầu tiên** (`K = 1`), không phải của
-ngưỡng tốt nhất — đây là quy ước tổng hợp duy nhất cho RQ1, để số liệu kích thước encoding
-có mặt **kể cả khi hết giờ** (`FEAS`/`TO`). Nếu deadline hết trước khi dựng CNF (ví dụ
-`time_limit ≤ 0`) thì không có lần dò nào dựng CNF và hai trường là `None`.
-`metadata["probes"]` giữ kích thước từng lần dò (`variables`, `clauses`, `t_encode`,
-`t_solve`) nên vẫn phân tích được độ phức tạp encoding theo `K`; `metadata["abp_encoding_stats"]`
-là phân bố clause theo nhóm ràng buộc của CNF tốt nhất (`lo`). `peak_memory` chưa đo ở W1
+
+**Quy ước kích thước encoding (RQ1)**: `Result.variables`/`clauses` là kích thước CNF của
+**lần dò cuối cùng có dựng CNF** (K cuối đã thử), **không** phải `K = 1` và không phải ngưỡng
+tốt nhất. Ở `K = 1` không có mệnh đề khoảng cách (`distance = 0`), nên số của `K = 1` không đo
+được đúng thứ RQ1 so sánh (pairwise và order khác nhau ở mệnh đề khoảng cách). Lần dò cuối là
+nơi encoding thực sự làm việc: `OPT` → K = `hi` (ngưỡng vừa chứng minh UNSAT), `FEAS`/`TO` →
+K lớn nhất đã thử. Quy ước này giữ số liệu kích thước có mặt **kể cả khi hết giờ**
+(`FEAS`/`TO`). Nếu deadline hết trước khi dựng CNF (ví dụ `time_limit ≤ 0`) thì không lần dò
+nào có CNF và hai trường là `None`.
+
+`metadata["probes"]` giữ số liệu **từng** lần dò (`variables`, `clauses`, `t_encode`,
+`t_solve`, `t_io`) nên vẫn phân tích được độ phức tạp encoding theo `K`;
+`metadata["abp_encoding_stats"]` là phân bố clause theo nhóm ràng buộc của CNF tốt nhất (`lo`);
+`metadata["t_io"]` là tổng thời gian I/O ngoài solver (mục 9). `peak_memory` chưa đo ở W1
 (xem `docs/sat_tooling.md`).
 
 ## 7. Interface
@@ -149,3 +156,20 @@ JSON, một file một instance:
 `read_instance` kiểm tra: đủ 6 trường, `n` là số nguyên ≥ 0, mỗi cạnh là cặp số nguyên
 trong `0..n-1` và không tự khuyên. Trường lạ bị bỏ qua. `write_instance` ghi đúng schema
 này; `read_instance(write_instance(x)) == x` (roundtrip, xem `tests/sat/test_io.py`).
+
+## 9. Experimental setup — cách đo cho RQ1/RQ2
+
+Quy ước số liệu cho phần thực nghiệm, để RQ1 và RQ2 đo đúng một đại lượng:
+
+- **RQ1 (kích thước encoding)**: `Result.variables`/`clauses` là kích thước CNF của lần dò
+  **cuối cùng** (mục 6) — tức K cuối đã thử, nơi có mệnh đề khoảng cách; per-K ở
+  `metadata["probes"]`. Hai encoding (`pairwise`, `order`) phải so trên cùng một dãy K.
+- **RQ2 (so solver)**: `t_solve` của Kissat **không** đo cùng đại lượng với `t_solve` của
+  PySAT, nên RQ2 **không** so sánh trực tiếp `t_solve` với Kissat: chỉ so trạng thái
+  (`OPT`/`FEAS`/`TO`/`ERR`) và số ca `OPT`. Lý do: Kissat chạy qua binary ngoài nên
+  `t_solve` còn bao khởi động process, mà `subprocess` không tách được khởi động khỏi phần
+  giải; thời gian ghi file DIMACS thì đã tách riêng ở `metadata["t_io"]` (không tính vào
+  `t_solve`). Chi tiết cách đo: `docs/sat_tooling.md` mục 7.
+- **Ngân sách**: `time_limit` là ngân sách cho cả chuỗi K, gồm encode và mọi lần gọi solver
+  (mục 5, mục 7).
+- **Bộ nhớ**: `peak_memory = None` ở W1 (`docs/sat_tooling.md` mục 8).

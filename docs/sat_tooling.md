@@ -149,7 +149,7 @@ sửa gì: `Config(sat_solver="kissat")` → `_open_backend()` trả `KissatBack
 | Kết quả | mã thoát `10` = SAT (đọc model ở các dòng `v`), `20` = UNSAT, mã khác = `BackendError` → `ERR` |
 | Timeout | `subprocess` timeout phía Python; hết giờ thì process bị cắt và trả `UNKNOWN`. **Không** dựa vào option `--time` của Kissat (chưa kiểm chứng được trên Windows) |
 | Không có binary | `BackendError("Không tìm thấy binary Kissat...")` → status `ERR`, không crash |
-| Đo thời gian | thời gian ghi DIMACS nằm trong `t_solve` (với PySAT nó nằm ở `add_clauses`); `t_encode` vẫn là `build_cnf` |
+| Đo thời gian | `io_time` = dựng + ghi file DIMACS (đo bằng `perf_counter`), **không** tính vào `solve_time`; `solve_time`/`t_solve` = `subprocess` (khởi động process + giải). Vì khởi động process **không** tách được khỏi phần giải, `t_solve` của Kissat **không** so sánh trực tiếp được với `t_solve` của PySAT: RQ2 chỉ so trạng thái và số ca OPT (`docs/sat_spec.md` mục 9). `t_encode` vẫn là `build_cnf` |
 
 ### 7.3 Cách cài / trỏ tới binary
 
@@ -186,8 +186,10 @@ tự bỏ skip.
   nằm trong `t_encode` lẫn `t_solve`, chỉ có trong `t_total` — cần tách riêng ở W2 nếu muốn
   so sánh chi phí encode.
 - Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "b", "t_encode",
-  "t_solve", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là của lần
-  dò đầu tiên (xem `docs/sat_spec.md` mục 6).
+  "t_solve", "t_io", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là
+  của lần dò **cuối cùng** (`docs/sat_spec.md` mục 6). `metadata["t_io"]` là tổng thời gian
+  I/O ngoài `solve`: `KissatBackend` ghi file DIMACS (không tính vào `t_solve`, xem mục 7),
+  PySAT để `0.0` vì nạp clause nằm ở `add_clauses`.
 - `peak_memory`: **chưa đo ở W1**, để `None`. Cách đo đề xuất cho chạy chính thức:
   `psutil.Process().memory_info().rss` (bắt cả bộ nhớ native của solver) hoặc
   `tracemalloc` (chỉ bộ nhớ Python — **không** thấy bộ nhớ native, nên không đủ). `psutil`
@@ -202,9 +204,9 @@ cho env conda của P1 — cùng minor, khác patch):
 .\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1
 ```
 
-Kết quả 2026-10-13: `75 passed, 2 skipped in 2.40s`. Hai test skip là các test cần binary
-Kissat thật (`tests/sat/test_kissat.py`, mục 7.4); phần còn lại của `tests/sat/test_kissat.py`
-(parser, DIMACS, đường lỗi) vẫn chạy.
+Kết quả 2026-10-14 (review lần 2 — đã thêm test R1/R2): `80 passed, 2 skipped in 5.08s`.
+Hai test skip là các test cần binary Kissat thật (`tests/sat/test_kissat.py`, mục 7.4); phần
+còn lại của `tests/sat/test_kissat.py` (parser, DIMACS, đường lỗi, binary giả) vẫn chạy.
 
 - `python-sat==1.9.dev15` trên venv này: import được, `pysat.__version__ = '1.9.dev15'`
   (khớp `requirements.txt`).
