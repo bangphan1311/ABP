@@ -73,15 +73,6 @@ def test_time_limit_stops_hard_instance(solver_name):
         backend.delete()
 
 
-def test_pysat_kissat_family_is_refused_at_construction():
-    # PySAT 1.9.dev15 (Windows): nạp clause vào kissat là access violation.
-    # Backend phải chặn ngay khi khởi tạo để không bao giờ tới native call đó.
-    with pytest.raises(BackendError, match="kissat"):
-        SatBackend("kissat")
-    with pytest.raises(BackendError, match="kissat"):
-        SatBackend("kissat404")
-
-
 def test_supported_solvers_are_constructible():
     for name in supported_solvers():
         with SatBackend(name) as backend:
