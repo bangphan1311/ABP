@@ -103,11 +103,7 @@ def solver_family(solver_name: str) -> str:
 
 
 def supported_solvers() -> tuple[str, ...]:
-    """Tên solver gợi ý, tất cả đều nạp được clause và giới hạn được thời gian.
-
-    Không gồm ``kissat``: family của PySAT crash process khi nạp clause (xem
-    ``docs/sat_tooling.md`` mục 7).
-    """
+    """Tên solver gợi ý, tất cả đều nạp được clause và giới hạn được thời gian."""
     return SUPPORTED_SOLVERS
 
 
@@ -117,13 +113,6 @@ class SatBackend:
     def __init__(self, solver_name: str | None = None, use_timer: bool = False):
         self.solver_name = (solver_name or DEFAULT_SOLVER).lower()
         self.family = solver_family(self.solver_name)
-
-        # Chặn từ lúc khởi tạo: family Kissat của PySAT giết process khi nạp clause.
-        if self.family in PYSAT_KISSAT_FAMILIES:
-            raise BackendError(
-                f"PySAT family '{self.family}' crash process khi nạp clause; "
-                "Kissat chưa được hỗ trợ ở W1 (xem docs/sat_tooling.md mục 7)."
-            )
 
         try:
             self._solver = Solver(name=self.solver_name, use_timer=use_timer)
@@ -160,9 +149,7 @@ class SatBackend:
     # --- nạp CNF --------------------------------------------------------
 
     def add_clause(self, clause: Sequence[int]) -> None:
-        """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên.
-
-        """
+        """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên."""
         self._solver.add_clause(validate_clause(clause))
         self._n_clauses += 1
 
@@ -226,7 +213,7 @@ class SatBackend:
             done.set()
 
     def _solve_with_conflict_budget(self, time_limit: float):
-        """Timeout bằng ``conf_budget`` tăng dần (CaDiCaL, Kissat).
+        """Timeout bằng ``conf_budget`` tăng dần (CaDiCaL).
 
         Mỗi lần gọi chỉ bị chặn theo số xung đột, nên đồng hồ được kiểm tra
         giữa các vòng; độ vượt deadline bị chặn bởi thời gian của vòng trước.

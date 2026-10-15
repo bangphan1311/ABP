@@ -2,34 +2,25 @@
 
 Owner: P2. Ngày: 2026-10-13. Branch: `p2/w1-sat` (push lên cùng PR #3).
 Verify cuối: `.\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1`
-→ **`80 passed, 2 skipped`** (2 skip = test cần binary Kissat thật). Số `75 passed, 2 skipped
-in 2.40s` ghi ở bản trước là **thiếu test**: review lần 2 đếm `78 passed, 2 skipped`, sau khi
-thêm test R1/R2 là `80 passed, 2 skipped`.
+→ **`72 passed`** (2026-10-14, sau khi bỏ Kissat — xem B1). Số `80 passed, 2 skipped` ghi ở
+bản trước là trạng thái cũ, còn adapter/test Kissat.
 
 ## Blocker
 
-### B1 — Kissat ngoài binary: adapter xong, máy dev chưa có binary
+### B1 — Kissat: gác sang W2, adapter đã bỏ
 
-- Commit: `15a5879` `feat(sat): run kissat as external binary`.
-- Thay đổi:
-  - `src/sat/kissat.py` (mới): `KissatBackend` cùng interface `SatBackend` (add_clause(s),
-    solve(time_limit), get_model, status, n_vars, n_clauses, delete); ghi DIMACS ra file
-    tạm, chạy `subprocess.run([binary, cnf])`, đọc exit code 10/20 + model ở dòng `v`.
-  - `src/sat/solve.py`: `_open_backend()` → `Config(sat_solver="kissat")` dùng `KissatBackend`.
-  - `src/sat/backend.py`: `SatBackend.add_clause` chặn family `kissat404` của PySAT bằng
-    `BackendError` (trước đây native access violation giết process); bỏ `kissat404` khỏi
-    `BUDGETED_FAMILIES`; tách `validate_clause()` dùng chung cho hai backend.
-  - `docs/sat_tooling.md` mục 7: cách cài/trỏ binary (`ABP_KISSAT` hoặc `PATH`), cách đo
-    `t_encode`/`t_solve` khi gọi ngoài, và bảng bằng chứng đã thử trên máy này.
-- Verify: `tests/sat/test_kissat.py` — parser DIMACS/model, exit code lạ, thiếu binary → `ERR`
-  không crash, binary hỏng → `ERR`; hai test chạy binary thật `skip` khi thiếu binary
-  (đang skip: `2 skipped`).
-- **Kết quả Kissat trên máy này: CHƯA CHẠY ĐƯỢC** (`kissat_path() -> None`). Lý do cụ thể:
-  release upstream `arminbiere/kissat` `rel-4.0.4` chỉ có `apple-amd64/arm64`, `linux-amd64`
-  (không có bản Windows); `winget search kissat` → không có; scoop main bucket không có
-  manifest `kissat.json`; conda-forge `kissat` không có file `win-64`; PyPI `kissat`/`pykissat`
-  → 404; máy không có `cl`/`gcc`/`clang`/`conda` để build từ source. Vì vậy trạng thái vẫn là
-  **"chưa hỗ trợ"**, không giả lập hỗ trợ; có binary thì đặt `ABP_KISSAT` là test tự chạy.
+- Quyết định cuối: **bỏ Kissat khỏi W1, gác sang W2** (`pr3-review.md` R3 hướng B). W1 không
+  có đường chạy Kissat.
+- Thay đổi: xóa `src/sat/kissat.py` và `tests/sat/test_kissat.py`; bỏ hết wiring Kissat khỏi
+  `src/sat/solve.py` / `src/sat/backend.py`.
+- `Config(sat_solver="kissat")` nay ném `ValueError` (`"kissat chưa hỗ trợ ở W1; gác sang W2."`)
+  trong `src/sat/solve.py` — chặn trước khi dựng backend, không để native crash.
+- Lý do: family `kissat404` của PySAT giết process khi nạp clause (access violation, wheel
+  `1.9.dev15` trên Windows); đường chạy binary ngoài **chưa kiểm chứng** được trên máy dev
+  (không có binary, không có toolchain C); upstream `arminbiere/kissat` `rel-4.0.4` không có
+  bản Windows. Chi tiết ở `docs/sat_tooling.md` mục 7.
+- Verify: `tests/sat/test_solve.py::test_kissat_solver_is_deferred_to_w2` chốt `ValueError`.
+  (Commit `15a5879` `feat(sat): run kissat as external binary` đã bị revert.)
 
 ### B2 — Duyệt K từ B+1, dừng ở UNSAT đầu tiên
 
@@ -82,8 +73,7 @@ thêm test R1/R2 là `80 passed, 2 skipped`.
   (`https://pypi.org/pypi/python-sat/json`): bản mới nhất là `1.9.dev15`, **không có bản stable
   nào** → giữ pin `python-sat==1.9.dev15`.
 - Đã chạy toàn bộ suite trên venv 3.11 của repo, lệnh + kết quả ghi ở `docs/sat_tooling.md` mục 9:
-  `80 passed, 2 skipped` (Python `3.11.15`; `docs/ENV.md` ghi `3.11.17` cho env conda
-  của P1 — cùng minor). Số `75 passed, 2 skipped in 2.40s` ghi ở bản trước là thiếu test.
+  `72 passed` (Python `3.11.15`; `docs/ENV.md` ghi `3.11.17` cho env conda của P1 — cùng minor).
 - `solver_family()` vẫn đọc `vars(SolverNames)`; đã ghi rõ hệ quả (family lạ → `BackendError`
   khi có `time_limit`, không im lặng trả sai) ở `docs/sat_tooling.md` mục 1.
 
@@ -102,13 +92,11 @@ path4     sat: OPT  lb=2 ub=2 gap=0.0 vars=16 cls=56  probes=[1, 2, 3]     | ora
 cycle5    sat: OPT  lb=2 ub=2 gap=0.0 vars=25 cls=110 probes=[1, 2, 3]     | oracle: OPT lb=2 ub=2
 complete3 sat: OPT  lb=1 ub=1 gap=0.0 vars=9  cls=24  probes=[1, 2]        | oracle: OPT lb=1 ub=1
 path6     sat: OPT  lb=3 ub=3 gap=0.0 vars=36 cls=192 probes=[1, 2, 3, 4]  | oracle: OPT lb=3 ub=3
-kissat_path() -> None
 ```
 
 ## Chưa làm (và lý do)
 
-- **Kissat chạy thật**: không có binary Windows trên máy này và không có toolchain C (chi tiết
-  ở B1). Adapter + test + tài liệu đã xong; đặt `ABP_KISSAT` là chạy.
+- **Kissat**: gác sang W2 (xem B1); adapter và test đã xóa, W1 không có đường chạy Kissat.
 - **S5** (cận trên từ bậc đỉnh, `memory_limit` thực thi, order encoding): ngoài phạm vi được giao.
 - **Hygiene**: newline cuối file của `src/sat/*.py`, `tests/sat/*.py` đã thêm (`9ac0d15`);
   `pyproject.toml`, `.python-version`, `AGENTS.md`, `docs/agents/` vẫn untracked (quyết định commit
