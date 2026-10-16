@@ -1,0 +1,21 @@
+{
+  "id": "path4",
+  "name": "Path graph with 4 vertices",
+  "n": 4,
+  "edges": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      3
+    ]
+  ],
+  "source": "generator",
+  "tier": "toy"
+}
