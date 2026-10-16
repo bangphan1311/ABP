@@ -1,4 +1,4 @@
-"""Schema một run (CONTRACT.md §7) và các hàm dựng record."""
+"""Schema một run và các hàm dựng record."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 
 from src.common.models import Config, Instance, Result
 
-# Thứ tự cột của runs.csv. Phần đầu đúng theo CONTRACT §7, phần sau là bổ sung.
+# Thứ tự cột của runs.csv. 
 RUN_FIELDS = (
     "run_id", "instance", "method", "abp_encoding", "amo_encoding", "solver",
     "search_mode", "status", "lb", "ub", "t_encode", "t_solve", "t_total",
@@ -23,16 +23,12 @@ RUN_FIELDS = (
 
 
 def make_run_id(instance: Instance, config: Config) -> str:
-    """run_id xác định (deterministic): cùng instance + config -> cùng id.
-
-    Nhờ vậy resume bỏ qua run đã xong, và validation phát hiện trùng run_id.
-    """
     parts = [
         instance.id, config.method, config.abp_encoding, config.amo_encoding,
         config.sat_solver, config.search_mode,
         f"sym{int(config.symmetry)}", f"ws{int(config.warm_start)}",
-        f"s{config.seed}",
-    ]
+        f"s{config.seed}", f"tl{config.time_limit}", f"ml{config.memory_limit}",
+    ]   
     return "__".join("na" if p is None else str(p) for p in parts)
 
 
@@ -57,7 +53,6 @@ def now_iso() -> str:
 
 
 def solver_label(config: Config, result: Result | None) -> str:
-    """Cột `solver`: SAT thì tên SAT solver, còn lại là tên solver exact."""
     if config.sat_solver:
         return config.sat_solver
     if result is not None and result.metadata.get("solver"):
@@ -74,7 +69,6 @@ def build_record(
     error: str | None = None,
     status_override: str | None = None,
 ) -> dict[str, Any]:
-    """Gộp instance + config + result thành một record phẳng theo RUN_FIELDS."""
     status = status_override or (result.status if result else "ERR")
     record: dict[str, Any] = {
         "run_id": make_run_id(instance, config),
@@ -104,7 +98,6 @@ def build_record(
         "wall_time": wall_time,
         "error": error,
     }
-    # Phần không phẳng: giữ trong raw JSON, không đưa vào CSV.
     record["config"] = asdict(config)
     record["solution"] = (
         {str(k): v for k, v in result.solution.items()}

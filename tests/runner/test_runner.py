@@ -18,13 +18,13 @@ def path4(tmp_path):
 
 def test_oracle_run_saves_schema_record(path4, tmp_path):
     out = tmp_path / "raw"
-    rec = runner_mod.run_one(path4, Config(method="oracle", time_limit=30), out)
-
+    cfg = Config(method="oracle", time_limit=30)
+    rec = runner_mod.run_one(path4, cfg, out)
     assert rec["status"] == "OPT" and rec["lb"] == 2 and rec["ub"] == 2
     for field in RUN_FIELDS:
         assert field in rec, field
     saved = json.loads((out / f"{rec['run_id']}.json").read_text(encoding="utf-8"))
-    assert saved["run_id"] == rec["run_id"] == make_run_id(generator.path(4), Config(method="oracle"))
+    assert saved["run_id"] == rec["run_id"] == make_run_id(generator.path(4), cfg)
     assert saved["solution"] is not None
 
 
@@ -34,6 +34,15 @@ def test_resume_skips_existing(path4, tmp_path):
     first = runner_mod.run_one(path4, cfg, out)
     again = runner_mod.run_one(path4, cfg, out, resume=True)
     assert again["timestamp"] == first["timestamp"]  # không chạy lại
+
+
+def test_resume_does_not_reuse_run_with_different_time_limit(path4, tmp_path):
+    out = tmp_path / "raw"
+    short = runner_mod.run_one(path4, Config(method="oracle", time_limit=30), out)
+    long_ = runner_mod.run_one(path4, Config(method="oracle", time_limit=1800), out, resume=True)
+    assert long_["run_id"] != short["run_id"]
+    assert long_["time_limit"] == 1800
+    assert len(list(out.glob("*.json"))) == 2
 
 
 def test_solver_exception_becomes_err(path4, tmp_path):
@@ -52,7 +61,6 @@ def test_hard_timeout_becomes_to(path4, tmp_path, monkeypatch):
 
 
 def test_wrong_solution_is_caught_by_runner(path4, tmp_path, monkeypatch):
-    """Solver nói OPT lb=3 nhưng nghiệm chỉ đạt 2 -> ERR."""
     import tests.runner.slow_solver as m  # noqa: F401
     cfg = Config(method="tests.runner.liar:solve_liar", time_limit=30)
     rec = runner_mod.run_one(path4, cfg, tmp_path / "raw")
