@@ -5,7 +5,13 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
-
+def _is_proven_optimal(status_constants, code):
+    exact_codes = {
+        getattr(status_constants, name)
+        for name in ("optimal", "MIP_optimal")
+        if hasattr(status_constants, name)
+    }
+    return code in exact_codes
 
 def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
     if config is None:
@@ -33,6 +39,8 @@ def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
         model.set_warning_stream(None)
         model.set_results_stream(None)
         model.objective.set_sense(model.objective.sense.maximize)
+        model.parameters.mip.tolerances.mipgap.set(0.0)
+        model.parameters.mip.tolerances.absmipgap.set(0.0)
         types = [model.variables.type.integer] * (n + 1) + [model.variables.type.binary] * (len(pairs) + len(instance.edges))
         lb = [1] * n + [1] + [0] * (total - n - 1)
         ub = [n] * n + [n - 1] + [1] * (total - n - 1)
@@ -84,9 +92,6 @@ def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
         status_text = model.solution.get_status_string()
         has_solution = model.solution.is_primal_feasible()
         status_constants = model.solution.status
-        optimal_codes = {getattr(status_constants, name, None) for name in ("optimal", "MIP_optimal", "MIP_optimal_tolerance")}
-        optimal_codes.discard(None)
-
         status_norm = status_text.lower()
         if not has_solution:
             if "memory" in status_norm or "out of memory" in status_norm:
@@ -104,7 +109,7 @@ def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
         values = model.solution.get_values(list(range(n)))
         labeling = {v: int(round(values[v])) for v in range(n)}
         objective = verify(instance, labeling)
-        optimal = code in optimal_codes
+        optimal = _is_proven_optimal(status_constants, code)
         if optimal:
             st, lb_val, ub_val = "OPT", objective, objective
         else:
