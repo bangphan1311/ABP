@@ -1,172 +1,108 @@
-# Tooling SAT (W1)
+# Công cụ SAT: PySAT trong môi trường `.venv`
 
-Owner: P2. Đo trên PySAT `1.9.dev15`, Python `3.14.6`, Windows (msvc), `.venv` của repo.
-Mỗi mục dưới đây có kết luận hoặc ghi rõ **"chưa hỗ trợ"** kèm lý do.
+Tài liệu này chỉ mô tả những gì có thể kiểm chứng trong `.venv` đã cài các gói của `requirements.txt`, và trạng thái hệ thống Windows. Mỗi khẳng định đều đã chạy lại bằng `.venv\Scripts\python.exe`. Khẳng định chưa kiểm được ghi "chưa kiểm".
 
-## 1. PySAT
+Kết quả thô và lệnh chạy nằm trong `docs/handoff/sat-tooling/evidence.md`.
 
-- Pin trong `requirements.txt`: `python-sat==1.9.dev15` (kèm `six`).
-- Kiểm tra PyPI ngày 2026-10-13 (`https://pypi.org/pypi/python-sat/json`): bản mới nhất là
-  `1.9.dev15` và **không có bản stable nào** (không có release khác ngoài `dev`), nên giữ
-  pin bản dev; đổi sang stable khi PySAT phát hành.
-- PySAT là bản Python ship sẵn nhiều solver native; không cần cài solver ngoài cho W1
-  (Kissat gác sang W2, xem mục 7).
-- `pysat.solvers.Solver(name=...)` chọn solver. Tên hợp lệ và alias nằm trong
-  `pysat.solvers.SolverNames` (ví dụ `glucose4 = ('g4', 'g41', 'glucose4', 'glucose41')`).
-- Solver dựng được trong wheel này (đã thử `Solver(name=...)` rồi `delete()`):
-  `cadical103/153/195/300`, `glucose3/4/42`, `gluecard3/4`, `lingeling`, `kissat`
-  (= `kissat404`), `maplechrono`, `maplecm`, `maplesat`, `mergesat3`, `minisat22`,
-  `minisat-gh` (alias `mgh`; tên `minisatgh` **không** được nhận), `minisat-ep`,
-  `minicard`.
-- **Chưa hỗ trợ**: family `cryptosat` (`cryptosat`, `cms`, `cryptominisat`, ...) —
-  `NoSuchSolverError`/`AssertionError` khi dựng trong wheel này.
-- `solver_family()` đọc `vars(SolverNames)` (thuộc tính nội bộ của PySAT) để map alias →
-  family. Nếu PySAT đổi tên, family lạ sẽ không nằm trong hai danh sách timeout → `BackendError`
-  khi có `time_limit`, không im lặng trả kết quả sai.
-- Mặc định của backend: `cadical195` (`SatBackend.DEFAULT_SOLVER`), đổi qua
-  `Config.sat_solver`. `sat_solver="kissat"` bị chặn bằng `ValueError` (chưa hỗ trợ ở W1,
-  gác sang W2 — mục 7).
+## Môi trường
 
-## 2. Interface backend
+- Python: 3.11.15, `.venv\Scripts\python.exe`.
+- Venv không có `pip` (`python -m pip` báo `No module named pip`). Danh sách gói lấy bằng `importlib.metadata`.
+- Gói SAT: `python-sat` 1.9.dev15. Module đọc được là `pysat.__version__` = `1.9.dev15`, đúng với pin trong `requirements.txt`.
+- Các gói khác có trong venv: `ortools` 9.15.6755, `pytest` 9.1.1, `numpy`, `pandas`, `protobuf`.
+- Chưa kiểm: `gurobipy` 13.0.3, `cplex` 22.2.0.1 và `docplex` 2.32.264 có trong `requirements.txt` nhưng KHÔNG có trong venv. Không liên quan SAT, nhưng cần biết khi cài lại.
+- Hệ thống: không có binary `kissat` trên PATH (`Get-Command kissat` và `where.exe kissat` đều không thấy). Chưa tìm kiếm toàn ổ đĩa.
 
-`src/sat/backend.py` — lớp duy nhất biết PySAT:
+## Giao diện backend PySAT
 
-| Thành phần | Ý nghĩa |
-|---|---|
-| `SatBackend(solver_name=None, use_timer=False)` | Dựng solver; lỗi tên/build/giấy phép → `BackendError` |
-| `add_clause(clause)` | Thêm một clause; từ chối clause rỗng, literal `0`, literal không phải `int` |
-| `add_clauses(clauses)` | Thêm nhiều clause |
-| `solve(time_limit=None) -> "SAT"\|"UNSAT"\|"UNKNOWN"` | Giải; `UNKNOWN` khi hết giờ |
-| `status` | Trạng thái lần `solve` gần nhất |
-| `get_model() -> list[int] \| None` | Model đầy đủ (literal có dấu) khi `status == "SAT"` |
-| `n_vars`, `n_clauses` | Số biến solver đã biết, số clause đã nạp |
-| `solve_time` | Thời gian giải lần gần nhất (giây) |
-| `delete()`, `with` | Giải phóng solver native |
+Import dùng: `from pysat.solvers import Solver`, `from pysat.card import CardEnc, EncType`.
 
-Lưu ý đã kiểm chứng: `Solver.nof_clauses()` trả số clause trong header DIMACS, **không**
-phải số clause thêm tăng dần (trả `0` sau `add_clause`). `n_clauses` vì vậy tự đếm.
-`Solver.nof_vars()` cập nhật đúng theo biến lớn nhất đã thấy.
+- Tạo solver: `Solver(name="cadical195", bootstrap_with=clauses)`. `clauses` là list các list số nguyên, literal âm là phủ định. Hỗ trợ `with Solver(...) as s:` và `s.delete()`.
+- Thêm mệnh đề: `s.add_clause([1, -2])`. Thêm sau khi đã `solve` rồi solve lại được (xem bảng incremental).
+- Giải: `s.solve(assumptions=[...])` trả `True` (SAT), `False` (UNSAT). Không có budget thì không trả `None`.
+- Model: `s.get_model()` trả list literal có dấu, hoặc `None`. Đã kiểm với `cadical195`: 30 instance 3-SAT ngẫu nhiên (20 biến, 60 mệnh đề), 0 model vi phạm mệnh đề.
+- Core khi UNSAT dưới assumptions: `s.get_core()`. Ví dụ: assumptions `[-1, -2]` trên `[[1,2],[-1,2],[1,-2]]` cho core `[-1]`.
+- Thống kê: `s.accum_stats()` trả dict có `conflicts`, `decisions`, `propagations`, `restarts`. Một số solver không ghi `propagations` đúng (ví dụ `maplesat` báo 0), chưa kiểm nguyên nhân.
 
-`validate_clause(clause)` là hàm dùng chung kiểm tra clause (rỗng, literal `0`, không phải
-`int`) cho backend.
+## Timeout với PySAT thô
 
-## 3. Lấy model
+Dấu hiệu UNKNOWN là `solve_limited()` trả `None`.
 
-- `Solver.get_model()` trả **đủ** biến (True/False dạng literal có dấu), kiểm chứng trên
-  `path4` K=2: pairwise 16/16 biến, seqcounter 40/40 biến (kể cả aux var của `pysat.card`).
-- Decode: `src/sat/pairwise.decode_model(cnf, model)` lấy literal dương, đòi mỗi đỉnh đúng
-  một nhãn và nhãn là hoán vị `1..n`, nếu không → `ValueError` (không bỏ qua model sai).
-- Model chỉ được dùng khi `status == "SAT"`; `get_model()` trả `None` ở trạng thái khác.
+- Budget theo conflict: `s.conf_budget(n)` rồi `s.solve_limited()`. Đã kiểm `cadical195` và `minisat22` trên PHP(11,10) với `n=200`: trả `None` trong khoảng 1 ms. `cadical195` cũng trả `None` với `n=2000` trên PHP(10,9).
+- Budget không ổn định giữa các solver trong cùng một process. Với `minisat22`, `glucose4`, `maplesat`, solver đầu tiên trong process tôn trọng budget, các solver sau đôi khi bỏ qua budget và giải đủ tới kết quả (`False`, ví dụ `glucose4` 258 231 conflict, `minisat22` 998 326 conflict). `cadical195` cho kết quả nhất quán trong 3 lần chạy riêng và trong kịch bản hai solver liên tiếp. Nguyên nhân chưa kiểm.
+- Budget theo propagation: `s.prop_budget(n)` có hiệu lực với `minisat22`, `glucose4`, `maplesat` (kết quả thiếu nhất quán như trên). `cadical195` ném `NotImplementedError: Limit on propagations is currently unsupported by CaDiCaL.`. `lingeling` ném `NotImplementedError`.
+- Ngắt theo thời gian thực: `threading.Timer(0.5, s.interrupt)` cộng `s.solve_limited(expect_interrupt=True)`. Với `minisat22`, `glucose4`, `maplesat` trả `None` sau khoảng 0.5 s. Với `cadical195`, `interrupt()` ném `NotImplementedError: Limited solve is currently unsupported by CaDiCaL.` trong thread phụ, solver chạy tới hết và trả `False` sau 4.6 s. `lingeling` ném `NotImplementedError` ngay trên `solve_limited`.
+- Kết luận cho PySAT thô: với `cadical195` chỉ có `conf_budget` là đường UNKNOWN đã kiểm. Với họ minisat (`minisat22`, `glucose4`, `maplesat`) có thể dùng `interrupt` đã kiểm cho một lần giải, nhưng không nên tin budget khi giải nhiều lần trong một process. Chưa kiểm các solver khác (`cadical103`, `cadical153`, `cadical300`, `gluecard3`, `gluecard4`, `maplechrono`, `maplecm`, `mergesat3`, `minicard`, `minisatep`) trên instance khó.
 
-## 4. Timeout
+## Incremental và assumptions theo solver
 
-PySAT **không** có một cơ chế timeout thống nhất; hai cơ chế dùng được, chọn theo family
-solver (đọc mã nguồn `pysat/solvers.py` để xác nhận, không suy đoán):
+Kiểm trên instance nhỏ `[[1,2],[-1,2],[1,-2]]`. Với mỗi solver: giải, giải với assumptions `[-1,-2]` (kỳ vọng `False`, core `[-1]`), thêm mệnh đề `[3]` rồi giải lại.
 
-| Cơ chế | Family | Cách làm |
-|---|---|---|
-| `interrupt()` | `glucose3/4/42`, `gluecard3/4`, `minisat22`, `minisat-gh`, `minisat-ep`, `maplesat`, `maplechrono`, `maplecm`, `mergesat3` | watchdog thread gọi `interrupt()`, giải bằng `solve_limited(expect_interrupt=True)`; chính xác theo đồng hồ |
-| `conf_budget()` | `cadical103/153/195/300`, `kissat404` | vòng lặp: `conf_budget(budget)` → `solve_limited()`; `None` nghĩa là chưa kết luận → kiểm tra deadline, tăng gấp đôi budget, lặp lại |
+| Solver | Tạo được | assumptions có hiệu lực | thêm mệnh đề sau solve |
+|---|---|---|---|
+| cadical103, cadical153, cadical195, cadical300 | có | có | có |
+| glucose3, glucose4, glucose42 | có | có | có |
+| gluecard3, gluecard4 | có | có | có |
+| lingeling | có | có | có |
+| maplechrono, maplecm, maplesat | có | có | có |
+| mergesat3, minicard, minisat22, minisatep | có | có | có |
+| kissat404 (alias ks, ks4, kissat, kissat4) | có | KHÔNG: bỏ qua, cảnh báo, trả kết quả sai | KHÔNG: process bị abort |
+| cryptosat, minisatgh | KHÔNG: `NoSuchSolverError` | - | - |
 
-- **Chưa hỗ trợ**: `lingeling` (`interrupt`, `solve_limited`, `conf_budget` đều
-  `NotImplementedError`), `minicard` (không nằm trong hai family trên). Nếu
-  `Config.time_limit` được đặt với family đó → `BackendError`, không im lặng bỏ qua.
-- **Chưa hỗ trợ**: `prop_budget()` trên CaDiCaL và Kissat (`NotImplementedError`).
-- Đo thực tế trên `pysat.examples.genhard.PHP(nof_holes=13)` với `time_limit=0.3`:
-  `glucose4` → `UNKNOWN` sau **0.30 s**; `cadical195` → `UNKNOWN` sau **0.33 s**.
-- Sai số của cơ chế `conf_budget`: budget là số xung đột, không phải giây, nên mỗi lần
-  `solve_limited` có thể vượt deadline; độ vượt bị chặn bởi thời gian của vòng trước
-  (budget tăng gấp đôi). Cần đo kỹ hơn ở W2 nếu dùng `time_limit` sát ngưỡng.
-- Cờ interrupt còn sót: với family dùng `interrupt()`, nếu watchdog bắn đúng lúc solve
-  vừa xong thì lần `solve` **kế tiếp trên cùng backend** có thể trả `UNKNOWN`. Pipeline
-  W1 luôn dựng backend mới cho mỗi ngưỡng K nên ảnh hưởng cục bộ, và hướng sai là
-  "thận trọng" (`FEAS`/`TO` thay vì `OPT`), không bao giờ cho nghiệm sai.
-- **Phạm vi của `time_limit`**: ngân sách cho **cả chuỗi K** (WORK BREAKDOWN §5), gồm
-  `build_cnf` (encode), `add_clauses` (nạp clause) và `solve` của mọi lần dò. `_probe`
-  kiểm phần thời gian còn lại trước khi encode và sau khi nạp clause thì truyền phần còn
-  lại vào solver. Pha đang chạy khi hết giờ vẫn hoàn thành, nên `t_total` chỉ vượt
-  `time_limit` một khoảng nhỏ — đo trên máy dev (`cadical195`, `.venv` Python 3.11):
-  `grid(10,10)` limit 1.0 s → `t_total` **1.19 s** (`TO`); `grid(8,8)` limit 1.0 s →
-  **1.10 s** (`FEAS`), limit 2.0 s → **2.29 s** (`FEAS`). Test dùng cận
-  `t_total < 2 * time_limit + 0.5` (`tests/sat/test_solve.py`).
-- `time_limit` ≤ 0 → hết ngân sách trước khi encode: không dựng CNF, `UNKNOWN` ngay
-  (`TO` nếu chưa có nghiệm nào).
+Lưu ý: kết quả assumptions chỉ kiểm trên instance 3 biến. Chưa kiểm trên instance lớn.
 
-## 5. Assumptions
+## Mã hóa AMO và at-most-k: `pysat.card.EncType`
 
-- `solve(assumptions=[...])` và `solve_limited(assumptions=[...])` hoạt động với CaDiCaL
-  (kiểm chứng: `solve(assumptions=[-1, -2])` trên clause `(1 ∨ 2)` trả `False`).
-- **Chưa hỗ trợ**: Kissat bỏ qua `assumptions` (PySAT phát `warnings.warn`).
-- Danh sách assumption không được chứa literal trùng.
-- W1 không dùng assumptions: mỗi ngưỡng K dựng CNF mới (rõ ràng hơn, chậm hơn).
-  Incremental kèm assumption là hạng mục W2.
+Kiểm bằng `CardEnc.atmost` trên 6 literal, bound 1, 2, 3. Tính đúng được kiểm bằng cách thử 64 phép gán với `cadical195` và so với `sum <= bound`.
 
-## 6. AMO có sẵn
+| Encoder (giá trị) | bound=1 | bound=2 | bound=3 | Ghi chú |
+|---|---|---|---|---|
+| pairwise (0) | đúng, 15 mệnh đề | `UnsupportedBound` | `UnsupportedBound` | chỉ AMO |
+| seqcounter (1) | đúng, 14 mệnh đề | đúng, 18 | đúng, 18 | |
+| sortnetwrk (2) | đúng, 59 | đúng, 59 | đúng, 59 | |
+| cardnetwrk (3) | đúng, 28 | đúng, 56 | đúng, 56 | |
+| bitwise (4) | đúng, 18 | `UnsupportedBound` | `UnsupportedBound` | chỉ AMO |
+| ladder (5) | đúng, 24 | `UnsupportedBound` | `UnsupportedBound` | chỉ AMO |
+| totalizer (6) | đúng, 32 | đúng, 32 | đúng, 32 | |
+| mtotalizer (7) | đúng, 33 | đúng, 33 | đúng, 32 | |
+| kmtotalizer (8) | đúng, 20 | đúng, 31 | đúng, 30 | |
+| native (9) | 0 mệnh đề, sai | 0 mệnh đề, sai | 0 mệnh đề, sai | không sinh CNF, không dùng với `CardEnc` |
 
-`pysat.card.CardEnc.atmost(lits, bound=1, vpool=pool, encoding=EncType.<tên>)`.
-Số clause cho `m = 3` literal (đo thực tế):
+AMO là bound=1. Chưa kiểm tính đúng với n lớn hơn 6.
 
-| `EncType` | pairwise | seqcounter | cardnetwrk | sortnetwrk | totalizer | mtotalizer | kmtotalizer | bitwise | ladder | native |
-|---|---|---|---|---|---|---|---|---|---|---|
-| clause (m=3) | 3 | 5 | 17 | 17 | 9 | 11 | 8 | 6 | 12 | 0 |
+## Kissat
 
-- `pairwise` (mặc định của ABP) do `src/sat/pairwise.amo` tự sinh: `C(m,2)` clause.
-- Khi truyền `vpool`, `CardEnc` trả `CNFPlus`; với encoding không phải `native`, ràng buộc
-  vẫn nằm đầy đủ trong `.clauses`.
-- **Chưa hỗ trợ**: `native` — ràng buộc nằm trong `CNFPlus.atmosts` (không phải clause), chỉ
-  solver MiniCard mới hiểu; backend chưa hỗ trợ clause native nên `amo(..., "native")` báo lỗi
-  thay vì im lặng làm mất ràng buộc.
+Cách tới Kissat:
 
-## 7. Kissat
+- Qua PySAT: tên `kissat404`. Tạo được. Không có binary kissat ngoài trên PATH.
+- Kết quả kiểm trên Windows, không đạt yêu cầu dùng được:
+  - Assumptions bị bỏ qua. PySAT in cảnh báo `Kissat does not support assumptions. The assumptions parameter will be ignored.` và `solve(assumptions=[-1,-2])` trả `True` trên instance mà đáp án đúng là `False`. Đây là lỗi im lặng, dễ cho kết quả sai.
+  - `add_clause` sau `solve` làm process thoát với mã `-1073740791`, in `kissat_add: Coverage goal 'solver->level' reached.`. Không incremental.
+  - Model sai. Trên `[[1,2],[-1,2],[1,-2]]`, `get_model()` trả `[-1,-2]`, vi phạm mệnh đề `[1,2]`. Lặp lại được trong 2 lần chạy.
+  - Crash (`access violation`, mã `-1073741819`) trên 3-SAT ngẫu nhiên 20 biến, 40 mệnh đề (seed 7), trước khi `solve` trả về. Cũng crash khi gọi `conf_budget`/`prop_budget`/`interrupt` trên PHP(10,9). Chưa tách được lệnh nào gây crash.
+  - Trường hợp tầm thường `[[1],[2,3]]` cho `True`, model `[1,2,3]` đúng.
+- Kết luận: Kissat qua PySAT `kissat404` không dùng được trong môi trường này. Không cần đưa vào W1. Chưa kiểm binary kissat ngoài (phải cài và đo riêng).
 
-**Trạng thái W1: chưa hỗ trợ — gác sang W2.** W1 chỉ dùng CaDiCaL (mặc định `cadical195`)
-và Glucose; RQ2 chỉ so hai solver này (`docs/sat_spec.md` mục 9).
+## Đo t_encode, t_solve và bộ nhớ
 
-Lý do gác:
+- `t_encode`: `time.perf_counter()` quanh `CardEnc.atmost`. Với `seqcounter`, n=2000, k=50: 1.17 s và 1.30 s qua 2 lần chạy, 196 900 mệnh đề.
+- `t_load`: thời gian `Solver(name, bootstrap_with=...)`, gồm đưa mệnh đề vào solver. Với `cadical195` trên cùng CNF: 0.19 s đến 0.21 s. Đây là mục riêng, không gộp vào `t_encode`.
+- `t_solve`: `time.perf_counter()` quanh `s.solve()`. Với `cadical195` trên CNF trên: 0.006 s đến 0.007 s, SAT, 0 conflict. Instance này dễ, không đại diện.
+- Bộ nhớ, hai cách đo khác nhau:
+  - `tracemalloc`: chỉ thấy heap của Python, không thấy bộ nhớ của solver C. Đỉnh 25.6 MB trong lúc encode.
+  - Working set của process qua `GetProcessMemoryInfo` (ctypes, psapi): nền 19.8 MB. Sau encode 48.5 MB, đỉnh 129.0 MB. Khi solver `cadical195` còn sống 94.1 MB. Sau `delete()` 49.5 MB. Đỉnh 129.0 MB xảy ra trước lần đo sau encode. Chưa tách được encode với load trong đỉnh này.
+- Khác biệt: `t_encode` và `tracemalloc` là phía Python. `t_solve` là thời gian C của solver. Working set gồm cả bộ nhớ C và bộ nhớ Python.
 
-- Family `kissat404` của PySAT giết process khi nạp clause: wheel `1.9.dev15` trên Windows
-  báo `Windows fatal exception: access violation` (exit code `-1073741819` = `0xC0000005`).
-- Đường chạy binary ngoài **chưa kiểm chứng** được trên máy dev: không có binary Kissat và
-  không có toolchain C để build.
-- Release upstream `arminbiere/kissat` (`rel-4.0.4`) chỉ ship `apple-amd64`, `apple-arm64`,
-  `linux-amd64` — **không có bản Windows**; `winget`/scoop/conda-forge/PyPI đều không có.
+## Kết luận về Kissat
 
-Chọn `Config(sat_solver="kissat")` bị chặn ngay bằng `ValueError`
-(`"kissat chưa hỗ trợ ở W1; gác sang W2."`) trong `src/sat/solve.py`, không để native crash.
-Adapter binary ngoài (`src/sat/kissat.py`) và test của nó đã xóa; không còn đường chạy Kissat.
+Không đưa Kissat vào W1. Lý do: qua PySAT `kissat404` có lỗi assumptions im lặng, model sai, crash, không incremental. Không có binary kissat ngoài để so sánh. Nếu cần Kissat sau này, phải cài binary kissat ngoài, kiểm model và kết quả trên bộ instance nhỏ trước khi dùng.
 
-Mở lại ở W2: cần binary Kissat chạy được trên máy chạy chính thức và một adapter mới; nếu
-không, giữ nguyên đây là hạn chế đã ghi của RQ2.
+## Chưa kiểm
 
-## 8. Đo `t_encode`, `t_solve`, memory
-
-- `t_encode`: `perf_counter()` bọc `build_cnf(...)` trong `src/sat/solve.py::_probe`, cộng dồn
-  qua các ngưỡng K, trả ở `Result.t_encode`. `t_total` bao cả `t_encode` + `t_solve` cộng phần
-  còn lại (nạp clause vào solver, vòng lặp tìm K). `t_encode` của PySAT (`CardEnc`) nằm trong
-  `t_encode`; thời gian `add_clauses` hiện **không** nằm trong `t_encode` lẫn `t_solve`, chỉ có
-  trong `t_total` — cần tách riêng ở W2 nếu muốn so sánh chi phí encode.
-- `t_solve`: `perf_counter()` bọc `backend.solve(...)` trong `_probe` (thời gian **do pipeline
-  đo**, gồm cả chi phí gọi). Với backend PySAT (`SatBackend`) là thân `SatBackend.solve` — lời
-  gọi solver, và với CaDiCaL là cả vòng lặp `conf_budget` (mục 3); không có I/O.
-- Log từng lần dò: `Result.metadata["probes"] = [{"k", "status", "b", "t_encode",
-  "t_solve", "variables", "clauses"}, ...]`; `variables`/`clauses` của `Result` là
-  của lần dò **cuối cùng** (`docs/sat_spec.md` mục 6).
-- `peak_memory`: **chưa đo ở W1**, để `None`. Cách đo đề xuất cho chạy chính thức:
-  `psutil.Process().memory_info().rss` (bắt cả bộ nhớ native của solver) hoặc
-  `tracemalloc` (chỉ bộ nhớ Python — **không** thấy bộ nhớ native, nên không đủ). `psutil`
-  chưa nằm trong `requirements.txt`; quyết định thêm hay không để P3 chốt ở `PROTOCOL.md`.
-
-## 9. Chạy test (venv Python 3.11 của repo)
-
-Lệnh (đúng như đã chạy, `.venv` của repo là Python `3.11.15`; `docs/ENV.md` ghi `3.11.17`
-cho env conda của P1 — cùng minor, khác patch):
-
-```
-.\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider --basetemp=C:\Users\ducqu\AppData\Local\Temp\opencode\pytest-w1
-```
-
-Kết quả 2026-10-14 (bỏ Kissat khỏi W1, gác sang W2 — mục 7): `72 passed in 3.06s`
-(`tests/sat/test_kissat.py` đã xóa; `Config(sat_solver="kissat")` → `ValueError`).
-
-- `python-sat==1.9.dev15` trên venv này: import được, `pysat.__version__ = '1.9.dev15'`
-  (khớp `requirements.txt`).
+- Ngắt theo thời gian (`interrupt`) và budget với các solver chưa liệt kê trong mục timeout.
+- Nguyên nhân budget bị bỏ qua giữa các lần giải trong cùng process.
+- Tính đúng của assumptions và core trên instance lớn.
+- Tính đúng của mã hóa AMO với n lớn hơn 6.
+- Nguồn đỉnh bộ nhớ 129.0 MB.
+- Binary kissat ngoài và tìm kiếm trên toàn ổ đĩa.
+- Các gói `gurobipy`, `cplex`, `docplex` không có trong venv.
