@@ -79,10 +79,17 @@ def amo(
     return [list(clause) for clause in cnf.clauses]
 
 
-def trivial_unsat(n: int, k: int) -> bool:
-    """Nhóm ràng buộc 4: ``K >= n`` là UNSAT vì lệch nhãn tối đa là ``n - 1``."""
+def _check_k(k: int) -> None:
+    """K phải là int (không phải bool) với K >= 1."""
+    if isinstance(k, bool) or not isinstance(k, int):
+        raise TypeError(f"K must be int, not {type(k).__name__}: {k!r}.")
     if k < 1:
         raise ValueError("K phải >= 1.")
+
+
+def trivial_unsat(n: int, k: int) -> bool:
+    """Nhóm ràng buộc 4: ``K >= n`` là UNSAT vì lệch nhãn tối đa là ``n - 1``."""
+    _check_k(k)
     return k >= n
 
 
@@ -96,8 +103,9 @@ def build_cnf(
         raise ValueError("Đồ thị phải có ít nhất một đỉnh.")
     if not instance.edges:
         raise ValueError("ABP không xác định khi đồ thị không có cạnh.")
-    if k < 1:
-        raise ValueError("K phải >= 1.")
+    if any(u == v for u, v in instance.edges):
+        raise ValueError("self-loop (u, u) is not allowed.")
+    _check_k(k)
 
     var_of = {(v, p): v * n + p for v in range(n) for p in range(1, n + 1)}
     # Aux var của pysat.card bắt đầu sau vùng biến chính -> không đè id.

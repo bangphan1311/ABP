@@ -97,6 +97,10 @@ Cách tới Kissat:
 
 Không đưa Kissat vào W1. Lý do: qua PySAT `kissat404` có lỗi assumptions im lặng, model sai, crash, không incremental. Không có binary kissat ngoài để so sánh. Nếu cần Kissat sau này, phải cài binary kissat ngoài, kiểm model và kết quả trên bộ instance nhỏ trước khi dùng.
 
+## Kết luận G1 (pipeline + loader)
+
+Pipeline `instance → pairwise CNF → CaDiCaL (cadical195) → decode → verify()` khớp brute-force và CP-SAT trên 10 instance path/cycle/grid/complete, n ≤ 8, cả B tối ưu lẫn SAT/UNSAT tại mọi K (`tests/sat/test_g1_oracle.py`, demo `docs/handoff/sat-g1/`). Loader và generator chạy tối thiểu qua JSON. Kết quả chỉ trên bộ nhỏ này, chưa đo hiệu năng.
+
 ## Chưa kiểm
 
 - Ngắt theo thời gian (`interrupt`) và budget với các solver chưa liệt kê trong mục timeout.

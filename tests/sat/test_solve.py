@@ -349,3 +349,49 @@ def test_default_config_fields_emit_no_warning(recwarn):
     solve_sat(generator.path(4))
 
     assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]
+
+
+def test_self_loop_instance_raises_value_error():
+    instance = Instance(
+        id="loop", name="Loop", n=4, edges=((0, 0), (0, 1)), source="test", tier="toy"
+    )
+    with pytest.raises(ValueError, match="self-loop"):
+        solve_sat(instance)
+    with pytest.raises(ValueError, match="self-loop"):
+        solve_decision(instance, 2)
+
+
+@pytest.mark.parametrize("bad_ub", [0, -1, True, 2.0, "2"])
+def test_invalid_external_ub_format_raises(bad_ub):
+    with pytest.raises(ValueError, match="ub phải là số nguyên >= 1"):
+        solve_sat(generator.path(4), ub=bad_ub)
+
+
+def test_external_ub_below_verified_b_raises():
+    # path4: B = 2 đã verify; ub = 1 sai -> ValueError (không phải ERR).
+    with pytest.raises(ValueError, match="ub=1"):
+        solve_sat(generator.path(4), ub=1)
+
+
+def test_external_ub_equal_to_optimum_still_needs_solver_unsat():
+    # ub không thay thế bằng chứng UNSAT: OPT vẫn do solver chứng minh ở K = 3.
+    instance = generator.path(4)
+
+    result = solve_sat(instance, ub=2)
+
+    assert result.status == "OPT"
+    assert (result.lb, result.ub, result.gap) == (2, 2, 0.0)
+    assert result.metadata["unsat_source"] == "solver"
+    assert [probe["k"] for probe in result.metadata["probes"]] == [1, 2, 3]
+
+
+def test_absent_or_loose_external_ub_keeps_default_search():
+    instance = generator.path(4)
+    default = solve_sat(instance)
+
+    for ub in (None, instance.n - 1, 100):
+        result = solve_sat(instance, ub=ub)
+        assert (result.status, result.lb, result.ub) == (default.status, 2, 2)
+        assert [(p["k"], p["status"]) for p in result.metadata["probes"]] == [
+            (p["k"], p["status"]) for p in default.metadata["probes"]
+        ]
