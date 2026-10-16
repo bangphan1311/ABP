@@ -11,6 +11,7 @@ from threading import Event, Thread
 from time import monotonic
 from typing import Iterable, Literal, Sequence
 
+from pysat.card import CardEnc, EncType, IDPool
 from pysat.solvers import Solver, SolverNames
 
 SolveStatus = Literal["SAT", "UNSAT", "UNKNOWN"]
@@ -91,6 +92,18 @@ def validate_clause(clause: Sequence[int]) -> list[int]:
     return literals
 
 
+def new_id_pool(start_from: int) -> IDPool:
+    """Pool id biến phụ cho ``pysat.card``; bắt đầu sau vùng biến chính."""
+    return IDPool(start_from=start_from)
+
+
+def atmost_one_encoding(literals: Sequence[int], encoding: str, pool: IDPool | None):
+    """Dựng ràng buộc at-most-one bằng ``pysat.card``; trả object CNF thô."""
+    return CardEnc.atmost(
+        lits=list(literals), bound=1, vpool=pool, encoding=getattr(EncType, encoding)
+    )
+
+
 def solver_family(solver_name: str) -> str:
     """Family của một tên/alias solver (``g4`` -> ``glucose4``)."""
     name = solver_name.lower()
@@ -113,6 +126,8 @@ class SatBackend:
     def __init__(self, solver_name: str | None = None, use_timer: bool = False):
         self.solver_name = (solver_name or DEFAULT_SOLVER).lower()
         self.family = solver_family(self.solver_name)
+        if self.family in PYSAT_KISSAT_FAMILIES:
+            raise ValueError("kissat chưa hỗ trợ ở W1; gác sang W2.")
 
         try:
             self._solver = Solver(name=self.solver_name, use_timer=use_timer)

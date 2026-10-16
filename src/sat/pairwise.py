@@ -18,9 +18,8 @@ from dataclasses import dataclass, field
 from itertools import combinations
 from typing import Sequence
 
-from pysat.card import CardEnc, EncType, IDPool
-
 from src.common.models import Instance
+from src.sat.backend import atmost_one_encoding, new_id_pool
 
 DEFAULT_ABP_ENCODING = "pairwise"
 DEFAULT_AMO_ENCODING = "pairwise"
@@ -72,9 +71,7 @@ def amo(
             f"chọn một trong {', '.join(SUPPORTED_AMO_ENCODINGS)}."
         )
 
-    cnf = CardEnc.atmost(
-        lits=lits, bound=1, vpool=pool, encoding=getattr(EncType, encoding)
-    )
+    cnf = atmost_one_encoding(lits, encoding, pool)
     # Ràng buộc native không nằm trong clause -> sẽ mất ràng buộc nếu bỏ qua.
     if getattr(cnf, "atmosts", ()):
         raise ValueError(f"amo_encoding '{encoding}' trả ràng buộc native, chưa hỗ trợ.")
@@ -104,7 +101,7 @@ def build_cnf(
 
     var_of = {(v, p): v * n + p for v in range(n) for p in range(1, n + 1)}
     # Aux var của pysat.card bắt đầu sau vùng biến chính -> không đè id.
-    pool = IDPool(start_from=n * n + 1)
+    pool = new_id_pool(start_from=n * n + 1)
 
     assignment: list[list[int]] = []
     for v in range(n):

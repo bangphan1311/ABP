@@ -3,12 +3,14 @@
 import pytest
 from pysat.examples.genhard import PHP
 
+from src.sat import generator
 from src.sat.backend import (
     DEFAULT_SOLVER,
     BackendError,
     SatBackend,
     supported_solvers,
 )
+from src.sat.pairwise import build_cnf, decode_model
 
 
 def test_solve_toy_cnf_sat():
@@ -81,3 +83,56 @@ def test_supported_solvers_are_constructible():
 
 def test_default_solver_supports_time_limit():
     assert DEFAULT_SOLVER in supported_solvers()
+
+
+# Kissat của PySAT giết process khi nạp clause: phải chặn ở khởi tạo, trước native.
+@pytest.mark.parametrize("solver_name", ["kissat404", "kissat"])
+def test_kissat_is_blocked_at_backend_construction(solver_name):
+    with pytest.raises(ValueError, match="kissat chưa hỗ trợ ở W1; gác sang W2."):
+        SatBackend(solver_name)
+
+
+class FakeBackend:
+    """Backend giả: ghi lại clause, không giải. Đủ giao diện mà tầng trên dùng."""
+
+    def __init__(self):
+        self.clauses: list[list[int]] = []
+        self._status = "UNKNOWN"
+
+    @property
+    def status(self):
+        return self._status
+
+    def add_clause(self, clause):
+        self.clauses.append(list(clause))
+
+    def add_clauses(self, clauses):
+        for clause in clauses:
+            self.add_clause(clause)
+
+    def solve(self, time_limit=None):
+        return self._status
+
+    def get_model(self):
+        return None
+
+
+def test_encoding_is_identical_across_backends():
+    # path(4): K=2 SAT (labels 2,4,1,3), K=3 UNSAT. Encoding không phụ thuộc backend.
+    cnf = build_cnf(generator.path(4), 2)
+
+    fake = FakeBackend()
+    fake.add_clauses(cnf.clauses)
+    assert fake.clauses == cnf.clauses
+
+    with SatBackend("cadical195") as real:
+        real.add_clauses(cnf.clauses)
+        assert real.n_clauses == len(fake.clauses)
+        assert real.solve() == "SAT"
+        labeling = decode_model(cnf, real.get_model())
+        assert set(labeling.values()) == {1, 2, 3, 4}
+
+    unsat_cnf = build_cnf(generator.path(4), 3)
+    with SatBackend("cadical195") as real:
+        real.add_clauses(unsat_cnf.clauses)
+        assert real.solve() == "UNSAT"
