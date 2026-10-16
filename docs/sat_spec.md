@@ -9,15 +9,15 @@ Cho `G = (V, E)` đồ thị đơn, vô hướng, `n = |V|`, và ngưỡng `K`:
 
 > Hỏi có tồn tại song ánh `f: V → {1, …, n}` sao cho `|f(u) − f(v)| ≥ K` với mọi cạnh `{u, v} ∈ E`?
 
-Đồ thị đơn, vô hướng nên mỗi cạnh là cặp không thứ tự `{u, v}` với `u ≠ v`; điều kiện không phụ thuộc thứ tự `u, v`. Loader không loại cạnh trùng: `{u, v}` lặp hoặc `{v, u}` đều được nhận và đều được đếm trong `m = |E|` (số phần tử của tuple cạnh, xem `src/sat/loader.py`).
+Đồ thị đơn, vô hướng nên mỗi cạnh là cặp không thứ tự `{u, v}` với `u ≠ v`; điều kiện không phụ thuộc thứ tự `u, v`. Loader loại cạnh trùng ngay lúc đọc: `{u, v}` lặp hoặc `{v, u}` chỉ tính một cạnh; `m = |E|` đếm số cạnh `{u, v}` duy nhất (xem `src/sat/loader.py`).
 
 Trường hợp biên:
 
-- `K` nguyên, `K ≥ 1`; `K < 1`: `ValueError`. `K = 1`: luôn SAT (hai đỉnh kề nhau có nhãn khác nhau nên lệch ≥ 1). `K` không nguyên (vd `2.5`) → `TypeError`; `K = True` (bool) hiện được nhận như `1`, chưa bị chặn (câu hỏi mở).
-- `K ≥ n` (với `|E| ≥ 1`): UNSAT, vì lệch nhãn lớn nhất chỉ là `n − 1`. Chốt UNSAT trước khi dựng CNF (`trivial_unsat` trong `src/sat/pairwise.py`, được kiểm tra trước `build_cnf` trong `src/sat/solve.py`); `build_cnf` không tự từ chối `K ≥ n`.
-- `|E| = 0` hoặc `n = 0`: về mặt toán học điều kiện trống là SAT, nhưng ABP không xác định → `ValueError` khi dựng CNF. Đây là kiểm tra đầu vào, không phải đáp án toán học.
+- `K` phải là `int` (không phải `bool`) và `K ≥ 1`. Sai kiểu — `bool` (kể cả `True`/`False`) hoặc không nguyên (vd `2.5`) — → `TypeError`; `K` nguyên nhưng `K < 1` → `ValueError`. `K = 1`: luôn SAT (hai đỉnh kề nhau có nhãn khác nhau nên lệch ≥ 1).
+- Kiểm tra đầu vào chạy trước mọi thứ: `|E| = 0` hoặc `n = 0` → `ValueError` trước `trivial_unsat`, nên đồ thị rỗng không bao giờ trả UNSAT. Về mặt toán học điều kiện trống là SAT, nhưng ABP không xác định — đây là kiểm tra đầu vào, không phải đáp án toán học.
+- Sau kiểm tra đầu vào: `K ≥ n` (với `|E| ≥ 1`): UNSAT, vì lệch nhãn lớn nhất chỉ là `n − 1`. Chốt UNSAT trước khi dựng CNF (`trivial_unsat` trong `src/sat/pairwise.py`, được kiểm tra trước `build_cnf` trong `src/sat/solve.py`); `build_cnf` không tự từ chối `K ≥ n`.
 - Đỉnh cô lập: vẫn nhận một nhãn, không có clause khoảng cách. Đồ thị không liên thông: không xử lý riêng, `f` là song ánh toàn cục.
-- Cạnh tự khuyên `(u, u)`: bị từ chối khi đọc dữ liệu qua loader (`src/sat/loader.py`). `Instance` dựng tay trong bộ nhớ không qua loader: `_validate_instance` (`src/sat/solve.py`) không kiểm tra tự khuyên, nên `solve_sat` có thể trả `ERR` với thông báo gây hiểu lầm thay vì `ValueError` (câu hỏi mở).
+- Cạnh tự khuyên `(u, u)`: bị từ chối bằng `ValueError` ở bước kiểm tra đầu vào, cả khi đọc qua loader (`src/sat/loader.py`) lẫn với `Instance` dựng tay trong bộ nhớ qua `_validate_instance` (`src/sat/solve.py`).
 
 ## 2. Biến SAT
 
@@ -82,5 +82,5 @@ lặp khi lo + 1 < hi:
 - UNSAT đầu tiên → `B = K − 1` tối ưu; dừng.
 - ERR (lỗi encoding, không phải UNSAT/OPT): model SAT tại `K` không đạt ngưỡng khi `verify`; nghiệm `OPT`/`FEAS` mâu thuẫn bằng chứng dò (giá trị khác ngưỡng đã chứng minh); hoặc không có nghiệm verify được dù chưa hết giờ. Ba trường hợp này `solve_sat` trả `ERR`.
 - Không mượn hướng tìm kiếm của 2DBMP: không duyệt `K` từ trên xuống, không tìm kiếm nhị phân. Lý do: duyệt tăng dần đảm bảo lần dò UNSAT đầu tiên đồng thời chứng minh tối ưu, và mọi lần dò SAT trước đó đều cho nghiệm đã verify (giả thuyết chưa đo: các ngưỡng cao là UNSAT khó nhất).
-- `ub = hi − 1` do `solve_sat` tự tính từ lần UNSAT đầu tiên (`summarise_result`, `src/sat/solve.py`); `ub` ngoài (P1/P2) chưa có đường nhận vào ở W1. Cận trên tầm thường của bài toán là `n − 1`; sau lần UNSAT đầu tiên `ub = B` tối ưu.
+- `solve_sat` nhận tham số `ub` ngoài tùy chọn do P2 tính. Không truyền `ub`: solver tự tính mặc định `ub = hi − 1` từ lần UNSAT đầu tiên (`summarise_result`, `src/sat/solve.py`); cận trên tầm thường của bài toán là `n − 1`, sau lần UNSAT đầu tiên `ub = B` tối ưu. `ub` ngoài không hợp lệ (vd: `ub` nhỏ hơn `B` đã verify SAT) → `ValueError`.
 - Mỗi ngưỡng dựng CNF mới và dùng backend mới; không dùng incremental/assumption ở W1.
