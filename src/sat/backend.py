@@ -11,6 +11,7 @@ from threading import Event, Thread
 from time import monotonic
 from typing import Iterable, Literal, Sequence
 
+from pysat.card import CardEnc, EncType, IDPool
 from pysat.solvers import Solver, SolverNames
 
 SolveStatus = Literal["SAT", "UNSAT", "UNKNOWN"]
@@ -91,6 +92,18 @@ def validate_clause(clause: Sequence[int]) -> list[int]:
     return literals
 
 
+def new_id_pool(start_from: int) -> IDPool:
+    """Pool id biến phụ cho ``pysat.card``; bắt đầu sau vùng biến chính."""
+    return IDPool(start_from=start_from)
+
+
+def atmost_one_encoding(literals: Sequence[int], encoding: str, pool: IDPool | None):
+    """Dựng ràng buộc at-most-one bằng ``pysat.card``; trả object CNF thô."""
+    return CardEnc.atmost(
+        lits=list(literals), bound=1, vpool=pool, encoding=getattr(EncType, encoding)
+    )
+
+
 def solver_family(solver_name: str) -> str:
     """Family của một tên/alias solver (``g4`` -> ``glucose4``)."""
     name = solver_name.lower()
@@ -103,11 +116,7 @@ def solver_family(solver_name: str) -> str:
 
 
 def supported_solvers() -> tuple[str, ...]:
-    """Tên solver gợi ý, tất cả đều nạp được clause và giới hạn được thời gian.
-
-    Không gồm ``kissat``: family của PySAT crash process khi nạp clause (xem
-    ``docs/sat_tooling.md`` mục 7).
-    """
+    """Tên solver gợi ý, tất cả đều nạp được clause và giới hạn được thời gian."""
     return SUPPORTED_SOLVERS
 
 
@@ -117,13 +126,8 @@ class SatBackend:
     def __init__(self, solver_name: str | None = None, use_timer: bool = False):
         self.solver_name = (solver_name or DEFAULT_SOLVER).lower()
         self.family = solver_family(self.solver_name)
-
-        # Chặn từ lúc khởi tạo: family Kissat của PySAT giết process khi nạp clause.
         if self.family in PYSAT_KISSAT_FAMILIES:
-            raise BackendError(
-                f"PySAT family '{self.family}' crash process khi nạp clause; "
-                "Kissat chưa được hỗ trợ ở W1 (xem docs/sat_tooling.md mục 7)."
-            )
+            raise ValueError("kissat chưa hỗ trợ ở W1; gác sang W2.")
 
         try:
             self._solver = Solver(name=self.solver_name, use_timer=use_timer)
@@ -160,9 +164,7 @@ class SatBackend:
     # --- nạp CNF --------------------------------------------------------
 
     def add_clause(self, clause: Sequence[int]) -> None:
-        """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên.
-
-        """
+        """Thêm một clause. Từ chối clause rỗng và literal 0/không nguyên."""
         self._solver.add_clause(validate_clause(clause))
         self._n_clauses += 1
 
@@ -226,7 +228,7 @@ class SatBackend:
             done.set()
 
     def _solve_with_conflict_budget(self, time_limit: float):
-        """Timeout bằng ``conf_budget`` tăng dần (CaDiCaL, Kissat).
+        """Timeout bằng ``conf_budget`` tăng dần (CaDiCaL).
 
         Mỗi lần gọi chỉ bị chặn theo số xung đột, nên đồng hồ được kiểm tra
         giữa các vòng; độ vượt deadline bị chặn bởi thời gian của vòng trước.

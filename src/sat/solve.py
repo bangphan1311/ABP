@@ -13,7 +13,12 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
-from src.sat.backend import DEFAULT_SOLVER, BackendError, SatBackend
+from src.sat.backend import (
+    DEFAULT_SOLVER,
+    BackendError,
+    SatBackend,
+    solver_family,
+)
 from src.sat.pairwise import (
     DEFAULT_ABP_ENCODING,
     DEFAULT_AMO_ENCODING,
@@ -58,11 +63,17 @@ def _warn_ignored_config(cfg: Config) -> None:
     )
 
 
-def solve_sat(instance: Instance, config: Config | None = None) -> Result:
+def solve_sat(
+    instance: Instance, config: Config | None = None, ub: int | None = None
+) -> Result:
     """Giải ABP bằng SAT; trả ``Result`` theo CONTRACT.md.
 
     Tìm K theo WORK BREAKDOWN §5 / Quang.md §3.3: ``K ← B + 1`` từ cận dưới, dừng ở
     lần UNSAT đầu tiên (ngưỡng đó chứng minh ``B`` tối ưu).
+
+    ``ub`` (tùy chọn) là cận trên ngoài do bên gọi tính. Chỉ kiểm tra, không dùng để
+    chứng minh: OPT vẫn cần UNSAT của solver. Nếu B đã verify lớn hơn ``ub`` → ``ValueError``
+    (``ub`` sai, không phải lỗi encoding). Vắng ``ub``: hành vi mặc định.
 
     ``Config.time_limit`` là ngân sách cho **cả chuỗi K**: bao gồm ``build_cnf`` (encode),
     ``add_clauses`` (nạp clause) và ``solve`` của mọi lần dò. Deadline được kiểm tra trước
@@ -81,7 +92,9 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         raise ValueError(
             f"abp_encoding '{abp_encoding}' chưa hỗ trợ; chọn {ABP_ENCODINGS}."
         )
+    _validate_solver(solver_name)
     _validate_instance(instance)
+    _validate_ub(ub)
 
     start = perf_counter()
     deadline = None if cfg.time_limit is None else start + cfg.time_limit
@@ -123,6 +136,10 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
                     f"Nghiệm tại K={k} chỉ đạt {value} < K: mâu thuẫn encoding."
                 )
                 break
+            if ub is not None and value > ub:  # ub bên ngoài sai -> ValueError
+                raise ValueError(
+                    f"ub={ub} nhỏ hơn B={value} đã verify: ub không hợp lệ."
+                )
             lo, best_solution, best_cnf = value, solution, cnf
         elif status == "UNSAT":
             # Ngưỡng K = lo + 1 đã bị bác -> B = lo là tối ưu.
@@ -147,7 +164,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
 
     t_total = perf_counter() - start
 
-    status, lb, ub, gap, verified = summarise_result(
+    status, lb, ub_out, gap, verified = summarise_result(
         instance, lo, hi, best_solution, timed_out, error is not None
     )
 
@@ -170,7 +187,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
         )
 
     if error is not None:
-        status, lb, ub, gap = "ERR", None, None, None
+        status, lb, ub_out, gap = "ERR", None, None, None
 
     metadata: dict[str, object] = {
         "method": METHOD,
@@ -189,7 +206,7 @@ def solve_sat(instance: Instance, config: Config | None = None) -> Result:
     return Result(
         status=status,
         lb=lb,
-        ub=ub,
+        ub=ub_out,
         gap=gap,
         t_encode=t_encode,
         t_solve=t_solve,
@@ -219,6 +236,7 @@ def solve_decision(
         raise ValueError(
             f"abp_encoding '{abp_encoding}' chưa hỗ trợ; chọn {ABP_ENCODINGS}."
         )
+    _validate_solver(solver_name)
     _validate_instance(instance)
 
     status, solution, _cnf, _t_encode, _t_solve = _probe(
@@ -292,6 +310,24 @@ def summarise_result(
     return "FEAS", value, ub, float(ub - value), value
 
 
+def _validate_solver(solver_name: str) -> None:
+    """Từ chối solver chưa hỗ trợ ở W1: Kissat gác sang W2.
+
+    Family ``kissat404`` của PySAT giết process khi nạp clause, và chưa có binary
+    Windows chạy được (``docs/sat_tooling.md`` mục 7). Chặn trước khi dựng backend.
+    """
+    if solver_family(solver_name) == "kissat404":
+        raise ValueError("kissat chưa hỗ trợ ở W1; gác sang W2.")
+
+
+def _validate_ub(ub: int | None) -> None:
+    """``ub`` tùy chọn phải là số nguyên >= 1 (đồ thị có cạnh thì B >= 1, K = 1 luôn SAT)."""
+    if ub is None:
+        return
+    if isinstance(ub, bool) or not isinstance(ub, int) or ub < 1:
+        raise ValueError(f"ub phải là số nguyên >= 1: {ub!r}.")
+
+
 def _validate_instance(instance: Instance) -> None:
     """Kiểm tra biên của ``Instance`` dựng tay (loader đã kiểm tra cùng điều kiện).
 
@@ -305,6 +341,8 @@ def _validate_instance(instance: Instance) -> None:
         raise ValueError("Đồ thị phải có ít nhất một đỉnh.")
     if not instance.edges:
         raise ValueError("ABP không xác định khi đồ thị không có cạnh.")
+    if any(u == v for u, v in instance.edges):
+        raise ValueError("self-loop (u, u) is not allowed.")
 
     for u, v in instance.edges:
         for endpoint in (u, v):

@@ -134,3 +134,18 @@ def test_decode_model_rejects_incomplete_or_duplicate_labels():
     with pytest.raises(ValueError, match="nhãn trong model"):
         # Đỉnh 0 có hai nhãn.
         decode_model(cnf, [cnf.var_of[(0, 1)], cnf.var_of[(0, 2)]])
+
+
+def test_k_must_be_plain_int():
+    for bad in (True, 2.0):
+        with pytest.raises(TypeError):
+            build_cnf(generator.path(4), bad)
+        with pytest.raises(TypeError):
+            trivial_unsat(4, bad)
+
+
+def test_self_loop_is_rejected():
+    instance = generator.path(4)
+    instance.edges = ((0, 0), (0, 1))
+    with pytest.raises(ValueError, match="self-loop"):
+        build_cnf(instance, 2)

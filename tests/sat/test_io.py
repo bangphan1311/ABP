@@ -109,3 +109,45 @@ def test_generator_output_survives_roundtrip_and_solves(tmp_path):
 
     assert result.status == "OPT"
     assert result.lb == oracle.lb
+
+
+@pytest.mark.parametrize(
+    "instance, n, m",
+    [
+        (generator.path(2), 2, 1),
+        (generator.path(7), 7, 6),
+        (generator.cycle(3), 3, 3),
+        (generator.cycle(8), 8, 8),
+        (generator.grid(2, 2), 4, 4),
+        (generator.grid(3, 4), 12, 17),
+        (generator.complete(2), 2, 1),
+        (generator.complete(6), 6, 15),
+    ],
+)
+def test_generator_vertex_and_edge_counts(instance, n, m):
+    assert instance.n == n
+    assert len(instance.edges) == m
+    assert len(set(instance.edges)) == m
+    assert all(0 <= u < n and 0 <= v < n and u != v for u, v in instance.edges)
+
+
+def test_loader_dedupes_unordered_edges(tmp_path):
+    path = tmp_path / "dup.json"
+    payload = {
+        "id": "dup", "name": "dup", "n": 3,
+        "edges": [[0, 1], [1, 0], [1, 2], [2, 1], [0, 1]],
+        "source": "test", "tier": "toy",
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert read_instance(path).edges == ((0, 1), (1, 2))
+
+
+@pytest.mark.parametrize("n, edges", [(0, []), (3, [])])
+def test_loader_rejects_empty_graph(tmp_path, n, edges):
+    path = tmp_path / "empty.json"
+    payload = {"id": "e", "name": "e", "n": n, "edges": edges, "source": "s", "tier": "t"}
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        read_instance(path)

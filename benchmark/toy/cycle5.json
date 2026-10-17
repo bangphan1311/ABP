@@ -1,0 +1,29 @@
+{
+  "id": "cycle5",
+  "name": "Cycle graph with 5 vertices",
+  "n": 5,
+  "edges": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      3,
+      4
+    ],
+    [
+      4,
+      0
+    ]
+  ],
+  "source": "generator",
+  "tier": "toy"
+}

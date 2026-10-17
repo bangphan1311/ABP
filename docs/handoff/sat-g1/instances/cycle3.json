@@ -1,0 +1,21 @@
+{
+  "id": "cycle3",
+  "name": "Cycle graph with 3 vertices",
+  "n": 3,
+  "edges": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      0
+    ]
+  ],
+  "source": "generator",
+  "tier": "toy"
+}
