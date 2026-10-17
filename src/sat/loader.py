@@ -70,6 +70,7 @@ def read_instance(path: str | Path) -> Instance:
         raise ValueError("Trường 'edges' phải là danh sách.")
 
     edges: list[tuple[int, int]] = []
+    seen: set[frozenset[int]] = set()
     for edge in raw_edges:
         if not isinstance(edge, list) or len(edge) != 2:
             raise ValueError(f"Cạnh phải là cặp [u, v]: {edge!r}.")
@@ -81,7 +82,13 @@ def read_instance(path: str | Path) -> Instance:
                 raise ValueError(f"Cạnh {edge!r} ngoài khoảng đỉnh 0..{n - 1}.")
         if u == v:
             raise ValueError(f"Cạnh tự khuyên {edge!r} không hợp lệ.")
-        edges.append((u, v))
+        key = frozenset((u, v))  # {u, v} == {v, u}: keep one edge
+        if key not in seen:
+            seen.add(key)
+            edges.append((u, v))
+
+    if n == 0 or not edges:
+        raise ValueError("Instance is empty (n = 0 or no edges).")
 
     return Instance(
         id=raw["id"],
