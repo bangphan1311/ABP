@@ -252,6 +252,26 @@ Doc không chốt. Hai phương án, lý do mỗi bên:
 Quyết định GO/NO-GO thuộc nhóm/customer tại gate M1. Doc này kết thúc ở đây,
 không chốt phương án nào.
 
+## 6. QUYẾT ĐỊNH M1 (2026-10-20): NO-GO Bonus
+
+Customer quyết định tại gate M1: **NO-GO** — chọn phương án B.
+
+- **Lý do**: Core vừa ổn định (matrix 8/8 xanh) và pilot W3 đã đủ việc; chưa có
+  ước tính compute từ `--dry-run` của P3 (blocker mục 4 chưa mở); Kissat bị
+  loại khiến hướng incremental mất công cụ chính; áp dụng chủ động quy tắc
+  WORK BREAKDOWN "khi chậm: cắt Bonus trước, không bao giờ cắt Core".
+- **Bonus bị cắt** (không làm trong W3, muốn làm lại phải chờ gate sau):
+  - Staircase encoding (Bonus 2.1 trong doc 13/WORK BREAKDOWN).
+  - Incremental solving (Bonus 2.2).
+  - Symmetry breaking (Bonus 2.3).
+  - AMO phụ: commander/product (Bonus 2.4).
+- **Hệ quả ghi nhận**: RQ2 chỉ báo cáo CaDiCaL + Glucose (kissat loại);
+  phạm vi Core 2 encoding × 2 AMO × 2 solver giữ nguyên; tài nguyên W3 dồn
+  cho pilot RQ1/RQ2 (ticket 16, 17) và correctness suite cuối (ticket 19).
+- **Việc còn mở của gate** (không chặn quyết định): P3 bổ sung cờ `--dry-run`
+  cho runner (`src/runner`) — mục 2 của ticket 15 vẫn chưa tick, theo dõi
+  bên phía P3.
+
 ## Nguồn
 
 - `docs/handoff/w2-sat/12-test-matrix.md` — kết quả matrix thật 2026-10-20.
