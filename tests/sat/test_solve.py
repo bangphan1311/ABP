@@ -227,7 +227,7 @@ def test_probe_passes_remaining_budget_to_solver_after_loading(monkeypatch):
     monkeypatch.setattr(SatBackend, "add_clauses", slow_add_clauses)
     monkeypatch.setattr(SatBackend, "solve", spy_solve)
 
-    status, solution, cnf, t_encode, t_solve = solve_module._probe(
+    status, solution, cnf, t_encode, t_solve, _ws_mb = solve_module._probe(
         generator.path(4), 2, "pairwise", "pairwise", "cadical195", 0.05
     )
 
@@ -395,3 +395,32 @@ def test_absent_or_loose_external_ub_keeps_default_search():
         assert [(p["k"], p["status"]) for p in result.metadata["probes"]] == [
             (p["k"], p["status"]) for p in default.metadata["probes"]
         ]
+
+
+def test_working_set_snapshot_is_positive_mb():
+    # Helper đo peak_memory (ticket 10): working set tiến trình đang chạy > 0.
+    from src.sat.solve import working_set_mb
+
+    assert working_set_mb() > 0.0
+
+
+def test_peak_memory_is_positive_mb_on_toy_run():
+    result = solve_sat(generator.path(4))
+
+    assert isinstance(result.peak_memory, float)
+    assert result.peak_memory > 0.0
+
+
+def test_peak_memory_is_none_on_backend_error(monkeypatch):
+    # Giữ hành vi cũ trên ERR: lỗi backend -> peak_memory None.
+    from src.sat.backend import BackendError, SatBackend
+
+    def broken_solve(self, time_limit=None):
+        raise BackendError("backend giả lập lỗi")
+
+    monkeypatch.setattr(SatBackend, "solve", broken_solve)
+
+    result = solve_sat(generator.path(4))
+
+    assert result.status == "ERR"
+    assert result.peak_memory is None
