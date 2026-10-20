@@ -228,7 +228,7 @@ def test_probe_passes_remaining_budget_to_solver_after_loading(monkeypatch):
     monkeypatch.setattr(SatBackend, "solve", spy_solve)
 
     status, solution, cnf, t_encode, t_solve = solve_module._probe(
-        generator.path(4), 2, "pairwise", "cadical195", 0.05
+        generator.path(4), 2, "pairwise", "pairwise", "cadical195", 0.05
     )
 
     assert status == "UNKNOWN"
@@ -277,7 +277,7 @@ def test_summarise_status_mapping():
 
 def test_unsupported_abp_encoding_raises():
     with pytest.raises(ValueError, match="abp_encoding"):
-        solve_sat(generator.path(4), Config(method="sat", abp_encoding="order"))
+        solve_sat(generator.path(4), Config(method="sat", abp_encoding="bogus"))
 
 
 def test_decision_unsupported_abp_encoding_raises():

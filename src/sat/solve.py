@@ -13,6 +13,7 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
+from src.sat import order
 from src.sat.backend import (
     DEFAULT_SOLVER,
     BackendError,
@@ -29,7 +30,7 @@ from src.sat.pairwise import (
 )
 
 METHOD = "sat"
-ABP_ENCODINGS = (DEFAULT_ABP_ENCODING,)
+ABP_ENCODINGS = (DEFAULT_ABP_ENCODING, "order")
 
 # Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.
 IGNORED_CONFIG_FIELDS = (
@@ -117,7 +118,7 @@ def solve_sat(
 
         try:
             status, solution, cnf, probe_encode, probe_solve = _probe(
-                instance, k, amo_encoding, solver_name, remaining
+                instance, k, abp_encoding, amo_encoding, solver_name, remaining
             )
         except BackendError as exc:  # lỗi backend/giấy phép -> ERR
             error = str(exc)
@@ -240,7 +241,7 @@ def solve_decision(
     _validate_instance(instance)
 
     status, solution, _cnf, _t_encode, _t_solve = _probe(
-        instance, k, amo_encoding, solver_name, cfg.time_limit
+        instance, k, abp_encoding, amo_encoding, solver_name, cfg.time_limit
     )
     return status, solution
 
@@ -248,11 +249,15 @@ def solve_decision(
 def _probe(
     instance: Instance,
     k: int,
+    abp_encoding: str,
     amo_encoding: str,
     solver_name: str,
     time_limit: float | None,
 ) -> tuple[str, dict[int, int] | None, CNF | None, float, float]:
     """Dựng CNF, giải, decode; trả ``(status, labeling, cnf, t_encode, t_solve)``.
+
+    ``abp_encoding`` chọn build/decode (``pairwise`` hoặc ``order``); hai encoding
+    dùng chung contract ``CNF`` nên phần còn lại của pipeline không đổi.
 
     ``time_limit`` là ngân sách còn lại cho **cả** ``build_cnf``, ``add_clauses`` và
     ``solve`` (WORK BREAKDOWN §5: runtime gồm tạo model/encoding và mọi lần gọi
@@ -266,7 +271,10 @@ def _probe(
         return "UNKNOWN", None, None, 0.0, 0.0
 
     t0 = perf_counter()
-    cnf = build_cnf(instance, k, amo_encoding=amo_encoding)
+    if abp_encoding == "order":
+        cnf = order.build_cnf(instance, k, amo_encoding=amo_encoding)
+    else:
+        cnf = build_cnf(instance, k, amo_encoding=amo_encoding)
     t_encode = perf_counter() - t0
 
     backend = SatBackend(solver_name)
@@ -277,7 +285,8 @@ def _probe(
         status = backend.solve(time_limit=remaining)
         t_solve = perf_counter() - t1
 
-        solution = decode_model(cnf, backend.get_model()) if status == "SAT" else None
+        decoder = order.decode_model if abp_encoding == "order" else decode_model
+        solution = decoder(cnf, backend.get_model()) if status == "SAT" else None
         return status, solution, cnf, t_encode, t_solve
     finally:
         backend.delete()
