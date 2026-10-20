@@ -16,6 +16,7 @@ from src.common.verify import verify
 from src.sat import order
 from src.sat.backend import (
     DEFAULT_SOLVER,
+    KISSAT_LIMITATION,
     BackendError,
     SatBackend,
     solver_family,
@@ -320,13 +321,14 @@ def summarise_result(
 
 
 def _validate_solver(solver_name: str) -> None:
-    """Từ chối solver chưa hỗ trợ ở W1: Kissat gác sang W2.
+    """Từ chối kissat: hạn chế vĩnh viễn W2 (ticket 09).
 
-    Family ``kissat404`` của PySAT giết process khi nạp clause, và chưa có binary
-    Windows chạy được (``docs/sat_tooling.md`` mục 7). Chặn trước khi dựng backend.
+    Family ``kissat404`` của PySAT cho model sai và abort process khi nạp clause
+    sau solve; không có binary kissat ngoài (``docs/sat_tooling.md`` mục Kissat).
+    Chặn trước khi dựng backend.
     """
     if solver_family(solver_name) == "kissat404":
-        raise ValueError("kissat chưa hỗ trợ ở W1; gác sang W2.")
+        raise ValueError(KISSAT_LIMITATION)
 
 
 def _validate_ub(ub: int | None) -> None:

@@ -285,12 +285,12 @@ def test_decision_unsupported_abp_encoding_raises():
         solve_decision(generator.path(4), 2, Config(method="sat", abp_encoding="bogus"))
 
 
-def test_kissat_solver_is_deferred_to_w2():
-    # Quyết định W1: Kissat gác sang W2 -> chọn nó phải ValueError rõ, không dựng
-    # backend để tránh native crash (docs/sat_tooling.md mục 7).
-    with pytest.raises(ValueError, match="kissat chưa hỗ trợ ở W1; gác sang W2."):
+def test_kissat_solver_is_permanently_blocked():
+    # Hạn chế vĩnh viễn W2 (ticket 09): qua PySAT kissat404 cho model sai và abort
+    # process, không có binary ngoài -> ValueError rõ, không dựng backend.
+    with pytest.raises(ValueError, match="hạn chế vĩnh viễn W2"):
         solve_sat(generator.path(4), Config(method="sat", sat_solver="kissat"))
-    with pytest.raises(ValueError, match="kissat chưa hỗ trợ ở W1; gác sang W2."):
+    with pytest.raises(ValueError, match="hạn chế vĩnh viễn W2"):
         solve_decision(generator.path(4), 2, Config(method="sat", sat_solver="kissat"))
 
 
