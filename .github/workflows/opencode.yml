@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
+      contents: read # checkout can len private repo (actions/checkout dung GITHUB_TOKEN)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
