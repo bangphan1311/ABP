@@ -22,7 +22,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
-          persist-credentials: false
+          # persist-credentials mac dinh true: action opencode tu git fetch nhanh PR,
+          # can credential helper cho repo private
 
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
