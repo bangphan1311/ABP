@@ -8,13 +8,17 @@ UNSAT thì ``K - 1 = B`` là tối ưu. Mọi nghiệm đều qua ``verify()`` t
 
 from __future__ import annotations
 
+import ctypes
 import warnings
+from ctypes import wintypes
 from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
+from src.sat import order
 from src.sat.backend import (
     DEFAULT_SOLVER,
+    KISSAT_LIMITATION,
     BackendError,
     SatBackend,
     solver_family,
@@ -29,7 +33,7 @@ from src.sat.pairwise import (
 )
 
 METHOD = "sat"
-ABP_ENCODINGS = (DEFAULT_ABP_ENCODING,)
+ABP_ENCODINGS = (DEFAULT_ABP_ENCODING, "order")
 
 # Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.
 IGNORED_CONFIG_FIELDS = (
@@ -63,6 +67,49 @@ def _warn_ignored_config(cfg: Config) -> None:
     )
 
 
+class _PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+    """PROCESS_MEMORY_COUNTERS của psapi (chỉ cần field working set)."""
+
+    _fields_ = [
+        ("cb", wintypes.DWORD),
+        ("PageFaultCount", wintypes.DWORD),
+        ("PeakWorkingSetSize", ctypes.c_size_t),
+        ("WorkingSetSize", ctypes.c_size_t),
+        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+        ("PagefileUsage", ctypes.c_size_t),
+        ("PeakPagefileUsage", ctypes.c_size_t),
+    ]
+
+
+_psapi = ctypes.WinDLL("psapi")
+_kernel32 = ctypes.WinDLL("kernel32")
+# Thiếu prototype thì HANDLE pseudo -1 của GetCurrentProcess bị cắt 32 bit
+# và GetProcessMemoryInfo luôn thất bại.
+_kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+_psapi.GetProcessMemoryInfo.argtypes = [
+    wintypes.HANDLE,
+    ctypes.POINTER(_PROCESS_MEMORY_COUNTERS),
+    wintypes.DWORD,
+]
+_psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+
+
+def working_set_mb() -> float:
+    """Working set hiện tại của process này, đơn vị MB, qua GetProcessMemoryInfo.
+
+    Thất bại hệ thống trả ``0.0``: số liệu bộ nhớ không được làm gãy pipeline.
+    """
+    counters = _PROCESS_MEMORY_COUNTERS()
+    counters.cb = ctypes.sizeof(_PROCESS_MEMORY_COUNTERS)
+    measured = _psapi.GetProcessMemoryInfo(
+        _kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+    )
+    return counters.WorkingSetSize / (1024.0 * 1024.0) if measured else 0.0
+
+
 def solve_sat(
     instance: Instance, config: Config | None = None, ub: int | None = None
 ) -> Result:
@@ -80,6 +127,12 @@ def solve_sat(
     mỗi pha và phần còn lại được truyền vào solver; pha đang chạy khi hết giờ vẫn hoàn
     thành nên ``t_total`` vượt ``time_limit`` một khoảng nhỏ (xem ``docs/sat_tooling.md``
     mục 4).
+
+    ``Result.peak_memory`` là working set lớn nhất của process, đơn vị MB (float),
+    chụp bằng ``GetProcessMemoryInfo`` tại các mốc — trước khi giải, sau mỗi probe,
+    và trong mỗi probe: trước solve (sau khi nạp clause), sau solve, sau decode —
+    rồi lấy max. Đây là max của các điểm chụp, không phải peak liên tục
+    (``docs/sat_tooling.md``). ``None`` khi ERR.
     """
     cfg = config or Config(method=METHOD)
     _warn_ignored_config(cfg)
@@ -108,6 +161,7 @@ def solve_sat(
     probes: list[dict[str, object]] = []
     t_encode = 0.0
     t_solve = 0.0
+    peak_ws = working_set_mb()  # mốc chụp đầu tiên: trước khi giải
     error: str | None = None
     timed_out = False
 
@@ -116,8 +170,8 @@ def solve_sat(
         remaining = None if deadline is None else deadline - perf_counter()
 
         try:
-            status, solution, cnf, probe_encode, probe_solve = _probe(
-                instance, k, amo_encoding, solver_name, remaining
+            status, solution, cnf, probe_encode, probe_solve, probe_ws = _probe(
+                instance, k, abp_encoding, amo_encoding, solver_name, remaining
             )
         except BackendError as exc:  # lỗi backend/giấy phép -> ERR
             error = str(exc)
@@ -125,6 +179,7 @@ def solve_sat(
 
         t_encode += probe_encode
         t_solve += probe_solve
+        peak_ws = max(peak_ws, probe_ws, working_set_mb())  # mốc: sau mỗi probe
         if cnf is not None:
             last_cnf = cnf
 
@@ -213,7 +268,7 @@ def solve_sat(
         t_total=t_total,
         variables=last_cnf.n_vars if last_cnf else None,
         clauses=len(last_cnf.clauses) if last_cnf else None,
-        peak_memory=None,  # chưa đo ở W1, xem docs/sat_tooling.md
+        peak_memory=None if error is not None else peak_ws,  # max các mốc chụp, MB
         solution=best_solution if status in ("OPT", "FEAS") else None,
         metadata=metadata,
     )
@@ -239,8 +294,8 @@ def solve_decision(
     _validate_solver(solver_name)
     _validate_instance(instance)
 
-    status, solution, _cnf, _t_encode, _t_solve = _probe(
-        instance, k, amo_encoding, solver_name, cfg.time_limit
+    status, solution, _cnf, _t_encode, _t_solve, _ws = _probe(
+        instance, k, abp_encoding, amo_encoding, solver_name, cfg.time_limit
     )
     return status, solution
 
@@ -248,37 +303,52 @@ def solve_decision(
 def _probe(
     instance: Instance,
     k: int,
+    abp_encoding: str,
     amo_encoding: str,
     solver_name: str,
     time_limit: float | None,
-) -> tuple[str, dict[int, int] | None, CNF | None, float, float]:
-    """Dựng CNF, giải, decode; trả ``(status, labeling, cnf, t_encode, t_solve)``.
+) -> tuple[str, dict[int, int] | None, CNF | None, float, float, float]:
+    """Dựng CNF, giải, decode; trả ``(status, labeling, cnf, t_encode, t_solve, ws_mb)``.
+
+    ``abp_encoding`` chọn build/decode (``pairwise`` hoặc ``order``); hai encoding
+    dùng chung contract ``CNF`` nên phần còn lại của pipeline không đổi.
 
     ``time_limit`` là ngân sách còn lại cho **cả** ``build_cnf``, ``add_clauses`` và
     ``solve`` (WORK BREAKDOWN §5: runtime gồm tạo model/encoding và mọi lần gọi
     solver). Hết ngân sách trước khi encode → ``UNKNOWN``, không dựng CNF; hết ngân
     sách sau khi nạp clause → ``solve`` nhận phần thời gian còn lại.
+
+    ``ws_mb`` là working set lớn nhất (MB) chụp trong lần dò này: trước solve
+    (sau khi nạp clause, solver còn sống), sau solve và sau decode. Là max của
+    các điểm chụp, không phải peak liên tục (``docs/sat_tooling.md``).
     """
     if trivial_unsat(instance.n, k):
-        return "UNSAT", None, None, 0.0, 0.0
+        return "UNSAT", None, None, 0.0, 0.0, working_set_mb()
 
     if time_limit is not None and time_limit <= 0:
-        return "UNKNOWN", None, None, 0.0, 0.0
+        return "UNKNOWN", None, None, 0.0, 0.0, working_set_mb()
 
     t0 = perf_counter()
-    cnf = build_cnf(instance, k, amo_encoding=amo_encoding)
+    if abp_encoding == "order":
+        cnf = order.build_cnf(instance, k, amo_encoding=amo_encoding)
+    else:
+        cnf = build_cnf(instance, k, amo_encoding=amo_encoding)
     t_encode = perf_counter() - t0
 
     backend = SatBackend(solver_name)
     try:
         backend.add_clauses(cnf.clauses)
+        ws_peak = working_set_mb()  # mốc: trước solve (đã nạp clause, solver còn sống)
         remaining = None if time_limit is None else time_limit - (perf_counter() - t0)
         t1 = perf_counter()
         status = backend.solve(time_limit=remaining)
         t_solve = perf_counter() - t1
+        ws_peak = max(ws_peak, working_set_mb())  # mốc: sau solve, trước delete()
 
-        solution = decode_model(cnf, backend.get_model()) if status == "SAT" else None
-        return status, solution, cnf, t_encode, t_solve
+        decoder = order.decode_model if abp_encoding == "order" else decode_model
+        solution = decoder(cnf, backend.get_model()) if status == "SAT" else None
+        ws_peak = max(ws_peak, working_set_mb())  # mốc: sau decode
+        return status, solution, cnf, t_encode, t_solve, ws_peak
     finally:
         backend.delete()
 
@@ -311,13 +381,14 @@ def summarise_result(
 
 
 def _validate_solver(solver_name: str) -> None:
-    """Từ chối solver chưa hỗ trợ ở W1: Kissat gác sang W2.
+    """Từ chối kissat: hạn chế vĩnh viễn W2 (ticket 09).
 
-    Family ``kissat404`` của PySAT giết process khi nạp clause, và chưa có binary
-    Windows chạy được (``docs/sat_tooling.md`` mục 7). Chặn trước khi dựng backend.
+    Family ``kissat404`` của PySAT cho model sai và abort process khi nạp clause
+    sau solve; không có binary kissat ngoài (``docs/sat_tooling.md`` mục Kissat).
+    Chặn trước khi dựng backend.
     """
     if solver_family(solver_name) == "kissat404":
-        raise ValueError("kissat chưa hỗ trợ ở W1; gác sang W2.")
+        raise ValueError(KISSAT_LIMITATION)
 
 
 def _validate_ub(ub: int | None) -> None:

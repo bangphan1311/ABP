@@ -85,10 +85,11 @@ def test_default_solver_supports_time_limit():
     assert DEFAULT_SOLVER in supported_solvers()
 
 
-# Kissat của PySAT giết process khi nạp clause: phải chặn ở khởi tạo, trước native.
+# Kissat của PySAT: model sai + abort process qua PySAT, không có binary ngoài.
+# Hạn chế vĩnh viễn W2 (ticket 09): chặn ở khởi tạo, trước native crash.
 @pytest.mark.parametrize("solver_name", ["kissat404", "kissat"])
 def test_kissat_is_blocked_at_backend_construction(solver_name):
-    with pytest.raises(ValueError, match="kissat chưa hỗ trợ ở W1; gác sang W2."):
+    with pytest.raises(ValueError, match="hạn chế vĩnh viễn W2"):
         SatBackend(solver_name)
 
 

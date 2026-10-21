@@ -97,6 +97,14 @@ Cách tới Kissat:
 
 Không đưa Kissat vào W1. Lý do: qua PySAT `kissat404` có lỗi assumptions im lặng, model sai, crash, không incremental. Không có binary kissat ngoài để so sánh. Nếu cần Kissat sau này, phải cài binary kissat ngoài, kiểm model và kết quả trên bộ instance nhỏ trước khi dùng.
 
+## Kết luận W2 (ticket 09: Glucose + Kissat; ticket 10: peak_memory)
+
+- Glucose: chạy qua cùng `SatBackend` như CaDiCaL, không pipeline riêng (`solve_sat` với `Config(sat_solver="glucose4")`; family nằm trong `INTERRUPTIBLE_FAMILIES`). E2E khớp oracle brute-force trên toy path4, cycle5, grid3x3, complete5 — gồm B tối ưu, decode, status và K-search chứng minh OPT (`tests/sat/test_glucose_e2e.py`). Glucose cùng CaDiCaL là các backend cho RQ2.
+- Caveat timeout (mục Timeout ở trên vẫn còn hiệu lực với W2): budget của glucose không ổn định khi giải nhiều lần trong cùng một process. Mỗi lần `_probe()` dựng một `SatBackend` mới nên e2e vẫn ổn định, nhưng test với glucose không được phụ thuộc timeout chặt — nếu cần time-limit thì dùng ngân sách rộng.
+- Kissat bị loại khỏi RQ2, hạn chế vĩnh viễn W2. Lý do: qua PySAT `kissat404` assumptions bị bỏ qua (kết quả sai im lặng), model sai, `add_clause` sau solve làm process abort, crash access violation; không có binary kissat ngoài trên PATH. Chặn tại khởi tạo backend (`PYSAT_KISSAT_FAMILIES`) và `_validate_solver`, thông báo nêu đủ lý do.
+- Muốn thêm Kissat sau này: cài binary kissat ngoài (không qua PySAT `kissat404`), đo `t_encode`/`t_solve` riêng cho từng lần gọi binary (không incremental — mỗi lần dò K là một lần chạy binary mới), kiểm model trên bộ instance nhỏ trước khi tin kết quả.
+- peak_memory (ticket 10): `Result.peak_memory` là working set lớn nhất của process, đơn vị MB (float), đo bằng `GetProcessMemoryInfo` (ctypes, psapi, không thêm dependency) chụp tại các mốc — trước khi giải, sau mỗi probe, và trong mỗi probe trước solve (sau khi nạp clause), sau solve, sau decode — rồi lấy max. Đây là max của các điểm chụp, không phải peak liên tục. `None` khi ERR.
+
 ## Kết luận G1 (pipeline + loader)
 
 Pipeline `instance → pairwise CNF → CaDiCaL (cadical195) → decode → verify()` khớp brute-force và CP-SAT trên 10 instance path/cycle/grid/complete, n ≤ 8, cả B tối ưu lẫn SAT/UNSAT tại mọi K (`tests/sat/test_g1_oracle.py`, demo `docs/handoff/sat-g1/`). Loader và generator chạy tối thiểu qua JSON. Kết quả chỉ trên bộ nhỏ này, chưa đo hiệu năng.

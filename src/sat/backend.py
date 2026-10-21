@@ -41,8 +41,16 @@ INTERRUPTIBLE_FAMILIES = frozenset(
 # Timeout thực hiện bằng vòng lặp ngân sách xung đột tăng dần (xem docs/sat_tooling.md).
 BUDGETED_FAMILIES = frozenset({"cadical103", "cadical153", "cadical195", "cadical300"})
 
-# Family Kissat của PySAT: nạp clause là access violation (giết process). Chặn khi khởi tạo.
+# Family Kissat của PySAT: assumptions bị bỏ qua, model sai, nạp clause sau solve
+# làm process abort. Không có binary kissat ngoài trên PATH. Hạn chế vĩnh viễn W2.
 PYSAT_KISSAT_FAMILIES = frozenset({"kissat404"})
+
+# Thông báo chặn kissat, dùng chung cho backend và pipeline (một thông điệp duy nhất).
+KISSAT_LIMITATION = (
+    "kissat bị loại, hạn chế vĩnh viễn W2: qua PySAT kissat404 cho model sai và "
+    "process abort, không có binary ngoài; muốn dùng phải cài binary ngoài và "
+    "kiểm lại (docs/sat_tooling.md)."
+)
 
 # Ngân sách xung đột khởi điểm cho mỗi lần gọi solve_limited; tăng gấp đôi mỗi vòng.
 CONFLICT_BUDGET_START = 1000
@@ -127,7 +135,7 @@ class SatBackend:
         self.solver_name = (solver_name or DEFAULT_SOLVER).lower()
         self.family = solver_family(self.solver_name)
         if self.family in PYSAT_KISSAT_FAMILIES:
-            raise ValueError("kissat chưa hỗ trợ ở W1; gác sang W2.")
+            raise ValueError(KISSAT_LIMITATION)
 
         try:
             self._solver = Solver(name=self.solver_name, use_timer=use_timer)
