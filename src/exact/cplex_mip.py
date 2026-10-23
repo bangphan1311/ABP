@@ -5,6 +5,7 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
+from src.exact.common import validate_exact_input, warn_ignored_config
 def _is_proven_optimal(status_constants, code):
     exact_codes = {
         getattr(status_constants, name)
@@ -16,8 +17,9 @@ def _is_proven_optimal(status_constants, code):
 def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
     if config is None:
         config = Config(method="cplex_mip")
+    validate_exact_input(instance, config)
+    warn_ignored_config(config, supported=("seed",))
     start = perf_counter()
-    try:
         import cplex
 
         n = instance.n
@@ -109,6 +111,14 @@ def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
         values = model.solution.get_values(list(range(n)))
         labeling = {v: int(round(values[v])) for v in range(n)}
         objective = verify(instance, labeling)
+        model_objective = int(round(model.solution.get_objective_value()))
+        if objective != model_objective:
+            return Result(status="ERR", t_encode=t_encode, t_solve=t_solve,
+                          t_total=perf_counter() - start,
+                          metadata={"solver": "CPLEX MIP",
+                                    "error": f"Objective native={model_objective} khác verify={objective}.",
+                                    "model_objective": model_objective,
+                                    "objective_verified": objective})
         optimal = _is_proven_optimal(status_constants, code)
         if optimal:
             st, lb_val, ub_val = "OPT", objective, objective
@@ -125,7 +135,7 @@ def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
                       t_encode=t_encode, t_solve=t_solve, t_total=perf_counter() - start,
                       variables=total, clauses=None, solution=labeling,
                       metadata={"solver": "CPLEX MIP", "cplex_status": code,
-                                "status_text": status_text, "objective_verified": objective})
+                                "status_text": status_text, "model_objective": model_objective, "objective_verified": objective})
     except MemoryError as exc:
         return Result(status="MO", t_total=perf_counter() - start,
                       metadata={"solver": "CPLEX MIP", "error": f"MemoryError: {exc}"})
