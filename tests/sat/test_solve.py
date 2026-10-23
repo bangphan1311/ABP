@@ -227,8 +227,8 @@ def test_probe_passes_remaining_budget_to_solver_after_loading(monkeypatch):
     monkeypatch.setattr(SatBackend, "add_clauses", slow_add_clauses)
     monkeypatch.setattr(SatBackend, "solve", spy_solve)
 
-    status, solution, cnf, t_encode, t_solve = solve_module._probe(
-        generator.path(4), 2, "pairwise", "cadical195", 0.05
+    status, solution, cnf, t_encode, t_solve, _ws_mb = solve_module._probe(
+        generator.path(4), 2, "pairwise", "pairwise", "cadical195", 0.05
     )
 
     assert status == "UNKNOWN"
@@ -277,7 +277,7 @@ def test_summarise_status_mapping():
 
 def test_unsupported_abp_encoding_raises():
     with pytest.raises(ValueError, match="abp_encoding"):
-        solve_sat(generator.path(4), Config(method="sat", abp_encoding="order"))
+        solve_sat(generator.path(4), Config(method="sat", abp_encoding="bogus"))
 
 
 def test_decision_unsupported_abp_encoding_raises():
@@ -285,12 +285,12 @@ def test_decision_unsupported_abp_encoding_raises():
         solve_decision(generator.path(4), 2, Config(method="sat", abp_encoding="bogus"))
 
 
-def test_kissat_solver_is_deferred_to_w2():
-    # Quyết định W1: Kissat gác sang W2 -> chọn nó phải ValueError rõ, không dựng
-    # backend để tránh native crash (docs/sat_tooling.md mục 7).
-    with pytest.raises(ValueError, match="kissat chưa hỗ trợ ở W1; gác sang W2."):
+def test_kissat_solver_is_permanently_blocked():
+    # Hạn chế vĩnh viễn W2 (ticket 09): qua PySAT kissat404 cho model sai và abort
+    # process, không có binary ngoài -> ValueError rõ, không dựng backend.
+    with pytest.raises(ValueError, match="hạn chế vĩnh viễn W2"):
         solve_sat(generator.path(4), Config(method="sat", sat_solver="kissat"))
-    with pytest.raises(ValueError, match="kissat chưa hỗ trợ ở W1; gác sang W2."):
+    with pytest.raises(ValueError, match="hạn chế vĩnh viễn W2"):
         solve_decision(generator.path(4), 2, Config(method="sat", sat_solver="kissat"))
 
 
@@ -395,3 +395,32 @@ def test_absent_or_loose_external_ub_keeps_default_search():
         assert [(p["k"], p["status"]) for p in result.metadata["probes"]] == [
             (p["k"], p["status"]) for p in default.metadata["probes"]
         ]
+
+
+def test_working_set_snapshot_is_positive_mb():
+    # Helper đo peak_memory (ticket 10): working set tiến trình đang chạy > 0.
+    from src.sat.solve import working_set_mb
+
+    assert working_set_mb() > 0.0
+
+
+def test_peak_memory_is_positive_mb_on_toy_run():
+    result = solve_sat(generator.path(4))
+
+    assert isinstance(result.peak_memory, float)
+    assert result.peak_memory > 0.0
+
+
+def test_peak_memory_is_none_on_backend_error(monkeypatch):
+    # Giữ hành vi cũ trên ERR: lỗi backend -> peak_memory None.
+    from src.sat.backend import BackendError, SatBackend
+
+    def broken_solve(self, time_limit=None):
+        raise BackendError("backend giả lập lỗi")
+
+    monkeypatch.setattr(SatBackend, "solve", broken_solve)
+
+    result = solve_sat(generator.path(4))
+
+    assert result.status == "ERR"
+    assert result.peak_memory is None
