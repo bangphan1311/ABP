@@ -5,11 +5,14 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
+from src.exact.common import validate_exact_input, warn_ignored_config
 
 
 def solve_gurobi_mip(instance: Instance, config: Config | None = None) -> Result:
     if config is None:
         config = Config(method="gurobi_mip")
+    validate_exact_input(instance, config)
+    warn_ignored_config(config, supported=("seed",))
     start = perf_counter()
     try:
         import gurobipy as gp
@@ -75,6 +78,14 @@ def solve_gurobi_mip(instance: Instance, config: Config | None = None) -> Result
 
         labeling = {v: int(round(x[v].X)) for v in range(n)}
         objective = verify(instance, labeling)
+        model_objective = int(round(model.ObjVal))
+        if objective != model_objective:
+            return Result(status="ERR", t_encode=t_encode, t_solve=t_solve,
+                          t_total=perf_counter() - start,
+                          metadata={"solver": "Gurobi MIP",
+                                    "error": f"Objective native={model_objective} khác verify={objective}.",
+                                    "model_objective": model_objective,
+                                    "objective_verified": objective})
         if status_code == GRB.OPTIMAL:
             status, lb, ub = "OPT", objective, objective
         elif mem_limit_code is not None and status_code == mem_limit_code:
@@ -88,7 +99,7 @@ def solve_gurobi_mip(instance: Instance, config: Config | None = None) -> Result
                       t_encode=t_encode, t_solve=t_solve, t_total=perf_counter() - start,
                       variables=model.NumVars, clauses=None, solution=labeling,
                       metadata={"solver": "Gurobi MIP", "gurobi_status": int(status_code),
-                                "model_objective": int(round(model.ObjVal)),
+                                "model_objective": model_objective,
                                 "objective_verified": objective})
     except MemoryError as exc:
         return Result(status="MO", t_total=perf_counter() - start,
