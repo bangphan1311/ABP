@@ -20,6 +20,7 @@ def solve_cplex_mip(instance: Instance, config: Config | None = None) -> Result:
     validate_exact_input(instance, config)
     warn_ignored_config(config, supported=("seed",))
     start = perf_counter()
+    try:
         import cplex
 
         n = instance.n
