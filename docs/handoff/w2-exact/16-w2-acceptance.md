@@ -25,17 +25,17 @@ optional bonus work is complete.
   `memory_limit` is not a hard cap.
 - [x] Existing local smoke evidence (before these follow-up edits): 454 tests passed;
   15/15 solver-by-toy results were OPT and independently verified.
-- [ ] Re-run `uv run python -m pytest tests -q` against this follow-up branch.
-- [ ] Re-run the 15-result smoke verification against this follow-up branch.
-- [ ] Review the resulting CI and local test outputs before approving/merging.
+- [x] Re-run `uv run python -m pytest tests -q` on `p1/w2-review-closeout`: **490 passed in 19.21s** (2026-10-23, local Windows environment).
+- [x] Re-run the 15-result smoke verification on this branch: **15/15 PASS**, all OPT and independently verified objective matches both `lb` and `ub`.
+- [x] `git diff --check` clean.
+- [ ] Confirm required GitHub CI checks (the commit status API currently reports no status entries) and complete maintainer review before merge.
 
 ## Limitations and release gate
 
-The earlier 454-pass result and 15/15 smoke verification predate this follow-up
-branch; they are historical evidence, not proof that the new edits pass. CPLEX CP
-must be verified in an environment with the CP Optimizer engine. If the engine or
-license is unavailable, its optional test may skip, but the acceptance report must
-record that limitation. `Config.memory_limit` is not enforced as a hard cap and must
+The initial 454-pass result was superseded by the fresh 490-pass run on this follow-up
+branch. The fresh 15/15 smoke check also ran on this branch. CPLEX CP passed the smoke
+run in the user's local environment. GitHub's commit status API currently returns no
+status entries, so do not claim a green remote CI run unless a separate check is visible. `Config.memory_limit` is not enforced as a hard cap and must
 not be used as an official memory-limit control.
 
 **Gate:** approve Week 2 core only after the two pending reruns and CI complete
