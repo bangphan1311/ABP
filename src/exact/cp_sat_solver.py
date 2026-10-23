@@ -1,13 +1,20 @@
 
 """Prototype CP-SAT cho bài toán Antibandwidth Problem."""
 
-from math import ceil
+from math import ceil, isfinite
 from time import perf_counter
 
 from ortools.sat.python import cp_model
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
+
+def _safe_upper_bound(status_code: int, best_bound: float, n: int) -> int:
+    """Return a safe integer upper bound for the ABP objective."""
+    if status_code == cp_model.UNKNOWN or not isfinite(best_bound):
+        return n - 1
+
+    return min(n - 1, max(0, ceil(best_bound - 1e-6)))
 
 
 def solve_cp_sat(instance: Instance, config: Config | None = None) -> Result:
@@ -71,7 +78,16 @@ def solve_cp_sat(instance: Instance, config: Config | None = None) -> Result:
 
     # Lấy cận trên nguyên cho bài toán tối đa hóa.
     best_bound = solver.best_objective_bound
-    ub = min(n - 1, max(0, ceil(best_bound - 1e-6)))
+    ub = _safe_upper_bound(status_code, best_bound, n)
+
+    if (
+        status_code == cp_model.UNKNOWN
+        or not isfinite(best_bound)
+    ):
+        # Chưa có bound đáng tin cậy: dùng cận trên tự nhiên của ABP.
+        ub = n - 1
+    else:
+        ub = min(n - 1, max(0, ceil(best_bound - 1e-6)))
 
     status_name = solver.status_name(status_code)
     labeling = None
