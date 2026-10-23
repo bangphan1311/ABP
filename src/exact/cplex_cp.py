@@ -5,6 +5,7 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
+from src.exact.common import validate_exact_input, warn_ignored_config
 
 
 def _is_memory_failure(*signals) -> bool:
@@ -54,6 +55,8 @@ def solve_cplex_cp(
     if config is None:
         config = Config(method="cplex_cp")
 
+    validate_exact_input(instance, config)
+    warn_ignored_config(config, supported=())
     start = perf_counter()
 
     try:
@@ -172,6 +175,26 @@ def solve_cplex_cp(
                 },
             )
 
+        try:
+            model_objective = int(round(float(solved.get_objective_value())))
+        except Exception as exc:
+            return Result(
+                status="ERR", t_encode=t_encode, t_solve=t_solve,
+                t_total=perf_counter() - start,
+                metadata={"solver": "CPLEX CP",
+                          "error": f"Không đọc được objective native: {type(exc).__name__}: {exc}",
+                          "objective_verified": objective},
+            )
+        if objective != model_objective:
+            return Result(
+                status="ERR", t_encode=t_encode, t_solve=t_solve,
+                t_total=perf_counter() - start,
+                metadata={"solver": "CPLEX CP",
+                          "error": f"Objective native={model_objective} khác verify={objective}.",
+                          "model_objective": model_objective,
+                          "objective_verified": objective},
+            )
+
         # A verified incumbent is OPT only when optimality is proven.
         st = _classify_status(
             status_text,
@@ -227,6 +250,7 @@ def solve_cplex_cp(
                 "solve_status": status_text,
                 "fail_status": fail_status,
                 "stop_cause": stop_cause,
+                "model_objective": model_objective,
                 "objective_verified": objective,
             },
         )

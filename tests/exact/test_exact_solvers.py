@@ -3,6 +3,7 @@
 Run from the repository root:
     python -m pytest tests/exact/test_exact_solvers.py -q
 """
+import importlib.util
 import pytest
 
 from src.common.models import Config
@@ -24,12 +25,43 @@ SOLVERS = [
 ]
 
 
+def _skip_if_backend_unavailable(solver_name):
+    module = {
+        "CP-SAT": "ortools",
+        "Gurobi MIP": "gurobipy",
+        "CPLEX MIP": "cplex",
+        "CPLEX CP": "docplex",
+    }[solver_name]
+    if importlib.util.find_spec(module) is None:
+        pytest.skip(f"Optional backend {module} is not installed")
+
+
+def _is_missing_engine_or_license(result):
+    if result.status != "ERR":
+        return False
+    message = str(result.metadata.get("error", "")).lower()
+    markers = (
+        "executable file is not found",
+        "cpoptimizer.exe",
+        "license",
+        "licence",
+        "no gurobi license",
+        "cplex error 1016",
+        "cannot open cplex",
+        "not available",
+    )
+    return any(marker in message for marker in markers)
+
+
 @pytest.mark.parametrize("instance", INSTANCES, ids=lambda inst: inst.id)
 @pytest.mark.parametrize("solver_name,solve", SOLVERS, ids=[s[0] for s in SOLVERS])
 def test_exact_solver_matches_oracle(instance, solver_name, solve):
+    _skip_if_backend_unavailable(solver_name)
     expected = solve_oracle(instance)
     result = solve(instance, Config(method=solver_name.lower().replace(" ", "_"), time_limit=30, seed=0))
 
+    if _is_missing_engine_or_license(result):
+        pytest.skip(f"{solver_name} engine/license unavailable: {result.metadata}")
     assert result.status == "OPT", f"{solver_name} failed: {result.metadata}"
     assert result.lb == result.ub == expected.lb
     assert result.solution is not None

@@ -34,6 +34,13 @@ def solve_cp_sat(instance: Instance, config: Config | None = None) -> Result:
     for u, v in instance.edges:
         if not (0 <= u < n and 0 <= v < n):
             raise ValueError(f"Cạnh ({u}, {v}) chứa đỉnh không hợp lệ.")
+        if u == v:
+            raise ValueError(f"Cạnh tự khuyên không hợp lệ: ({u}, {v}).")
+
+    if config.time_limit is not None and (
+        not isfinite(config.time_limit) or config.time_limit <= 0
+    ):
+        raise ValueError("time_limit phải là số hữu hạn lớn hơn 0.")
 
     start_total = perf_counter()
 
