@@ -1,4 +1,5 @@
 """Unit tests for shared exact-solver validation and configuration warnings."""
+import warnings
 import pytest
 
 from src.common.models import Config, Instance
@@ -33,7 +34,8 @@ def test_invalid_time_limit_raises_value_error(limit):
 
 
 def test_default_config_does_not_warn():
-    with pytest.warns(None) as record:
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
         warn_ignored_config(Config(method="gurobi_mip"), supported=("seed",))
     assert not record
 
