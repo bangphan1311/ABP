@@ -25,8 +25,6 @@ SOLVERS = [
 ]
 
 
-@pytest.mark.parametrize("instance", INSTANCES, ids=lambda inst: inst.id)
-@pytest.mark.parametrize("solver_name,solve", SOLVERS, ids=[s[0] for s in SOLVERS])
 def _skip_if_backend_unavailable(solver_name):
     module = {
         "CP-SAT": "ortools",
@@ -55,6 +53,8 @@ def _is_missing_engine_or_license(result):
     return any(marker in message for marker in markers)
 
 
+@pytest.mark.parametrize("instance", INSTANCES, ids=lambda inst: inst.id)
+@pytest.mark.parametrize("solver_name,solve", SOLVERS, ids=[s[0] for s in SOLVERS])
 def test_exact_solver_matches_oracle(instance, solver_name, solve):
     _skip_if_backend_unavailable(solver_name)
     expected = solve_oracle(instance)
