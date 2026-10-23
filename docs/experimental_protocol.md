@@ -1,210 +1,251 @@
 # Experimental Protocol — Antibandwidth Problem (ABP)
 
-- **Version:** 1.0-rc
-- **Status:** Waiting for P2/P3 review; freeze blockers M12–13 remain open
-- **Owner:** P1
-- **Reviewers:** P2, P3
-- **Dataset:** Harwell–Boeing only; 24 selected instances
-- **Purpose:** Single source of truth for experimental design. This is a draft, not a frozen protocol. Once the freeze conditions in §12 are met and the group confirms, tag v1.0.
+**Phiên bản:** 1.0-rc **Trạng thái:** chờ review của P2, P3 và xử lý các mục chặn freeze (Mục 12–13) **Dataset:** chỉ Harwell–Boeing, 24 instance **Owner:** P1 (coordinator). **Review:** P2, P3
 
-## 1. Scope and research questions
+Tài liệu này là nguồn duy nhất cho thiết kế thực nghiệm. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
 
-For a graph (G=(V,E)), ABP seeks a bijection (f:V\to\{1,\ldots,n\}) maximizing \(\min_{\{u,v\}\in E}|f(u)-f(v)|\).
+---
 
-Core SAT dimensions:
-- Variable encoding: pairwise and order.
-- At-most-one (AMO): pairwise and sequential counter.
-- SAT search: multi-run, non-incremental K-search.
-- SAT solvers: CaDiCaL and Glucose; include Kissat only if it is actually integrated and runnable in the project environment. If unavailable, RQ2 compares CaDiCaL/Glucose and documents the limitation.
+## 1. Mục tiêu và phạm vi
 
-Exact methods: Gurobi MIP, CPLEX MIP, CPLEX CP, and CP-SAT.
+ABP: tìm phép gán nhãn song ánh f: V → {1..n} sao cho giá trị nhỏ nhất của |f(u) − f(v)| trên các cạnh (u, v) là lớn nhất.
 
-Excluded from the official core: staircase/SCL/Duplex bonus encoding, incremental solving, symmetry breaking, and warm starts. Bonus SAT prototype is NO-GO. If a required exact solver cannot run because of licensing/tooling, record ERR with the reason; do not relabel it as timeout.
+AB(G) = max over f of ( min over (u,v) in E of |f(u) − f(v)| )
 
-- **RQ1:** How do variable encoding × AMO choice affect SAT performance?
-- **RQ2:** How do available SAT solvers compare under the canonical SAT configuration?
-- **RQ3:** How do the canonical SAT method and exact methods compare across the 24 official instances, including runtime/status against graph size and structure?
-- No RQ4 and no predictive claims. Conclusions must follow question → design → evidence → conclusion and avoid generalizing beyond measured results.
+Mục tiêu: so sánh phương pháp SAT và exact về tính đúng, hiệu năng và khả năng tái lập.
 
-## 2. Dataset and input contract
+**Core (bắt buộc):**
 
-Use only the 24 selected Harwell–Boeing instances. The intended CSV is `benchmark/hb/instances.csv`, with columns:
+- SAT: ABP encoding {pairwise, order}; AMO {pairwise, sequential counter}; solver {CaDiCaL, Glucose, Kissat}; search multi-run, non-incremental.
+- Exact: Gurobi MIP, CPLEX MIP, CPLEX CP, CP-SAT.
+
+Nếu Kissat khó tích hợp qua PySAT, gọi binary ngoài và ghi rõ cách đo; nếu vẫn không được, RQ2 chỉ so CaDiCaL và Glucose và nêu rõ hạn chế. Nếu một exact solver không chạy được do license hoặc công cụ, ghi `ERR` kèm lý do và báo cáo đúng phạm vi so sánh thực tế; không coi solver chưa chạy là đã hoàn thành.
+
+**Bonus: NO-GO** (quyết định cuối W2). Không đưa staircase/SCL/Duplex, incremental, symmetry breaking hoặc warm start vào kết quả benchmark. Các công trình liên quan chỉ dùng cho Related Work và đối chiếu định tính. Mở lại Bonus chỉ khi có quyết định ghi nhận rõ ràng.
+
+## 2. Dataset
+
+### 2.1. Nguồn và danh sách
+
+Chỉ dùng Harwell–Boeing Sparse Matrix Collection, bộ 24 đồ thị ABP chuẩn (12 nhỏ, 30–118 đỉnh; 12 lớn, 420–715 đỉnh). Danh sách quản lý tại `benchmark/hb/instances.csv` với các cột:
 
 `id,name,file,size_group,n,m_table,ab_lb_ref,ab_ub_ref,pilot_role`
 
-The CSV is a planned manifest of the selected instances; it does **not** prove the data files have been downloaded. Track actual files and SHA256 hashes in `MANIFEST.csv`. Expected filenames end in `.mtx.rnd`; ask the instructor what `.rnd` means and confirm the actual file format before finalizing the loader. Expected input format: header `n n m`, then `u v) edge rows, 1-indexed; validate rather than assume.
+Có dòng trong CSV không có nghĩa file dữ liệu đã được tải và kiểm tra; việc đó ghi nhận riêng trong `MANIFEST.csv`.
 
-Loader rules:
-- Preserve vertices (1,\ldots,n), including isolated vertices.
-- Reject self-loops; treat the graph as undirected; deduplicate repeated edges and reversed duplicates.
-- Record source file SHA256, header (m), and edge count after cleaning.
-- Verify (n) matches the selected table for all 24 instances and header (m) matches `m_table`. If cleaning changes the edge count, document the discrepancy.
-- `ab_lb_ref` and `ab_ub_ref` are literature/reference checks only, never solver inputs. Every reported OPT objective must be within the reference bounds when those bounds are valid for the same instance definition.
+Tên ma trận (ví dụ `bcsstk06`) là id dùng trong dữ liệu và paper; chữ cái A–X chỉ để trao đổi.
 
-### Selected instance table
+### 2.2. Định dạng file
 
-| ID | Instance | n | m | Reference LB | Reference UB | Pilot role |
-|---|---|---:|---:|---:|---:|---|
-| A | pores_1 | 30 | 103 | 6 | 8 | config |
-| B | ibm32 | 32 | 90 | 9 | 9 | — |
-| C | bcspwr01 | 39 | 46 | 16 | 17 | — |
-| D | bcsstk01 | 48 | 176 | 8 | 9 | — |
-| E | bcspwr02 | 49 | 59 | 21 | 22 | config |
-| F | curtis54 | 54 | 124 | 12 | 13 | — |
-| G | will57 | 57 | 127 | 12 | 14 | config |
-| H | impcol_b | 59 | 281 | 8 | 8 | config |
-| I | ash85 | 85 | 219 | 19 | 27 | config |
-| J | nos4 | 100 | 247 | 32 | 40 | config |
-| K | dwt_234 | 117 | 162 | 46 | 58 | config |
-| L | bcspwr03 | 118 | 179 | 39 | 39 | — |
-| M | bcsstk06 | 420 | 3720 | 28 | 72 | stress |
-| N | bcsstk07 | 420 | 3720 | 28 | 72 | — |
-| O | impcol_d | 425 | 1267 | 91 | 173 | — |
-| P | can_445 | 445 | 1682 | 78 | 120 | config |
-| Q | 494_bus | 494 | 586 | 219 | 246 | — |
-| R | dwt_503 | 503 | 2762 | 46 | 71 | — |
-| S | sherman4 | 546 | 1341 | 256 | 272 | — |
-| T | dwt_592 | 592 | 2256 | 103 | 150 | — |
-| U | 662_bus | 662 | 906 | 219 | 220 | config |
-| V | nos6 | 675 | 1290 | 326 | 337 | stress |
-| W | 685_bus | 685 | 1282 | 136 | 136 | config |
-| X | can_715 | 715 | 2975 | 112 | 142 | stress |
+Dự kiến `*.mtx.rnd`: dòng đầu `n n m`, các dòng sau mỗi dòng một cạnh `u v` (đánh số từ 1). Cần xác nhận định dạng thực tế của cả 24 file; ý nghĩa hậu tố `.rnd` được xác minh nếu cần mô tả trong Experimental setup.
 
-Use the exact supplied filenames when creating the CSV (for example, `A-pores_1.mtx.rnd`, `K-dwt__234.mtx.rnd`, `P-can__445.mtx.rnd`, `Q-494_bus.mtx.rnd`). Confirm every filename against the instructor-provided files; do not fabricate missing files.
+### 2.3. Quy tắc chuyển thành đồ thị (loader)
 
-There are 12 small instances (n=30–118) and 12 large instances (n=420–715).
+1. Giữ nguyên tập đỉnh 1..n, kể cả đỉnh cô lập.
+2. Bỏ self-loop.
+3. Coi cạnh là vô hướng, loại cạnh trùng.
+4. Ghi vào `MANIFEST.csv`: sha256 của file, `m` trong header, `m` sau làm sạch.
 
-## 3. Official and pilot subsets
+Kiểm tra bắt buộc: `n` khớp `instances.csv` cho cả 24 instance; `m` trong header khớp `m_table`; nếu `m` đổi sau làm sạch, ghi chênh lệch và giải thích trong Experimental setup. Không âm thầm sửa file nguồn hay bỏ đỉnh để dữ liệu khớp kỳ vọng.
 
-- **Official:** all 24 selected instances.
-- **Pilot-config:** A, E, G, H, I, J, K, P, U, W — 10 instances: pores_1, bcspwr02, will57, impcol_b, ash85, nos4, dwt_234, can_445, 662_bus, 685_bus.
-- **Pilot-stress:** M, V, X — bcsstk06, nos6, can_715. Use for resource/kill/resume testing, not canonical configuration selection.
-- The remaining 14 instances were not used to select the canonical configuration. Explicitly state that the 10 pilot-config instances informed configuration selection; the other 14 are not a randomly sampled independent test set.
-- Freeze subsets at M2. Any change requires a documented methodology decision.
+### 2.4. Cận tham chiếu
 
-The pilot-config set spans n=30–685. Any difficulty classification based on literature is indicative only because prior work may use different encodings/settings.
+`ab_lb_ref` và `ab_ub_ref` lấy từ literature, chỉ dùng kiểm tra phụ: giá trị `OPT` phải nằm trong [`ab_lb_ref`, `ab_ub_ref`], nếu không thì điều tra trước khi chấp nhận. Không dùng làm đầu vào cho solver.
 
-## 4. Experimental design
+### 2.5. Tier 0/1
 
-### RQ1 — encoding × AMO
-Run the 10 Pilot-config instances using CaDiCaL and multi-run search across the 2×2 combinations:
-1. pairwise variable encoding + pairwise AMO
-2. pairwise variable encoding + sequential-counter AMO
-3. order variable encoding + pairwise AMO
-4. order variable encoding + sequential-counter AMO
+Tier 0 (đồ thị rất nhỏ cho oracle và unit test) và Tier 1 (path, cycle, grid, complete...) chỉ dùng để kiểm tra tính đúng và sanity check, không báo cáo như kết quả benchmark. Benchmark chính thức chỉ gồm 24 instance Harwell–Boeing.
 
-Record variables, clauses, encoding time, solver time, total time, peak memory, and status.
+## 3. Các tập instance
 
-### RQ2 — SAT solver
-Use the canonical configuration selected by RQ1 on the same 10 Pilot-config instances. Compare CaDiCaL, Glucose, and Kissat only if Kissat is runnable. Reuse CaDiCaL results from RQ1 when the configuration and run conditions match; otherwise rerun and explain why.
+| Tập | Instance | Mục đích |
+|---|---|---|
+| **Official** | cả 24 | RQ3 và phân tích độ khó |
+| **Validation subset** (10) | pores_1, bcsstk01, bcspwr02, curtis54, will57, impcol_b, ash85, nos4, dwt_234, bcspwr03 | Pilot RQ1/RQ2, chỉ để chọn canonical config |
+| **Pilot-large** (3) | bcsstk06, nos6, can_715 | Lộ sớm vấn đề trên instance lớn (CNF quá lớn, MIP yếu, memory); không dùng để chọn config |
 
-### RQ3 — SAT vs exact
-Run the frozen canonical SAT method and the four exact methods on all 24 Official instances. Analyze status and runtime against n, |E|, density, and maximum degree. Suggested outputs: cactus plot, runtime scatter/plots, and status distribution. Report missing/failed methods transparently.
+Validation subset lấy từ 12 instance nhỏ/vừa (A–L), bỏ hai instance ít phân biệt nhất (ibm32 và bcspwr01, cận tham chiếu gần như trùng nhau). Subset trải n từ 30 đến 118 và bậc trung bình từ khoảng 2,4 đến 9,5, gồm instance dự kiến nhanh, trung bình và khó. Phân loại độ khó dựa trên một bài tham khảo dùng encoding khác nên chỉ mang tính gợi ý.
 
-## 5. Solver protocol and objective verification
+**Thời điểm khóa:** Validation subset khóa trước khi pilot bắt đầu. Danh sách 24 instance Official khóa cùng benchmark ở M2.
 
-### SAT multi-run K-search
-Use fresh, non-incremental CNF/backend instances per K. Start from the trivial lower bound or a quick heuristic; include heuristic time in `t_total`. For each K, encode ABP ≥ K and call the solver. On SAT, decode and independently verify the labeling, calculate its actual antibandwidth B, then set K ← B+1. The first UNSAT after a verified incumbent proves optimality. Do not treat UNKNOWN/timeout as SAT or UNSAT.
+**Quy tắc báo cáo.** Work breakdown yêu cầu RQ3 chạy trên toàn bộ 24 instance, đồng thời validation subset không dùng để báo cáo RQ3; hai yêu cầu này không thể cùng đúng tuyệt đối vì validation subset nằm trong 24 instance. Cách xử lý (cần nhóm xác nhận):
 
-Use a valid graph-based upper bound agreed by P1/P2 and record the formula in the experiment configuration. Do not use literature reference bounds as solver input. P1/P2 must review off-by-one and K/window-width mapping before freeze.
+- Canonical config được chọn và khóa trước khi xem kết quả official.
+- RQ3 báo cáo trên cả 24 instance, và báo cáo thêm riêng trên 14 instance không thuộc Validation subset. Paper nêu rõ 10 instance đã dùng để chọn config.
+- 14 instance này không phải tập test độc lập lấy mẫu ngẫu nhiên; chúng là phần còn lại của bộ benchmark.
 
-### Exact methods
-P1 drafts the exact formulation and P2 reviews it. For MIP, use edge binary variables for the condition `|f(u)-f(v)| >= K`; avoid weak big-M formulations where a stronger formulation is available. Keep default solver parameters except for common resource settings (one thread, time limit, memory limit, seed); document API differences and any solver-specific deviations.
+## 4. Câu hỏi nghiên cứu
 
-## 6. Resource limits and reproducibility
+**RQ1 — Encoding (Validation subset).** ABP encoding và AMO encoding ảnh hưởng thế nào đến kích thước CNF và hiệu năng? Cố định CaDiCaL và search mode `multi`; đổi 2 × 2 = 4 cấu hình (ABP {pairwise, order} × AMO {pairwise, sequential counter}).
 
-- Run official experiments on the same documented machine/environment.
-- One thread per run; no warm start or symmetry breaking.
-- Total concurrent memory use must not exceed physical RAM.
-- Pilot limit: 600 seconds per run. Official limit: 1800 seconds per instance × method. For SAT, 1800 seconds covers the entire multi-K chain.
-- `t_total` includes model/encoding construction and all solver calls. For exact solvers, the time passed to the solver is 1800 seconds minus model-build time.
-- Runner wall time is authoritative. A hard kill at `time_limit + 30s` is grace for shutdown only, not extra solve budget.
-- Target 30 GB/run only if physical RAM and enforcement are verified. If RAM is insufficient, reduce this before freeze, document it, and reduce concurrency accordingly. Runner must enforce memory limits; config-only declarations are not enforcement.
-- Use one run per instance × method, seed=0. Do not report confidence intervals from a single run; state this as a limitation.
-- Skip valid existing runs. Investigate and rerun missing/ERR runs in W5 while preserving raw history.
+**RQ2 — SAT solver (Validation subset).** Với encoding và AMO tốt nhất từ RQ1, CaDiCaL, Glucose, Kissat khác nhau thế nào? Chỉ đổi solver.
 
-## 7. Status and correctness contract
+**RQ3 — SAT vs Exact (Official, 24 instance).** Canonical SAT config so với Gurobi MIP, CPLEX MIP, CPLEX CP, CP-SAT dưới cùng protocol. Kèm phân tích độ khó: runtime và status theo n, |E|, density, bậc đỉnh; cactus plot, scatter, phân bố status. Không dùng từ "predict" vì dự án không xây dựng mô hình dự đoán.
 
-- **OPT:** verified solution and an optimality certificate/proof.
-- **FEAS:** verified incumbent, but optimality not proven by the budget end.
-- **TO:** timeout without a verified incumbent.
-- **MO:** memory limit exceeded, supported by evidence.
-- **ERR:** execution, licensing, invalid output, or other failure.
-- A license error is ERR, not TO. Do not infer MO without evidence.
+Không có RQ4; Bonus không đánh số RQ. Mỗi RQ trình bày theo chuỗi: câu hỏi → thiết kế thí nghiệm → bằng chứng → kết luận. Không kết luận "A tốt hơn B" chỉ từ vài runtime.
 
-For every solution, validate that labels form a permutation of 1..n and independently recompute the objective from the graph. Check `lb <= ub`; OPT must have a valid certificate; FEAS must have a verified incumbent; TO must not have a verified incumbent. No duplicate `run_id`, and no missing expected runs in the final matrix. OPT objectives must be consistent with reference bounds when comparable.
+## 5. Phương pháp giải
 
-Correctness gates:
-- Tier 0/1 tests and oracle comparisons must pass for all core solvers.
-- For large instances, if any two methods report OPT with different objectives, investigate before reporting.
-- Preserve raw solver output and validation evidence.
+### 5.1. SAT (multi-run, non-incremental)
 
-## 8. Metrics, schema, and outputs
+1. Bắt đầu từ cận dưới tầm thường hoặc nghiệm heuristic nhanh; thời gian heuristic tính vào `t_total`.
+2. Với mỗi K, mã hóa CNF "tồn tại nhãn với antibandwidth ≥ K" và gọi solver.
+3. Nếu SAT: giải mã nghiệm, verify, tính antibandwidth thực tế B, đặt K ← B + 1.
+4. Nếu UNSAT sau một nghiệm đã verify có giá trị B: B là tối ưu (`OPT`).
+5. Cận trên ban đầu tính từ n và bậc đỉnh (P1/P2 thống nhất cách tính, ghi vào `ub`); không dùng cận từ literature.
+6. P1 và P2 review chéo ánh xạ giữa "antibandwidth ≥ K" và độ rộng cửa sổ trong encoding để tránh lệch một đơn vị.
 
-Each run should record:
-`run_id, instance, method, abp_encoding, amo_encoding, solver, search_mode, status, lb, ub, t_encode, t_solve, t_total, variables, clauses, peak_memory, git_tag, host, timestamp`.
+### 5.2. Exact
 
-Use consistent N/A values when a metric does not apply; never invent measurements. RQ1 reports variables/clauses, encode/solve/total time, peak memory, and status. RQ2 reports status counts, per-instance runtime/memory, errors and anomalies. RQ3 reports status, bounds, total time and memory.
+P1 viết formulation, P2 review. MIP dùng biến nhị phân theo cạnh cho |f(u) − f(v)| ≥ K, tránh big-M yếu. Không tinh chỉnh riêng từng solver: dùng tham số mặc định, trừ các thiết lập chung (1 thread, time limit, memory limit, seed). Mọi khác biệt bắt buộc do API hoặc giới hạn solver phải được ghi nhận; không tuyên bố các solver chạy "giống hệt nhau" nếu thực tế không đúng.
 
-Pipeline: config → runner → subprocess per run → raw JSON/output → validation → `runs.csv` → figures/tables. Generate figures from saved data; do not manually edit `runs.csv`. Preserve raw outputs and run history.
+## 6. Protocol chạy
 
-## 9. Pilot size and canonical selection
+### 6.1. Tài nguyên
 
-- RQ1: 10 instances × 4 configurations × CaDiCaL = 40 runs.
-- RQ2: add Glucose and, if runnable, Kissat on the chosen configuration = 20 additional runs; reuse the 10 matching CaDiCaL runs from RQ1. Expected SAT pilot total: 60 unique runs if all three solvers are available.
-- Exact pilot: 10 instances × 4 exact methods = 40 runs.
-- Stress checks: 3 instances × 5 core methods = 15 runs.
-- If a solver is unavailable, record actual run count and reason; do not imply it ran.
+- Cùng một máy cho mọi official run; 1 thread mỗi run; không warm start; không symmetry breaking.
+- Mọi phương pháp nhận cùng một đồ thị đã qua loader (cùng format input).
+- Số run song song sao cho tổng memory limit không vượt RAM vật lý.
 
-Choose canonical config in this order:
-1. More OPT results.
-2. Tie: lower PAR2 (non-OPT runs penalized at 2 × time limit).
-3. Tie: lower median peak memory.
-4. Tie: lower median clause count.
+### 6.2. Time limit
 
-Handle errors/missing runs consistently; do not exclude an adverse run without a technical reason. Save pilot results and the selection rationale in docs before M2. Freeze the canonical search settings as `search_mode=multi`, `symmetry=false`, `warm_start=false`.
+- Official: 1800 s mỗi (instance × phương pháp), đúng work breakdown.
+- Pilot: 600 s mỗi run. Đây là bổ sung của protocol để tiết kiệm compute (work breakdown không quy định time limit riêng cho pilot), nên canonical config được chọn trong chế độ ngắn hơn official; nhóm xác nhận, hoặc chạy pilot ở 1800 s nếu ngân sách cho phép.
+- Với SAT multi-run, 1800 s là ngân sách cho cả chuỗi K, không phải từng lần gọi solver.
+- `t_total` gồm thời gian build model/encoding và mọi lần gọi solver. Với exact solver, time limit truyền cho solver là 1800 − t_build.
+- Số liệu chính thức là wall-time do runner đo. Runner kill cứng tại time_limit + 30 s chỉ để dự phòng; 30 s này không phải ngân sách solve thêm.
 
-## 10. Official run plan
+### 6.3. Memory limit
 
-After v1.0 freeze, run 24 instances × 5 methods (canonical SAT, CP-SAT, Gurobi MIP, CPLEX MIP, CPLEX CP) = 120 expected official runs. Investigate and rerun missing/ERR runs in W5. If a solver cannot run because of licensing/tooling, record ERR and the reason; do not relabel as TO.
+Mức mục tiêu: 30 GB mỗi run. Chỉ dùng mức này sau khi xác minh RAM vật lý và khả năng thực thi giới hạn trên máy chạy; nếu không đáp ứng, chốt ngưỡng thấp hơn trước freeze, ghi rõ trong paper và giảm số run song song.
 
-## 11. Compute budget and environment record
+Runner phải thực thi giới hạn bộ nhớ thật, không chỉ ghi `memory_limit` trong config. Chỉ ghi `MO` khi có bằng chứng run vượt giới hạn; lỗi không rõ nguyên nhân thì điều tra, không tự gán `MO`.
 
-Worst-case core-hour estimates (not wall-clock guarantees):
-- SAT pilot: 60 × 600s = 10 core-hours.
-- Exact pilot: 40 × 600s ≈ 6.7 core-hours.
-- Stress checks: 15 × 600s = 2.5 core-hours.
-- Official: 120 × 1800s = 60 core-hours.
+### 6.4. Seed, lặp, resume
 
-Use W3 `--dry-run` and pilot evidence to update estimates. If the budget is too large, reduce RQ1/RQ2 pilot first; do not drop large official instances without a documented group decision.
+- Mỗi cặp (instance × phương pháp) chạy 1 lần, `seed = 0`. Hạn chế đã biết: runtime không có khoảng tin cậy từ nhiều lần chạy; nêu trong Limitations.
+- Runner bỏ qua run đã có kết quả hợp lệ. Run thiếu hoặc `ERR` được chạy lại ở W5; mọi lần chạy lại được ghi nhận, không ghi đè lịch sử.
 
-Before freeze, record: machine/CPU/RAM/OS; Python and library versions; OR-Tools, Gurobi, CPLEX CP, PySAT and SAT solver versions/how invoked; Git tag/commit; licenses/model limits; time/memory limits and concurrency.
+## 7. Status và validation
 
-## 12. Freeze conditions (M2)
+| Status | Định nghĩa |
+|---|---|
+| `OPT` | Nghiệm đã verify và có certificate tối ưu |
+| `FEAS` | Nghiệm đã verify, chưa chứng minh tối ưu khi hết ngân sách |
+| `TO` | Hết giờ, chưa có nghiệm verify |
+| `MO` | Vượt memory limit đã cấu hình |
+| `ERR` | Lỗi thực thi, license, output hỏng hoặc lỗi khác làm run không hoàn thành đúng quy trình |
 
-Freeze v1.0 only after all are true:
-1. All 24 actual data files are present; manifest/SHA256 is complete; loader passes all files.
-2. Correctness/oracle/cross-solver checks pass.
-3. Canonical SAT configuration is selected and reviewed.
-4. Memory enforcement and kill/resume have been tested.
-5. Exact time limit correctly includes model-build time.
-6. Subsets, RQs, time/memory limits, machine, versions and solver capabilities/licenses are documented and locked.
-7. P2 and P3 have reviewed the protocol and blockers are resolved.
+Lỗi license ghi `ERR`, không ghi `TO`.
 
-Until then, keep version 1.0-rc. After freeze, fixes for crashes, bugs, wrong results, validation and reproducibility are allowed. Do not silently change encoding, formulation, benchmark, RQ, solver set, limits or protocol; methodology changes must be documented, versioned, and affected runs repeated.
+**Kiểm tra nghiệm:** là hoán vị hợp lệ của 1..n, không trùng nhãn; objective tính lại độc lập và khớp output solver.
 
-## 13. Pre-freeze action list
+**Kiểm tra nhất quán:** `lb ≤ ub`; `OPT` có certificate; `FEAS` có incumbent đã verify; `TO` không có incumbent; không trùng `run_id`; không thiếu run so với kế hoạch; `OPT` nằm trong khoảng tham chiếu (Mục 2.4).
 
-- **P1:** Ask the instructor for the 24 `.mtx.rnd` files and clarify the `.rnd` format; confirm Gurobi/CPLEX licenses and limits; document the machine/RAM; review the exact formulation and time accounting; coordinate final freeze.
-- **P2:** Implement/verify loader and manifest against all 24 files; review P3 integration; check duplicate clauses in pairwise AMO; run RQ1/RQ2 pilots and document canonical selection; review correctness and proofs.
-- **P3:** Enforce hard memory limits; test kill/resume; validate `--dry-run` and budget; review run schema, pipeline and status classification.
-- **P2 + P3:** Review this protocol's dataset, subsets, metrics, resource limits and freeze conditions. Confirm formal ownership/assignment of tasks on GitHub.
+**Kiểm tra chéo:** trên Tier 0/1, mọi solver Core khớp oracle; trên instance lớn, hai solver cùng `OPT` thì objective phải bằng nhau. Mâu thuẫn phải được điều tra trước khi dùng dữ liệu.
 
-## 14. References
+## 8. Metric và schema
 
-- Fazekas et al. (2020), work on Duplex encoding and staircase AMO.
-- Sinnl (2021), computational approaches for the Antibandwidth Problem, *Central European Journal of Operations Research*, 29(3).
-- Truong et al. (2025), Sequential Counter Encoding for Staircase AMO, ICAART 2025.
-- Rodriguez-Tello et al. (2015), Harwell–Boeing graphs for the Cutwidth/related graph-layout problem.
+Schema theo `CONTRACT.md`. Mỗi run lưu tối thiểu: `run_id, instance, method, abp_encoding, amo_encoding, solver, search_mode, status, lb, ub, t_encode, t_solve, t_total, variables, clauses, peak_memory, git_tag, host, timestamp`. Trường không áp dụng cho một phương pháp được biểu diễn nhất quán theo schema, không điền giá trị giả.
 
-Published runtimes are not directly comparable unless hardware, encoding, symmetry settings, and solver configurations match. Verify complete bibliographic details before the final paper.
+- RQ1: variables, clauses, `t_encode`, `t_solve`, `t_total`, `peak_memory`, `status`.
+- RQ2: số instance theo status, runtime và memory từng instance, lỗi và run bất thường.
+- RQ3: `status`, `lb/ub`, `t_total`, `peak_memory`.
+
+Mọi bảng và hình sinh từ dữ liệu đã lưu bằng cnsplots; không sửa `runs.csv` bằng tay. Giữ raw output để truy vết. Paper theo cas-sc (yêu cầu đề).
+
+Báo cáo kích thước CNF và status của mọi instance, kể cả khi `TO`/`MO` (ví dụ SAT trên instance lớn); không chọn lọc kết quả.
+
+## 9. Pilot và chọn canonical config
+
+### 9.1. Thứ tự
+
+1. **RQ1:** 10 instance × 4 cấu hình (CaDiCaL) = 40 run → chọn (ABP encoding, AMO).
+2. **RQ2:** thêm Glucose và Kissat với cấu hình vừa chọn = 20 run mới; 10 run CaDiCaL lấy lại từ RQ1. Tổng SAT pilot: 60 run.
+3. **Pilot exact:** 10 instance × 4 exact solver = 40 run (kiểm tra formulation, license, tài nguyên).
+4. **Pilot-large:** 3 instance × (4 cấu hình SAT của RQ1 với CaDiCaL + 4 exact solver) = 24 run, để lộ sớm CNF quá lớn, MIP yếu, vấn đề memory và kiểm tra kill/resume. Kết quả có thể kích hoạt sửa lỗi hoặc điều chỉnh giới hạn tài nguyên theo freeze policy, nhưng không thay đổi quy tắc chọn config ở Mục 9.2.
+
+Nếu một solver không khả dụng, ghi lại số run thực tế và lý do; không giữ nguyên tổng dự kiến như thể mọi run đã xong.
+
+### 9.2. Quy tắc chọn (ghi trước khi chạy official)
+
+So sánh theo thứ tự:
+
+1. Nhiều instance `OPT` hơn.
+2. Hòa: PAR2 thấp hơn (run không `OPT` bị phạt 2 × time limit).
+3. Hòa: `peak_memory` trung vị thấp hơn.
+4. Hòa: `clauses` trung vị thấp hơn.
+
+Xử lý run lỗi, thiếu hoặc chưa hoàn thành nhất quán giữa các cấu hình; không loại run bất lợi nếu không có lý do kỹ thuật được ghi nhận. Kết quả pilot, quy tắc đã áp dụng và lý do chọn lưu trong `docs/` trước M2.
+
+Cố định toàn bộ benchmark: `search_mode = multi`, `symmetry = false`, `warm_start = false`.
+
+## 10. Official run
+
+Chỉ bắt đầu sau khi tag `v1.0`: 24 instance × 5 phương pháp (canonical SAT, CP-SAT, Gurobi MIP, CPLEX MIP, CPLEX CP) = 120 run dự kiến.
+
+P3 vận hành official run và validation; P1 không vận hành queue chạy thực nghiệm (kiểm tra ngẫu nhiên khoảng 10 run exact).
+
+Pipeline: configuration → runner → mỗi run một subprocess → raw JSON → validation → `runs.csv` → figure/table.
+
+Run `ERR` hoặc thiếu được điều tra và chạy lại ở W5. Nếu license không cho phép chạy một instance, ghi `ERR` cùng lý do, không đổi thành `TO`.
+
+## 11. Ngân sách và môi trường
+
+Core-giờ worst case = (số run × time limit) / 3600.
+
+| Giai đoạn | Số run | Time limit | Core-giờ |
+|---|---:|---:|---:|
+| Pilot RQ1 + RQ2 | 60 | 600 s | 10 |
+| Pilot exact | 40 | 600 s | 6,7 |
+| Pilot-large | 24 | 600 s | 4,0 |
+| Official RQ3 | 120 | 1800 s | 60 |
+
+Đây là ngân sách CPU, không phải cam kết thời gian lịch; thời gian thực còn phụ thuộc số run song song, license và overhead runner. Ở W3 chạy `--dry-run` và pilot để thay bằng số đo thật. Nếu vượt ngân sách: thu nhỏ pilot RQ1/RQ2 trước; không bỏ instance lớn hay thu hẹp RQ3.
+
+**Môi trường (điền trước freeze, không để ở trạng thái giả định):** máy, CPU, RAM, hệ điều hành; phiên bản Python; OR-Tools, Gurobi, CPLEX/CP Optimizer; PySAT, CaDiCaL, Glucose, Kissat và cách gọi từng solver; git tag/commit; loại license và giới hạn kích thước model; memory limit, time limit, chính sách chạy song song.
+
+## 12. Freeze policy
+
+**Điều kiện tag `v1.0`** (dự kiến giữa W4; chỉ tag khi đủ tất cả):
+
+1. Có đủ 24 file dữ liệu, `MANIFEST.csv` đã tạo, loader qua test cả 24 instance.
+2. Correctness test và oracle/cross-solver check đạt.
+3. Canonical SAT config đã chọn từ pilot, ghi lý do, đã review.
+4. Runner thực thi memory limit thật; kill/resume đã kiểm thử.
+5. Time limit của exact tính đúng cả thời gian build.
+6. Tập con, RQ, time/memory limit, máy và version solver đã khóa; khả năng chạy và giới hạn license của từng solver đã ghi rõ.
+7. P2 và P3 đã review các phần liên quan.
+
+Nếu còn điều kiện chưa đạt, giữ `1.0-rc`; không tag chỉ để kịp mốc.
+
+**Sau `v1.0`:**
+
+- Được sửa: crash, bug, kết quả sai, validation fail, mất khả năng tái lập.
+- Không sửa âm thầm: encoding, formulation, benchmark, RQ, cấu hình solver, time limit, protocol.
+- Nếu buộc đổi methodology: ghi quyết định, tăng version, chạy lại toàn bộ phần bị ảnh hưởng.
+
+## 13. Việc cần xong trước freeze
+
+| Việc | Owner | Review | Xong khi |
+|---|---|---|---|
+| Xin thầy 24 file `.mtx.rnd` và hỏi ý nghĩa `.rnd` | P1 | — | Có đủ file, nguồn và định dạng được ghi nhận |
+| Loader + `MANIFEST.csv` + test 24 instance | P2 | P3 | Đối chiếu n, m, chênh lệch sau làm sạch |
+| Thực thi memory limit cứng trong runner | P3 | P1 | Có bằng chứng giới hạn được thực thi |
+| Time limit của exact tính cả thời gian build | P1 | P3 | Test chứng minh tổng ngân sách đúng |
+| Kiểm tra AMO pairwise có loại clause trùng | P2 | P1 | Có kết quả; rủi ro MO được xử lý hoặc ghi nhận |
+| Kiểm tra license Gurobi/CPLEX và giới hạn kích thước model | P1 | — | Ghi rõ solver chạy được trên instance lớn |
+| `--dry-run` và ước tính ngân sách thật | P3 | P1 | Bảng Mục 11 được cập nhật bằng số đo |
+| Pilot RQ1/RQ2, chọn canonical config | P2 | P1 | Báo cáo trong `docs/` theo Mục 9.2 |
+| Review protocol (Mục 3, 5, 9) và pipeline (Mục 7–8) | P2, P3 | P1 | Các điểm chặn freeze được xác nhận |
+
+Phân công theo vai trò trong work breakdown; giao task chính thức thực hiện trên GitHub.
+
+## 14. Tài liệu tham khảo
+
+- Fazekas, Sinnl, Biere, Parragh (2020). Duplex encoding of staircase at-most-one constraints for the antibandwidth problem.
+- Sinnl (2021). A note on computational approaches for the antibandwidth problem. CEJOR 29(3).
+- Truong, Kieu, To (2025). Sequential Counter Encoding for Staircase At-Most-One Constraints. ICAART 2025.
+- Rodriguez-Tello, Romero-Monsivais, Ramírez-Torres, Lardeux (2015). Harwell–Boeing graphs for the CB problem.
+
+Các công trình trên dùng máy, symmetry breaking và cấu hình khác với protocol này, nên không so sánh trực tiếp số liệu runtime.
