@@ -85,6 +85,11 @@ both AMO values give identical rows):
   instance in the pilot.
 * `peak_memory`: 111.4 MB max vs 126.5 MB.
 
+Early-warning thresholds (variables > 200 000, `t_encode` > 5 s) never fired in
+the pilot: the largest CNF has 2 500 variables / 255 400 clauses and the slowest
+encode is 1.6 s. That is a statement about this subset only; the thresholds stay
+as CLI flags (`--max-vars`, `--slow-encode`) for larger tiers.
+
 **`amo_encoding = pairwise`, rationale.**
 
 * For `abp_encoding = order` the AMO axis is inert: the monotone chain replaces
@@ -156,7 +161,8 @@ no external `kissat` binary on `PATH` (`docs/sat_tooling.md`, section "Kissat";
 `src/sat/backend.py:44-53`, `src/sat/solve.py:383-391`). The RQ2 grid refuses any
 kissat-family name and the CLI prints the exclusion note on start
 (`experiments/pilot_rq2.py`). No "Kissat: not installed" row should appear in
-the paper tables.
+the paper tables. No anomaly line was printed in this pilot: 40/40 runs are OPT
+with no warning and no error, so there is nothing to classify.
 
 ## Fixed axes
 

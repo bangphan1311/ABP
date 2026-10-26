@@ -159,6 +159,6 @@ behaviour, record it so results are read correctly).
 
 On the review machine `%TEMP%\pytest-of-ducqu` exists with an ACL owned by
 another security context; `pytest` fixtures using `tmp_path` fail with
-`PermissionError` until `TEMP`/`TMP` point to an accessible directory (the full
-suite is green with `TEMP` redirected: 487 passed, 3 skipped). Anyone reproducing
-the correctness suite on Windows should check this first.
+`PermissionError` until `TEMP`/`TMP` point to an accessible directory (full suite
+with the W3 tests: 498 passed, 3 skipped). Anyone reproducing the correctness
+suite on Windows should check this first.
