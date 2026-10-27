@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INV = ROOT / "benchmark/hb/instances.csv"
 DATA = ROOT / "benchmark/hb/raw"
 OUT = ROOT / "benchmark/hb/MANIFEST.csv"
-FIELDS = ["id","name","file","status","relative_path","sha256","n_reference","m_reference","n_header","n_cols","n_rows","m_header","m_file_rows","m_clean","self_loops_removed","duplicate_edges_removed","delta_max","ub_n_minus_delta","notes"]
+FIELDS = ["id","name","file","status","relative_path","sha256","n_reference","m_reference","n_header","n_cols","m_header","m_file_rows","m_clean","self_loops_removed","duplicate_edges_removed","delta_max","ub_n_minus_delta","notes"]
 
 def read_inventory(p):
     with p.open(encoding="utf-8-sig", newline="") as f:
@@ -69,7 +69,7 @@ def inspect(path, ref, rel):
             degrees[u] += 1
             degrees[v] += 1
         delta = max(degrees,default=0)
-        rec.update(n_header=n,n_cols=n2,n_rows=len(lines),m_header=m,m_file_rows=len(edges),
+        rec.update(n_header=n,n_cols=n2,m_header=m,m_file_rows=len(edges),
                    m_clean=len(seen),self_loops_removed=loops,duplicate_edges_removed=duplicates,
                    delta_max=delta,ub_n_minus_delta=(n-delta if delta else ""))
         notes=[]

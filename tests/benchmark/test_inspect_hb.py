@@ -12,7 +12,7 @@ def test_valid_file_computes_delta_and_ub(tmp_path):
     (data/"path4.mtx.rnd").write_text("4 4 3\n1 2\n2 3\n3 4\n",encoding="utf-8")
     rows,passed=inspect_instances(inv,data,tmp_path/"MANIFEST.csv")
     assert passed is True; row=rows[0]
-    assert row["status"]=="VALID"; assert row["n_rows"]==4; assert row["m_clean"]==3
+    assert row["status"]=="VALID"; assert row["n_header"]==4; assert row["m_file_rows"]==3; assert row["m_clean"]==3
     assert row["delta_max"]==2; assert row["ub_n_minus_delta"]==2; assert len(row["sha256"])==64
 
 def test_duplicate_reverse_edge_and_loop_are_reported(tmp_path):
