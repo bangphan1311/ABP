@@ -5,7 +5,7 @@ on:
     paths:
       - "src/common/checkpoint.py"
       - "src/sat/solve.py"
-      - "src/runner/runner.py"
+      - "src/runner/**"
       - "tests/runner/**"
       - ".github/workflows/w3-checkpoint-tests.yml"
   workflow_dispatch:
@@ -15,8 +15,13 @@ permissions:
 
 jobs:
   checkpoint-runner-tests:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 5
+    name: Runner tests (${{ matrix.os }})
     steps:
       - name: Lấy mã nguồn
         uses: actions/checkout@v4
