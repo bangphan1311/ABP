@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INV = ROOT / "benchmark/hb/instances.csv"
 DATA = ROOT / "benchmark/hb/raw"
 OUT = ROOT / "benchmark/hb/MANIFEST.csv"
-FIELDS = ["id","name","file","status","relative_path","sha256","n_header","n_cols","n_rows","m_header","m_table","m_file_rows","m_clean","self_loops_removed","duplicate_edges_removed","delta_max","ub_n_minus_delta","notes"]
+FIELDS = ["id","name","file","status","relative_path","sha256","n_reference","m_reference","n_header","n_cols","n_rows","m_header","m_file_rows","m_clean","self_loops_removed","duplicate_edges_removed","delta_max","ub_n_minus_delta","notes"]
 
 def read_inventory(p):
     with p.open(encoding="utf-8-sig", newline="") as f:
@@ -27,8 +27,9 @@ def read_inventory(p):
 def inspect(path, ref, rel):
     b = path.read_bytes()
     rec = dict.fromkeys(FIELDS, "")
-    rec.update(id=ref["id"],name=ref["name"],file=ref["file"],status="INVALID_FORMAT",relative_path=rel,
-               sha256=hashlib.sha256(b).hexdigest(),m_table=ref["m_table"])
+    rec.update(id=ref["id"],name=ref["name"],file=ref["file"],status="INVALID_FORMAT",
+               relative_path=rel,sha256=hashlib.sha256(b).hexdigest(),
+               n_reference=ref["n"],m_reference=ref["m_table"])
     try:
         text = b.decode("utf-8-sig")
         lines = [(i,s.strip()) for i,s in enumerate(text.splitlines(),1)
@@ -68,9 +69,9 @@ def inspect(path, ref, rel):
             degrees[u] += 1
             degrees[v] += 1
         delta = max(degrees,default=0)
-        rec.update(n_header=n,n_cols=n2,n_rows=len(lines),m_header=m,m_file_rows=len(edges),m_clean=len(seen),
-                   self_loops_removed=loops,duplicate_edges_removed=duplicates,delta_max=delta,
-                   ub_n_minus_delta=(n-delta if delta else ""))
+        rec.update(n_header=n,n_cols=n2,n_rows=len(lines),m_header=m,m_file_rows=len(edges),
+                   m_clean=len(seen),self_loops_removed=loops,duplicate_edges_removed=duplicates,
+                   delta_max=delta,ub_n_minus_delta=(n-delta if delta else ""))
         notes=[]
         if n != int(ref["n"]): notes.append(f"n_header={n} != n_reference={ref['n']}")
         if m != int(ref["m_table"]): notes.append(f"m_header={m} != m_reference={ref['m_table']}")
@@ -90,12 +91,17 @@ def inspect_instances(instances_path, data_dir, manifest_path):
     out=[]
     for r in refs:
         f=data_dir/r["file"]
+        try:
+            rel=f.resolve().relative_to(ROOT.resolve()).as_posix()
+        except ValueError:
+            rel=f.name
         if not f.is_file():
             row=dict.fromkeys(FIELDS,"")
-            row.update(id=r["id"],name=r["name"],file=r["file"],status="MISSING",relative_path=f.as_posix(),
-                       m_table=r["m_table"],notes="source file absent; file-derived measurements intentionally blank")
+            row.update(id=r["id"],name=r["name"],file=r["file"],status="MISSING",relative_path=rel,
+                       n_reference=r["n"],m_reference=r["m_table"],
+                       notes="source file absent; file-derived measurements intentionally blank")
         else:
-            row=inspect(f,r,f.as_posix())
+            row=inspect(f,r,rel)
         out.append(row)
     manifest_path.parent.mkdir(parents=True,exist_ok=True)
     with manifest_path.open("w",encoding="utf-8",newline="") as f:

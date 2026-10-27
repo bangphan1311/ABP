@@ -12,7 +12,7 @@
 | Official dataset definition | `CONFIRMED_FROM_SOURCE` | Optsicom describes 24 Harwell–Boeing ABP graphs, 12 smaller and 12 larger; it defines an edge from a nonzero matrix entry. [Optsicom ABP page](https://grafo.etsii.urjc.es/optsicom/abp.html) |
 | Canonical archive URL | `SOURCE_LINK_CONFIRMED; DOWNLOAD_NOT_COMPLETED_HERE` | [hb.zip](https://grafo.etsii.urjc.es/optsicom/abp/hb.zip), linked from Optsicom. The execution environment used to prepare this preflight could not resolve/download the archive; no claim is made that the 24 raw files were downloaded. |
 | Repository input files | `NOT_PRESENT_ON_GITHUB_AT_CHECK` | The `main` branch `benchmark/` directory contained `.gitkeep` and `toy/`; `benchmark/hb/` was not present. This says nothing about untracked files on an individual's Windows machine. |
-| 24-row instance inventory | `REFERENCE_INVENTORY_PREPARED` | `benchmark/hb/instances.csv`; `n,m` copied from the published Harwell–Boeing table reported in the ABP literature. Values are reference values, not measurements read from `.mtx.rnd` in this repository. [Sinnl, 2021](https://link.springer.com/article/10.1007/s10100-020-00688-4) |
+| 24-row instance inventory | `REFERENCE_INVENTORY_PREPARED` | `benchmark/hb/instances.csv`; `n,m` are cross-referenced to Table 1 of Sinnl (2021); `ab_lb_ref`/`ab_ub_ref` reproduce historical best-solution/upper-bound values in the appendix table reproducing Lozano et al. (2012). Values are reference values, not measurements read from `.mtx.rnd` in this repository. [Sinnl, 2021](https://link.springer.com/article/10.1007/s10100-020-00688-4) |
 | Literature ABP bounds | `REFERENCE_VALUES_ONLY` | `ab_lb_ref` is the published best-known feasible value and `ab_ub_ref` is a published upper bound reproduced in the ABP literature. They are checks, not certified optimum values. [Sinnl, 2021 / reproduced Lozano et al. table](https://link.springer.com/article/10.1007/s10100-020-00688-4) |
 | File hashes / headers / cleaned edge counts | `PENDING_RAW_FILES` | No SHA-256 or header values are supplied until the actual archive files are present. Run `python scripts/inspect_hb.py` afterward. |
 | Maximum degree `Δ` and `UB = n − Δ` | `PENDING_RAW_FILES` | Not computable from published `n,m` alone. Do not infer degree distribution from matrix dimensions or edge count. The inspector fills these only from actual edge rows. |
@@ -21,7 +21,7 @@
 | Hard memory limit | `BLOCKER_IN_CODE` | The runner accepts `--memory-limit`, but current SAT code warns that `memory_limit` is ignored; catching Python `MemoryError` is not OS-level process memory enforcement. See current `src/sat/solve.py` and `src/runner/worker.py`. |
 | Safe resume/checkpoint | `BLOCKER_IN_CODE` | Current `src/runner/runner.py` reuses any existing JSON for a run ID without validation; a hard kill returns `TO` without a saved incumbent checkpoint. Needs implementation and tests before freeze. |
 | Exact-solver time accounting | `BLOCKER_REQUIRES_TEST` | Current exact solver implementations build the model before setting the solver's time limit; confirm and fix so build + solve fit within `t_total` budget, then test. |
-| `--dry-run` / CNF preflight | `TOOL_ADDED; TARGET RUN PENDING` | `scripts/estimate_hb_cnf.py` computes formula-only counts from the published reference `n,m`. It does not allocate a full CNF and does not measure peak RAM. For `can__715`, formulas at `K=n−1` predict an extremely large CNF; do not build that full CNF until process memory limiting has been tested. |
+| CNF formula estimate (not queue dry-run) | `TOOL_ADDED; TARGET RUN PENDING` | `scripts/estimate_hb_cnf.py` computes formula-only counts from the published reference `n,m`; it is **not** the runner queue `--dry-run`. It does not allocate a full CNF and does not measure peak RAM. A queue-level dry-run that checks every planned run/configuration remains pending. For `can__715`, formulas at `K=n−1` predict an extremely large CNF; do not build that full CNF until process memory limiting has been tested. |
 
 ## 2. Data download and verification workflow
 
@@ -39,7 +39,7 @@
 
 ## 3. Current reference table and unknown metrics
 
-`benchmark/hb/instances.csv` contains published reference `n,m` and historical lower/upper ABP bounds. It deliberately does **not** contain `Δ` or computed `UB=n−Δ` because raw edge files have not been verified here. Those columns remain blank in a `MISSING` manifest until actual files are inspected.
+`benchmark/hb/instances.csv` contains published reference `n,m` and historical lower/upper ABP bounds. `MANIFEST.csv` carries `n_reference` and `m_reference` beside the file-derived fields. It deliberately leaves `Δ` and computed `UB=n−Δ` blank because raw edge files have not been verified here; they remain blank in `MISSING` rows until actual files are inspected.
 
 Source table facts: there are 12 small instances (`n` from 30 to 118) and 12 large instances (`n` from 420 to 715); the largest published graph `can__715` is listed as `n=715, m=2975`. This is an estimate-input from literature, not proof of the corresponding local file contents.
 
