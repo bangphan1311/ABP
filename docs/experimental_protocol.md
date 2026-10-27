@@ -1,8 +1,12 @@
 # Experimental Protocol — Antibandwidth Problem (ABP)
 
-**Phiên bản:** 1.0-rc **Trạng thái:** chờ review của P2, P3 và xử lý các mục chặn freeze (Mục 12–13) **Dataset:** chỉ Harwell–Boeing, 24 instance **Owner:** P1 (coordinator). **Review:** P2, P3
+**Phiên bản:** 1.0-rc  
+**Trạng thái:** đã nhận review W3; chờ re-review sau cập nhật và xử lý các mục chặn freeze (Mục 12–13)  
+**Dataset:** Harwell–Boeing, 24 instance  
+**Owner:** P1 (coordinator)  
+**Review:** P2, P3
 
-Tài liệu này là nguồn duy nhất cho **thiết kế thực nghiệm**. Đặc tả kỹ thuật SAT (biến, clause, K-search và semantics) được mô tả tại [`docs/sat_spec.md`](sat_spec.md) và nháp methodology tại [`docs/handoff/w2-sat/14-sat-methodology.md`](handoff/w2-sat/14-sat-methodology.md); hai tài liệu này không thay thế các giới hạn thực nghiệm trong protocol. P1/P2 phải review chéo ánh xạ `|p − q| < K` (cặp nhãn bị cấm) với `|f(u) − f(v)| ≥ K` (điều kiện cần thỏa) trước freeze. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
+Tài liệu này là nguồn duy nhất cho **thiết kế thực nghiệm**. [`docs/sat_spec.md`](sat_spec.md) ghi đặc tả W1 cho pairwise và K-search; [`docs/handoff/w2-sat/14-sat-methodology.md`](handoff/w2-sat/14-sat-methodology.md) mở rộng phần giải thích cho order encoding và AMO. Đây là tài liệu đặc tả/nháp methodology hiện có, phải được review đối chiếu với code và `CONTRACT.md`, không thay thế các giới hạn thực nghiệm trong protocol. P1/P2 phải review chéo ánh xạ `|p − q| < K` (cặp nhãn bị cấm) với `|f(u) − f(v)| ≥ K` (điều kiện cần thỏa) trước freeze. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
 
 ---
 
@@ -90,7 +94,7 @@ Không có RQ4; Bonus không đánh số RQ. Mỗi RQ trình bày theo chuỗi: 
 
 1. Khởi tạo `LB = 0`; có thể dùng heuristic để lấy incumbent ban đầu, nhưng thời gian heuristic tính vào `t_total`. Mọi incumbent phải qua `verify()` độc lập.
 2. Cận trên hợp lệ tính từ bậc lớn nhất `Δ = max_v deg(v)`: `UB = n − Δ` (với instance có ít nhất một cạnh). Lý do: một đỉnh bậc `Δ` phải có `Δ` nhãn hàng xóm cách nhãn của nó ít nhất K, trong khi có nhiều nhất `n − K` nhãn khả dụng ở khoảng cách đó; vì vậy `K ≤ n − Δ`. P1/P2 phải xác nhận lập luận và kiểm tra `1 ≤ UB ≤ n − 1` trên toàn bộ instance trước freeze. Không dùng cận từ literature làm đầu vào solver.
-3. Nếu incumbent đã verify có giá trị `B = UB`, có thể kết luận `OPT` không cần gọi solver thêm vì nghiệm đạt một cận trên hợp lệ; lưu nguồn chứng nhận là `verified_upper_bound`. Không đánh dấu `OPT` nếu `UB` chưa được xác minh.
+3. Nếu incumbent đã verify có giá trị `B = UB`, về mặt toán học incumbent đạt cận trên. Tuy nhiên, theo contract/SAT methodology hiện tại, `ub` ngoài chỉ được kiểm tra và `OPT` vẫn cần bằng chứng UNSAT tại ngưỡng tiếp theo; **không** tự trả `OPT` chỉ từ cận ngoài. Tiếp tục probe `K = B + 1` để lưu bằng chứng UNSAT theo cơ chế hiện hành. Chỉ thay đổi quy tắc này nếu P1/P2 cập nhật đồng bộ `CONTRACT.md`, implementation và correctness tests trước freeze.
 4. Với mỗi K, mã hóa CNF bài toán quyết định `|f(u) − f(v)| ≥ K`. Trong encoding nhãn `p, q`, các cặp có `|p − q| < K` bị cấm; do đó P1/P2 phải review ánh xạ này cùng `docs/sat_spec.md` để tránh lệch một đơn vị.
 5. Nếu SAT: giải mã nghiệm, chạy `verify()`, tính antibandwidth thực tế `B`, cập nhật incumbent và đặt `K ← B + 1` (không chỉ `K + 1`). Nếu UNSAT tại K sau một incumbent đã verify B, thì B là tối ưu (`OPT`).
 6. Mỗi lần gọi solver nhận **thời gian còn lại của ngân sách toàn run**, không được khởi động lại toàn bộ time limit cho từng K. Nếu hết ngân sách mà đã có incumbent hợp lệ nhưng chưa chứng minh tối ưu, trả `FEAS`; nếu chưa có incumbent hợp lệ, trả `TO`.
@@ -202,7 +206,7 @@ Core-giờ worst case = (số run × time limit) / 3600.
 
 | Giai đoạn | Số run | Time limit | Core-giờ worst case |
 |---|---:|---:|---:|
-| Pilot RQ1 (3 CNF/configurations uniques) | 30 | 1800 s | 15,0 |
+| Pilot RQ1 (3 cấu hình CNF duy nhất) | 30 | 1800 s | 15,0 |
 | Pilot RQ2 (run mới; nếu Glucose + Kissat đều dùng được) | tối đa 20 | 1800 s | tối đa 10,0 |
 | Pilot exact | 40 | 600 s | 6,7 |
 | Pilot-large (3 SAT + 4 exact × 3 instance) | 21 | 1800 s | 10,5 |
