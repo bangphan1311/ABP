@@ -9,6 +9,7 @@ UNSAT thì ``K - 1 = B`` là tối ưu. Mọi nghiệm đều qua ``verify()`` t
 from __future__ import annotations
 
 import ctypes
+import os
 import warnings
 from ctypes import wintypes
 from time import perf_counter
@@ -85,30 +86,52 @@ class _PROCESS_MEMORY_COUNTERS(ctypes.Structure):
     ]
 
 
-_psapi = ctypes.WinDLL("psapi")
-_kernel32 = ctypes.WinDLL("kernel32")
-# Thiếu prototype thì HANDLE pseudo -1 của GetCurrentProcess bị cắt 32 bit
-# và GetProcessMemoryInfo luôn thất bại.
-_kernel32.GetCurrentProcess.restype = wintypes.HANDLE
-_psapi.GetProcessMemoryInfo.argtypes = [
-    wintypes.HANDLE,
-    ctypes.POINTER(_PROCESS_MEMORY_COUNTERS),
-    wintypes.DWORD,
-]
-_psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+# Windows dùng psapi; Linux dùng /proc/self/statm để tránh phụ thuộc API Windows
+# ngay lúc import (đặc biệt khi chạy unit test/CI trên Linux).
+if hasattr(ctypes, "WinDLL"):
+    _psapi = ctypes.WinDLL("psapi")
+    _kernel32 = ctypes.WinDLL("kernel32")
+    # Thiếu prototype thì HANDLE pseudo -1 của GetCurrentProcess bị cắt 32 bit
+    # và GetProcessMemoryInfo luôn thất bại.
+    _kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    _psapi.GetProcessMemoryInfo.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(_PROCESS_MEMORY_COUNTERS),
+        wintypes.DWORD,
+    ]
+    _psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+else:
+    _psapi = None
+    _kernel32 = None
 
 
 def working_set_mb() -> float:
     """Working set hiện tại của process này, đơn vị MB, qua GetProcessMemoryInfo.
 
+    Trên Windows dùng GetProcessMemoryInfo; Linux đọc RSS từ /proc/self/statm.
     Thất bại hệ thống trả ``0.0``: số liệu bộ nhớ không được làm gãy pipeline.
     """
-    counters = _PROCESS_MEMORY_COUNTERS()
-    counters.cb = ctypes.sizeof(_PROCESS_MEMORY_COUNTERS)
-    measured = _psapi.GetProcessMemoryInfo(
-        _kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
-    )
-    return counters.WorkingSetSize / (1024.0 * 1024.0) if measured else 0.0
+    if _psapi is not None and _kernel32 is not None:
+        counters = _PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(_PROCESS_MEMORY_COUNTERS)
+        measured = _psapi.GetProcessMemoryInfo(
+            _kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+        )
+        if measured:
+            return counters.WorkingSetSize / (1024.0 * 1024.0)
+
+    # Linux: trường resident pages ở cột 2 của /proc/self/statm; chỉ đọc số liệu,
+    # không tạo cơ chế enforce giới hạn bộ nhớ.
+    try:
+        with open("/proc/self/statm", "r", encoding="ascii") as stream:
+            fields = stream.read().split()
+        resident_pages = int(fields[1])
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        if resident_pages >= 0 and page_size > 0:
+            return resident_pages * page_size / (1024.0 * 1024.0)
+    except (OSError, ValueError, IndexError, AttributeError):
+        pass
+    return 0.0
 
 
 def solve_sat(
