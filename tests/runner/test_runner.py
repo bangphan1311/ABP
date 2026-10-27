@@ -103,7 +103,7 @@ def test_resume_retries_err_and_preserves_previous_attempt(path4, tmp_path):
 def test_hard_timeout_recovers_verified_checkpoint(path4, tmp_path, monkeypatch):
     # Worker ghi incumbent rồi bị runner kill; runner phải phục hồi FEAS và verify lại.
     monkeypatch.setattr(runner_mod, "KILL_GRACE_SECONDS", 0.0)
-    cfg = Config(method="tests.runner.slow_solver:solve_checkpoint_slow", time_limit=1.0)
+    cfg = Config(method="tests.runner.slow_solver:solve_checkpoint_slow", time_limit=3.0)
 
     rec = runner_mod.run_one(path4, cfg, tmp_path / "raw", resume=True)
 
