@@ -5,7 +5,7 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
-from src.exact.common import validate_exact_input, warn_ignored_config
+from src.exact.common import remaining_time_budget, validate_exact_input, warn_ignored_config
 
 
 def _is_memory_failure(*signals) -> bool:
@@ -101,6 +101,17 @@ def solve_cplex_cp(
                 raise ValueError("time_limit phải lớn hơn 0.")
 
             params["TimeLimit"] = float(config.time_limit)
+
+        # Deduct build time from the whole-run budget before starting CP Optimizer.
+        remaining = remaining_time_budget(config.time_limit, perf_counter() - start)
+        if remaining is not None:
+            if remaining <= 0:
+                return Result(
+                    status="TO", ub=n - 1, t_encode=t_encode, t_solve=0.0,
+                    t_total=perf_counter() - start, variables=n + 1, clauses=None,
+                    metadata={"solver": "CPLEX CP", "time_budget_exhausted_during_build": True},
+                )
+            params["TimeLimit"] = remaining
 
         # Solve the model.
         solve_start = perf_counter()

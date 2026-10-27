@@ -66,3 +66,33 @@ def test_wrong_solution_is_caught_by_runner(path4, tmp_path, monkeypatch):
     rec = runner_mod.run_one(path4, cfg, tmp_path / "raw")
     assert rec["status"] == "ERR"
     assert "khác objective" in rec["error"]
+
+
+def test_resume_archives_corrupted_json_before_rerunning(path4, tmp_path):
+    out = tmp_path / "raw"
+    cfg = Config(method="oracle", time_limit=30)
+    first = runner_mod.run_one(path4, cfg, out)
+    raw_path = out / f"{first['run_id']}.json"
+    raw_path.write_text("{not valid json", encoding="utf-8")
+
+    again = runner_mod.run_one(path4, cfg, out, resume=True)
+
+    assert again["status"] == "OPT"
+    archived = list((out / "attempt_history").glob("*.json"))
+    assert len(archived) == 1
+    assert archived[0].read_text(encoding="utf-8") == "{not valid json"
+
+
+def test_resume_retries_err_and_preserves_previous_attempt(path4, tmp_path):
+    out = tmp_path / "raw"
+    cfg = Config(method="tests.runner.slow_solver:solve_boom", time_limit=30)
+    first = runner_mod.run_one(path4, cfg, out)
+    assert first["status"] == "ERR"
+
+    again = runner_mod.run_one(path4, cfg, out, resume=True)
+
+    assert again["status"] == "ERR"
+    archived = list((out / "attempt_history").glob("*.json"))
+    assert len(archived) == 1
+    prior = json.loads(archived[0].read_text(encoding="utf-8"))
+    assert prior["status"] == "ERR"

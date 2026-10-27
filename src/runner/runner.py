@@ -16,18 +16,75 @@ import sys
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
-from time import perf_counter
+from time import perf_counter, time_ns
 from typing import Any
 
 from src.common.models import Config, Result
 from src.common.verify import verify
-from src.runner.schema import build_record, make_run_id
+from src.runner.schema import RUN_FIELDS, build_record, make_run_id
 from src.sat.loader import read_instance
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT_DIR = REPO_ROOT / "results" / "raw"
 # Thời gian dư cho khởi động subprocess/import solver trước khi kill cứng.
 KILL_GRACE_SECONDS = 30.0
+
+
+def _valid_resume_record(path: Path, instance, config: Config, run_id: str) -> dict[str, Any] | None:
+    """Validate an existing raw record before allowing resume to skip it."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(record, dict):
+            return None
+        if not set(RUN_FIELDS).issubset(record):
+            return None
+        if record.get("run_id") != run_id or record.get("instance") != instance.id:
+            return None
+        if record.get("config") != asdict(config):
+            return None
+
+        status = record.get("status")
+        # ERR is a failed attempt, not a reusable completed result.
+        if status not in {"OPT", "FEAS", "TO", "MO"}:
+            return None
+
+        raw_solution = record.get("solution")
+        if raw_solution is None:
+            if status in {"OPT", "FEAS"}:
+                return None
+            if status == "TO" and record.get("lb") is not None:
+                return None
+        else:
+            if not isinstance(raw_solution, dict):
+                return None
+            labeling = {int(k): v for k, v in raw_solution.items()}
+            if len(labeling) != len(raw_solution):
+                return None
+            objective = verify(instance, labeling)
+            if record.get("lb") != objective:
+                return None
+            if status == "OPT" and record.get("ub") != objective:
+                return None
+            if status in {"FEAS", "MO"} and record.get("ub") is not None:
+                if record["ub"] < objective:
+                    return None
+            if status == "TO":
+                return None
+
+        return record
+    except (OSError, json.JSONDecodeError, ValueError, TypeError, KeyError):
+        return None
+
+
+def _archive_existing_record(path: Path) -> Path:
+    """Move the old attempt outside the active raw-record directory before retry."""
+    archive_dir = path.parent / "attempt_history"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    target = archive_dir / f"{path.stem}.{time_ns()}.json"
+    while target.exists():
+        target = archive_dir / f"{path.stem}.{time_ns()}.json"
+    path.replace(target)
+    return target
 
 
 def run_one(
@@ -44,8 +101,13 @@ def run_one(
     run_id = make_run_id(instance, config)
     out_file = out_dir / f"{run_id}.json"
 
-    if resume and out_file.exists():
-        return json.loads(out_file.read_text(encoding="utf-8"))
+    if out_file.exists():
+        if resume:
+            cached = _valid_resume_record(out_file, instance, config, run_id)
+            if cached is not None:
+                return cached
+        # Preserve corrupted/ERR/forced-rerun attempts for audit instead of overwriting.
+        _archive_existing_record(out_file)
 
     with tempfile.TemporaryDirectory() as tmp:
         cfg_file = Path(tmp) / "config.json"
