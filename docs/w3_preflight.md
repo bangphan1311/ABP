@@ -1,86 +1,70 @@
-# W3 preflight — ABP Harwell–Boeing
+# Kiểm tra trước thí nghiệm (W3) — ABP Harwell–Boeing
 
-**State at preparation time:** `PARTIAL / NOT READY TO FREEZE`  
-**Owner:** P1 (coordinator)  
-**Branch target:** `p1/w3-experimental-protocol-rc`  
-**Purpose:** record independently checkable evidence and leave unverified fields empty. This file is not proof that all benchmark prerequisites are satisfied.
+**Trạng thái:** `PARTIAL / NOT READY TO FREEZE`  
+**Phụ trách:** P1 (điều phối)  
+**Nhánh:** `p1/w3-experimental-protocol-rc`  
+**Mục đích:** ghi lại bằng chứng đã có và các điều kiện còn thiếu. Tài liệu này không khẳng định toàn bộ benchmark đã sẵn sàng chạy chính thức.
 
-## 1. Evidence summary
+## 1. Tóm tắt bằng chứng hiện có
 
-| Item | State | Evidence / note |
+| Hạng mục | Trạng thái | Bằng chứng / ghi chú |
 |---|---|---|
-| Official dataset definition | `CONFIRMED_FROM_SOURCE` | Optsicom describes 24 Harwell–Boeing ABP graphs, 12 smaller and 12 larger; it defines an edge from a nonzero matrix entry. [Optsicom ABP page](https://grafo.etsii.urjc.es/optsicom/abp.html) |
-| Canonical archive URL | `SOURCE_LINK_CONFIRMED; DOWNLOAD_NOT_COMPLETED_HERE` | [hb.zip](https://grafo.etsii.urjc.es/optsicom/abp/hb.zip), linked from Optsicom. The execution environment used to prepare this preflight could not resolve/download the archive; no claim is made that the 24 raw files were downloaded. |
-| Repository input files | `NOT_PRESENT_ON_GITHUB_AT_CHECK` | The `main` branch `benchmark/` directory contained `.gitkeep` and `toy/`; `benchmark/hb/` was not present. This says nothing about untracked files on an individual's Windows machine. |
-| 24-row instance inventory | `REFERENCE_INVENTORY_PREPARED` | `benchmark/hb/instances.csv`; `n,m` are cross-referenced to Table 1 of Sinnl (2021); `ab_lb_ref`/`ab_ub_ref` reproduce historical best-solution/upper-bound values in the appendix table reproducing Lozano et al. (2012). These are reference values, not measurements read from the local `.mtx.rnd` files. [Sinnl, 2021](https://link.springer.com/article/10.1007/s10100-020-00688-4) |
-| Literature ABP bounds | `REFERENCE_VALUES_ONLY` | `ab_lb_ref` is the published best-known feasible value and `ab_ub_ref` is a published upper bound reproduced in the ABP literature. They are checks, not certified optimum values. [Sinnl, 2021 / reproduced Lozano et al. table](https://link.springer.com/article/10.1007/s10100-020-00688-4) |
-| File hashes / headers / cleaned edge counts | `PENDING_RAW_FILES` | No SHA-256 or header values are supplied until the actual archive files are present. Run `python scripts/inspect_hb.py` afterward. |
-| Maximum degree `Δ` and `UB = n − Δ` | `PENDING_RAW_FILES` | Not computable from published `n,m` alone. Do not infer degree distribution from matrix dimensions or edge count. The inspector fills these only from actual edge rows. |
-| Solver license on official run machine | `NOT_CHECKED` | A historical tooling note records one contributor's venv without Gurobi/CPLEX/DOcplex installed; this is not a fresh test of the official machine and does not prove license state. Run `python scripts/w3_preflight_env.py --probe-solvers` locally. |
-| Official machine CPU/RAM/OS/Python | `NOT_RECHECKED_ON_OFFICIAL_HOST` | Historical notes from the project mention Ryzen 5 7535HS, about 15.2 GB RAM, and Python 3.11.17; these are not treated as a current machine probe. The runtime snapshot script records actual current values locally. |
-| Hard memory limit | `BLOCKER_IN_CODE` | The runner accepts `--memory-limit`, but current SAT code warns that `memory_limit` is ignored; catching Python `MemoryError` is not OS-level process memory enforcement. See current `src/sat/solve.py` and `src/runner/worker.py`. |
-| Safe resume record validation / incumbent checkpoint | `PARTIALLY_PATCHED; CI REQUIRED` | Branch now validates schema, run ID, instance/config and any stored solution before reusing a raw record. Corrupt/`ERR`/forced-rerun attempts are archived under `attempt_history/`. The hard-timeout path still returns `TO` without a durable incumbent checkpoint, so kill/recover remains a freeze blocker. |
-| Exact-solver time accounting | `PATCHED_IN_BRANCH; CI/SOLVER PROBE REQUIRED` | Branch computes remaining time from the whole-run start after model construction and passes that remainder to Gurobi MIP, CPLEX MIP, CPLEX CP and CP-SAT; if build consumes the entire budget, it returns `TO` without starting search. The logic has unit tests for remaining-budget arithmetic, but licensed solver execution and full CI still need verification. |
-| CNF estimate / plan-only dry-run | `TOOLS_ADDED; TARGET RUN PENDING` | `scripts/estimate_hb_cnf.py` computes formula-only counts from published reference `n,m`; it does not allocate a full CNF or estimate peak RAM. `scripts/dry_run_benchmark.py` checks the protocol run matrix and raw-file presence but is **not** the execution queue and launches no solvers. A queue-level dry-run integrated with the runner remains pending. For `can__715`, formulas at `K=n−1` predict an extremely large CNF; do not build that full CNF until process memory limiting has been tested. |
+| Nguồn dữ liệu | `CONFIRMED_FROM_SOURCE` | Trang Optsicom mô tả bộ ABP Harwell–Boeing gồm 24 đồ thị, chia thành 12 đồ thị nhỏ và 12 đồ thị lớn: https://grafo.etsii.urjc.es/optsicom/abp.html |
+| Tệp ZIP chính thức | `DOWNLOADED_AND_HASHED_LOCALLY` | Tệp được liên kết từ trang Optsicom: https://grafo.etsii.urjc.es/optsicom/abp/hb.zip. SHA-256 của ZIP đã tải: `C7B39A13A37707A09F36408273DB75D6A8BC1CB40E071AC960C724E1F58F6E7E`. |
+| Kiểm tra 24 tệp dữ liệu | `PASS_LOCAL_CHECK` | `benchmark/hb/MANIFEST.csv` có 24 dòng, tất cả `VALID`; `n` và `m` khớp giá trị tham chiếu; không phát hiện self-loop hoặc cạnh vô hướng trùng lặp. Các tệp dữ liệu thô vẫn nằm cục bộ trong `benchmark/hb/raw/`, không commit lên Git. |
+| Số liệu đồ thị thực tế | `RECORDED_IN_MANIFEST` | Manifest ghi SHA-256 từng tệp, header, số dòng cạnh, `m_clean`, số cạnh bị loại, `delta_max` và `ub_n_minus_delta = n - delta_max`. |
+| Kiểm thử tự động | `PASS_LOCAL_TEST_SUITE` | Lần chạy được báo cáo: `uv run pytest tests -q` → `506 passed`. Cần chạy lại trên commit cuối trước khi freeze. |
+| Kiểm tra nhanh solver | `PASS_TINY_PROBES` | Các phép thử mô hình nhỏ đã PASS cho CP-SAT, CaDiCaL, Glucose, Gurobi MIP, CPLEX MIP và CPLEX CP. Đây chỉ là smoke test, không chứng minh license hoặc khả năng xử lý benchmark lớn. |
+| Máy đã kiểm tra | `LOCAL_HOST_SNAPSHOT` | Windows 10.0.26200; Python 3.11.16; AMD64; 12 logical CPUs; RAM 15.21 GiB. Chưa xác nhận đây là máy chính thức dùng cho toàn bộ thí nghiệm. |
+| Phiên bản gói ghi nhận | `LOCAL_ENVIRONMENT` | OR-Tools 9.15.6755; python-sat 1.9.dev15; pytest 9.1.1; gurobipy 13.0.3; cplex 22.2.0.1; docplex 2.32.264. `psutil` không có trong môi trường được kiểm tra. |
+| Gurobi | `TINY_PROBE_PASS_LICENSE_LIMIT_UNRESOLVED` | Thông báo môi trường ghi nhận license restricted, non-production, hết hạn 2027-11-29. Phải xác minh giới hạn kích thước mô hình và quyền sử dụng cho benchmark; không suy ra từ tiny probe rằng mô hình lớn chạy được. |
+| Kissat native | `NOT_VERIFIED` | Không tìm thấy executable `kissat` trên PATH tại lần kiểm tra. Không tính Kissat là solver đã sẵn sàng cho benchmark cho đến khi kiểm tra binary độc lập. |
+| Giới hạn bộ nhớ cấp hệ điều hành | `BLOCKER` | Chưa có bằng chứng test xác nhận một process vượt giới hạn bị hệ điều hành chặn và được ghi status `MO`. Chỉ ghi cấu hình `memory_limit` hoặc bắt `MemoryError` không đủ. |
+| Checkpoint và khôi phục sau khi bị kill | `BLOCKER` | Chưa có bằng chứng test end-to-end chứng minh incumbent hợp lệ được checkpoint bền vững, được xác minh lại sau hard kill và được khôi phục đúng status. |
+| Dry-run của hàng đợi thực thi | `NOT_EQUIVALENT_TO_PLAN_CHECKER` | `scripts/dry_run_benchmark.py` kiểm tra ma trận kế hoạch, không phải hàng đợi thực thi tích hợp với runner; không chạy solver và không enforce giới hạn bộ nhớ. |
+| License và máy chính thức | `PENDING_CONFIRMATION` | Cần xác nhận máy official, quyền dùng solver và giới hạn kích thước mô hình trước khi chạy benchmark chính thức. Không đưa license key, mật khẩu, token hoặc dump biến môi trường vào repository. |
 
-## 2. Data download and verification workflow
+## 2. Cách tái tạo kiểm tra dữ liệu
 
-1. Open the [official Optsicom ABP page](https://grafo.etsii.urjc.es/optsicom/abp.html) and use its linked `hb.zip`. Preserve the original archive for provenance; record the downloaded archive's SHA-256 locally.
-2. Extract the **ABP graph edge-list files** to `benchmark/hb/raw/`. Do not rename a MatrixMarket source matrix or other dataset to `.mtx.rnd` to make it appear to match. Expected canonical filenames are listed in `instances.csv` (including names with double underscores such as `dwt__234.mtx.rnd` and `can__715.mtx.rnd`).
-3. Run:
-
-   ```powershell
-   python scripts/inspect_hb.py
-   ```
-
-   The script creates/replaces `benchmark/hb/MANIFEST.csv`. `MISSING`, `INVALID_FORMAT`, `REFERENCE_MISMATCH` and `INVALID_GRAPH` are not passes. `VALID_WITH_CLEANING` records that the actual file had self-loops or duplicate undirected edges that the graph loader would remove; review each such case rather than hiding it.
-4. Only accept the actual-file metrics if all 24 rows have valid status and the `n`/header `m` values agree with their published references or every discrepancy is investigated and documented. Compare `m_header`, physical row count, `m_clean`, removed loops/duplicates, `Δ`, and `UB=n−Δ` separately.
-5. Keep `instances.csv` as source reference metadata; keep file-derived evidence in `MANIFEST.csv`. Never copy `n,m_table` into `n_header,m_header,m_clean` as a placeholder.
-
-## 3. Current reference table and unknown metrics
-
-`benchmark/hb/instances.csv` contains published reference `n,m` and historical lower/upper ABP bounds. `MANIFEST.csv` carries `n_reference` and `m_reference` beside the file-derived fields. It deliberately leaves `Δ` and computed `UB=n−Δ` blank because raw edge files have not been verified here; they remain blank in `MISSING` rows until actual files are inspected.
-
-Source table facts: there are 12 small instances (`n` from 30 to 118) and 12 large instances (`n` from 420 to 715); the largest published graph `can__715` is listed as `n=715, m=2975`. This is an estimate-input from literature, not proof of the corresponding local file contents.
-
-## 4. CNF size estimate warning
-
-Run a formula-only estimate without constructing the full formula:
+Từ thư mục gốc repository, sau khi tải và giải nén đúng các tệp danh sách cạnh ABP vào `benchmark/hb/raw/`, chạy:
 
 ```powershell
-python scripts/estimate_hb_cnf.py --name can__715
+uv run python scripts/inspect_hb.py
 ```
 
-For the published references `n=715,m=2975`, `K=714`, the script's closed-form counts are:
+Lệnh sẽ tạo/cập nhật `benchmark/hb/MANIFEST.csv`. Chỉ chấp nhận dữ liệu khi mọi instance có trạng thái hợp lệ và các sai khác so với giá trị tham chiếu đã được điều tra. Không đổi tên ma trận nguồn khác thành `.mtx.rnd` để ép qua kiểm tra.
 
-- Pairwise ABP + pairwise AMO: 511,225 primary variables and 1,883,777,380 clauses.
-- Order encoding: 510,510 variables and 1,701,778,420 clauses.
-- Pairwise ABP + sequential-counter AMO: full AMO/auxiliary totals require the installed PySAT encoder; the estimate reports unknown if PySAT cannot be imported. The distance-clause count under this formula is still 1,518,761,300.
+Phân biệt:
+- `instances.csv`: tên instance và số liệu tham chiếu đã công bố.
+- `MANIFEST.csv`: số liệu được tính từ nội dung các tệp thực tế, bao gồm SHA-256, header, số cạnh, bậc lớn nhất và cận `UB = n - Δ`.
 
-These are **worst-case formula counts** from published reference `n,m`, assuming `K=n−1`; they are not measured CNF sizes from raw files, not solver results, and not a peak-memory estimate. Actual pilot probes use the solver's K path; do not treat this as a recommendation to build or solve the full largest-instance CNF without a tested memory cap.
+Nguồn đối chiếu số liệu tham chiếu: Sinnl (2021), bảng tham chiếu lại Lozano et al. (2012): https://link.springer.com/article/10.1007/s10100-020-00688-4.
 
-## 5. Machine and solver inventory
+## 3. Kiểm tra môi trường và solver
 
-Run on the intended official benchmark machine, inside the environment that will run the project:
+Chạy trong đúng môi trường dự định dùng để benchmark:
 
 ```powershell
-python scripts/w3_preflight_env.py > docs/w3_preflight_environment.json
-python scripts/w3_preflight_env.py --probe-solvers > docs/w3_solver_probe.json
+uv run python scripts/w3_preflight_env.py
+uv run python scripts/w3_preflight_env.py --probe-solvers
 ```
 
-The first file records Python executable/version, OS, architecture, processor string, logical CPU count, physical RAM where detectable, installed package versions, and relevant executables on `PATH`. The second also runs tiny smoke models for CP-SAT, CaDiCaL, Glucose, Gurobi MIP, CPLEX MIP, and CP Optimizer. A tiny solver pass proves only that this small model ran; it does not establish support for a large model or the license's full size/usage entitlement. Never put license keys, passwords, tokens, or environment dumps into the repo.
+Lệnh thứ hai chạy các mô hình nhỏ cho CP-SAT, CaDiCaL, Glucose, Gurobi MIP, CPLEX MIP và CPLEX CP. Kết quả PASS chỉ chứng minh mô hình nhỏ đó chạy được ở môi trường hiện tại; không chứng minh license cho mô hình lớn, hiệu năng, hay máy hiện tại là máy official.
 
-Current repository dependency facts from `main`: `pyproject.toml` has `dependencies = []`; `requirements.txt` pins OR-Tools, Gurobi, CPLEX, DOcplex, PySAT, and pytest. Dependency pins do not establish that a package is installed or licensed on the machine.
+## 4. Điều kiện còn thiếu trước khi freeze
 
-## 6. Solver and runner risks visible in the repository
+Các mục sau vẫn là blocker, không được đánh dấu hoàn tất chỉ dựa trên tiny probe hoặc trạng thái trong cấu hình:
 
-- `kissat404` through PySAT has historical repo evidence of ignored assumptions, invalid models and crashes on Windows; do **not** use it for RQ2. A native Kissat binary has not been verified. Scope RQ2 to CaDiCaL and Glucose unless a separate binary passes correctness tests.
-- Branch now validates the existing raw record's schema, run ID, instance/config and any stored incumbent before resume skips it; invalid/`ERR` records are archived before retry. Hard-kill still has no incumbent checkpoint, so that recovery behavior remains unimplemented.
-- The hard-timeout path records `TO` and cannot recover an incumbent after the worker is killed. Needs checkpoint/audit trail or explicitly documented behavior before freeze.
-- `memory_limit` is not an actual OS-level memory cap in the current SAT/runner path. Do not run pilot-large expecting `MO` enforcement until this is implemented and tested on the target OS.
-- The branch now deducts model-build elapsed time from the optimizer allowance for all four exact methods. This is source-level patched but still needs CI and smoke tests against the installed licensed solver APIs before treating the gate as closed.
-- These are source-code findings, not proof of which backend/license is available on the target machine today.
+1. **Xác nhận máy official:** chốt máy, hệ điều hành, CPU, RAM, Python, phiên bản solver và cách gọi solver; lưu bằng chứng kiểm tra từ chính máy đó.
+2. **Xác minh license:** ghi loại license và giới hạn kích thước mô hình/quyền sử dụng của Gurobi, CPLEX MIP và CPLEX CP; nếu không chạy được, phải ghi rõ phạm vi thực nghiệm thực tế.
+3. **Kissat:** cài/kiểm tra binary native độc lập hoặc ghi rõ Kissat không khả dụng; không tính là đã kiểm thử nếu chưa có bằng chứng.
+4. **Hard memory limit:** chứng minh process vượt ngưỡng bị chặn ở cấp hệ điều hành, có raw evidence và status `MO` đúng.
+5. **Checkpoint/resume:** kiểm thử hard kill sau một probe; incumbent đã verify phải được lưu bền vững, kiểm tra lại khi khôi phục, và raw attempt cũ không bị ghi đè. Nếu không có incumbent hợp lệ, phân loại theo contract.
+6. **Ngân sách thời gian:** xác minh `t_total` tính cả build/encoding và toàn bộ chuỗi K; mỗi solver nhận phần thời gian còn lại, không được khởi động lại time limit cho từng probe.
+7. **Review và kiểm thử cuối:** chạy lại test suite trên commit chuẩn bị freeze; xử lý các nhận xét của P2/P3 trên PR #50 và ghi bằng chứng cho từng mục đã xử lý.
 
-## 7. Freeze-readiness conclusion
+## 5. Quyết định hiện tại
 
-**Not ready for `v1.0` at this point.** The official source and published inventory are identified, and tooling now exists to verify actual files and collect the target environment. The actual 24 raw files, SHA-256 manifest, `Δ`/computed `UB`, fresh solver-license probes, dry-run on the target host, hard memory enforcement, and checkpoint/resume tests remain pending. Keep all unknown actual-file and official-machine fields empty or explicitly pending until evidence is committed.
+**Giữ phiên bản `1.0-rc`; chưa tạo tag `v1.0`.** Dữ liệu 24 instance đã được kiểm tra và manifest đã có trên nhánh, nhưng các điều kiện về máy chính thức, license, hard memory limit, checkpoint/resume và review cuối chưa đủ bằng chứng để tuyên bố sẵn sàng chạy benchmark chính thức.
+
+PR theo dõi: https://github.com/bangphan1311/ABP/pull/50
