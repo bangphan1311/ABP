@@ -7,7 +7,7 @@ The Optsicom Antibandwidth Problem page describes the Harwell–Boeing benchmark
 - Dataset page: https://grafo.etsii.urjc.es/optsicom/abp.html
 - Download URL linked from that page: https://grafo.etsii.urjc.es/optsicom/abp/hb.zip
 
-The archive could not be fetched from the current build environment, so the repository does not claim to contain the 24 raw `.mtx.rnd` files. Use the official page and download the archive manually if the link is reachable from the project machine. Keep the archive and record its SHA-256 for provenance.
+The official archive was downloaded and its 24 `.mtx.rnd` files were validated locally on 2026-10-27. The downloaded ZIP SHA-256 is `C7B39A13A37707A09F36408273DB75D6A8BC1CB40E071AC960C724E1F58F6E7E`. The raw payloads remain local under `benchmark/hb/raw/` and are not committed to Git. `MANIFEST.csv` records the SHA-256 and graph measurements of each file. To reproduce the validation, download the official archive from the URL above, extract the 24 graph files to `benchmark/hb/raw/`, and run `python scripts/inspect_hb.py`.
 
 ## What `instances.csv` and `MANIFEST.csv` mean
 

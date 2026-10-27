@@ -31,7 +31,7 @@ def probe(name):
             from docplex.cp.model import CpoModel
             m=CpoModel(); x=m.integer_var(min=1,max=1); m.add(x==1)
             r=m.solve(TimeLimit=5,LogVerbosity="Quiet"); st=str(r.get_solve_status()) if r else "no result"
-            ok=bool(r) and st.lower().endswith("optimal")
+            ok=bool(r) and st.lower() in ("optimal", "feasible") and int(round(r.get_value(x))) == 1
         else: return {"status":"NOT_PROBED"}
         return {"status":"PASS" if ok else "FAIL","solver_result":str(st)}
     except Exception as e:
@@ -43,7 +43,32 @@ def main():
     try:
         import psutil
         ram=psutil.virtual_memory().total; ram_gib=round(ram/1024**3,2)
-    except Exception: ram=ram_gib=None
+    except Exception:
+        ram = ram_gib = None
+        if os.name == "nt":
+            try:
+                import ctypes
+
+                class MEMORYSTATUSEX(ctypes.Structure):
+                    _fields_ = [
+                        ("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                    ]
+
+                mem = MEMORYSTATUSEX()
+                mem.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+                if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem)):
+                    ram = int(mem.ullTotalPhys)
+                    ram_gib = round(ram / 1024**3, 2)
+            except Exception:
+                pass
     data={"python":{"version":sys.version,"executable":sys.executable},
           "machine":{"os":platform.platform(),"system":platform.system(),"release":platform.release(),
                      "architecture":platform.machine(),"processor":platform.processor() or None,

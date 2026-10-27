@@ -36,6 +36,14 @@ def inspect(path, ref, rel):
                  if s.strip() and not s.strip().startswith(("#","%"))]
         if not lines:
             raise ValueError("empty file")
+
+        # Official Optsicom files start with a problem-name line.
+        if lines[0][1].casefold().startswith("nombre del problema:"):
+            lines = lines[1:]
+
+        if not lines:
+            raise ValueError("missing graph header after problem-name line")
+
         ln, head_text = lines[0]
         head = [int(x) for x in head_text.split()]
         if len(head) != 3:
@@ -105,7 +113,7 @@ def inspect_instances(instances_path, data_dir, manifest_path):
         out.append(row)
     manifest_path.parent.mkdir(parents=True,exist_ok=True)
     with manifest_path.open("w",encoding="utf-8",newline="") as f:
-        w=csv.DictWriter(f,fieldnames=FIELDS); w.writeheader(); w.writerows(out)
+        w=csv.DictWriter(f,fieldnames=FIELDS,lineterminator="\n"); w.writeheader(); w.writerows(out)
     return out, all(r["status"] in ("VALID","VALID_WITH_CLEANING") for r in out)
 
 def main():
