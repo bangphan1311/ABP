@@ -2,7 +2,7 @@
 
 **Phiên bản:** 1.0-rc **Trạng thái:** chờ review của P2, P3 và xử lý các mục chặn freeze (Mục 12–13) **Dataset:** chỉ Harwell–Boeing, 24 instance **Owner:** P1 (coordinator). **Review:** P2, P3
 
-Tài liệu này là nguồn duy nhất cho thiết kế thực nghiệm. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
+Tài liệu này là nguồn duy nhất cho **thiết kế thực nghiệm**. Đặc tả kỹ thuật SAT (biến, clause, K-search và semantics) được mô tả tại [`docs/sat_spec.md`](sat_spec.md) và nháp methodology tại [`docs/handoff/w2-sat/14-sat-methodology.md`](handoff/w2-sat/14-sat-methodology.md); hai tài liệu này không thay thế các giới hạn thực nghiệm trong protocol. P1/P2 phải review chéo ánh xạ `|p − q| < K` (cặp nhãn bị cấm) với `|f(u) − f(v)| ≥ K` (điều kiện cần thỏa) trước freeze. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
 
 ---
 
@@ -76,7 +76,7 @@ Validation subset lấy từ 12 instance nhỏ/vừa (A–L), bỏ hai instance 
 
 ## 4. Câu hỏi nghiên cứu
 
-**RQ1 — Encoding (Validation subset).** ABP encoding và AMO encoding ảnh hưởng thế nào đến kích thước CNF và hiệu năng? Cố định CaDiCaL và search mode `multi`; đổi 2 × 2 = 4 cấu hình (ABP {pairwise, order} × AMO {pairwise, sequential counter}).
+**RQ1 — Encoding (Validation subset).** ABP encoding và AMO encoding ảnh hưởng thế nào đến kích thước CNF và hiệu năng? Cố định CaDiCaL và search mode `multi`. Trục thiết kế là ABP {pairwise, order} × AMO {pairwise, sequential counter}, nhưng chỉ có **3 CNF khác nhau**: (pairwise, pairwise), (pairwise, seqcounter), (order, pairwise). Order encoding không dùng AMO nên (order, seqcounter) tạo CNF giống hệt (order, pairwise); không chạy cấu hình trùng chỉ để thay metadata. Khi báo cáo, AMO chỉ là biến thực nghiệm có ý nghĩa với pairwise encoding; với order, ghi `N/A` trong diễn giải nhưng giữ `amo_encoding = pairwise` cố định trong cấu hình máy để tái lập.
 
 **RQ2 — SAT solver (Validation subset).** Với encoding và AMO tốt nhất từ RQ1, CaDiCaL, Glucose, Kissat khác nhau thế nào? Chỉ đổi solver.
 
@@ -88,12 +88,14 @@ Không có RQ4; Bonus không đánh số RQ. Mỗi RQ trình bày theo chuỗi: 
 
 ### 5.1. SAT (multi-run, non-incremental)
 
-1. Bắt đầu từ cận dưới tầm thường hoặc nghiệm heuristic nhanh; thời gian heuristic tính vào `t_total`.
-2. Với mỗi K, mã hóa CNF "tồn tại nhãn với antibandwidth ≥ K" và gọi solver.
-3. Nếu SAT: giải mã nghiệm, verify, tính antibandwidth thực tế B, đặt K ← B + 1.
-4. Nếu UNSAT sau một nghiệm đã verify có giá trị B: B là tối ưu (`OPT`).
-5. Cận trên ban đầu tính từ n và bậc đỉnh (P1/P2 thống nhất cách tính, ghi vào `ub`); không dùng cận từ literature.
-6. P1 và P2 review chéo ánh xạ giữa "antibandwidth ≥ K" và độ rộng cửa sổ trong encoding để tránh lệch một đơn vị.
+1. Khởi tạo `LB = 0`; có thể dùng heuristic để lấy incumbent ban đầu, nhưng thời gian heuristic tính vào `t_total`. Mọi incumbent phải qua `verify()` độc lập.
+2. Cận trên hợp lệ tính từ bậc lớn nhất `Δ = max_v deg(v)`: `UB = n − Δ` (với instance có ít nhất một cạnh). Lý do: một đỉnh bậc `Δ` phải có `Δ` nhãn hàng xóm cách nhãn của nó ít nhất K, trong khi có nhiều nhất `n − K` nhãn khả dụng ở khoảng cách đó; vì vậy `K ≤ n − Δ`. P1/P2 phải xác nhận lập luận và kiểm tra `1 ≤ UB ≤ n − 1` trên toàn bộ instance trước freeze. Không dùng cận từ literature làm đầu vào solver.
+3. Nếu incumbent đã verify có giá trị `B = UB`, có thể kết luận `OPT` không cần gọi solver thêm vì nghiệm đạt một cận trên hợp lệ; lưu nguồn chứng nhận là `verified_upper_bound`. Không đánh dấu `OPT` nếu `UB` chưa được xác minh.
+4. Với mỗi K, mã hóa CNF bài toán quyết định `|f(u) − f(v)| ≥ K`. Trong encoding nhãn `p, q`, các cặp có `|p − q| < K` bị cấm; do đó P1/P2 phải review ánh xạ này cùng `docs/sat_spec.md` để tránh lệch một đơn vị.
+5. Nếu SAT: giải mã nghiệm, chạy `verify()`, tính antibandwidth thực tế `B`, cập nhật incumbent và đặt `K ← B + 1` (không chỉ `K + 1`). Nếu UNSAT tại K sau một incumbent đã verify B, thì B là tối ưu (`OPT`).
+6. Mỗi lần gọi solver nhận **thời gian còn lại của ngân sách toàn run**, không được khởi động lại toàn bộ time limit cho từng K. Nếu hết ngân sách mà đã có incumbent hợp lệ nhưng chưa chứng minh tối ưu, trả `FEAS`; nếu chưa có incumbent hợp lệ, trả `TO`.
+7. Labeling trả về nhưng không qua `verify()` không được nhận làm incumbent. Ghi rõ lỗi validation vào raw evidence và phân loại `ERR` theo `CONTRACT.md` (đầu ra sai/hỏng), không giả định nó là `FEAS` hoặc `TO` rồi bỏ qua lỗi.
+8. Nếu không dùng heuristic trong implementation, bỏ qua nhánh heuristic; không được tự gán rằng incumbent đạt UB. Thời gian build/encode, heuristic và mọi lần gọi solver đều tính vào `t_total`.
 
 ### 5.2. Exact
 
@@ -110,10 +112,12 @@ P1 viết formulation, P2 review. MIP dùng biến nhị phân theo cạnh cho |
 ### 6.2. Time limit
 
 - Official: 1800 s mỗi (instance × phương pháp), đúng work breakdown.
-- Pilot: 600 s mỗi run. Đây là bổ sung của protocol để tiết kiệm compute (work breakdown không quy định time limit riêng cho pilot), nên canonical config được chọn trong chế độ ngắn hơn official; nhóm xác nhận, hoặc chạy pilot ở 1800 s nếu ngân sách cho phép.
-- Với SAT multi-run, 1800 s là ngân sách cho cả chuỗi K, không phải từng lần gọi solver.
-- `t_total` gồm thời gian build model/encoding và mọi lần gọi solver. Với exact solver, time limit truyền cho solver là 1800 − t_build.
-- Số liệu chính thức là wall-time do runner đo. Runner kill cứng tại time_limit + 30 s chỉ để dự phòng; 30 s này không phải ngân sách solve thêm.
+- Pilot RQ1/RQ2: 1800 s mỗi run để chọn canonical config dưới cùng ngân sách thời gian với official benchmark.
+- Pilot exact: 600 s mỗi run để kiểm tra trước formulation, license và khả năng vận hành; đây không phải so sánh hiệu năng cuối cùng.
+- Pilot-large: 1800 s mỗi run để kiểm tra sớm timeout/memory trên 3 instance lớn dưới ngân sách gần official. Chỉ chạy sau khi P3 đã kiểm chứng hard memory limit trên một process thử nghiệm; không chạy khi memory cap chưa được enforce.
+- Với SAT multi-run, giới hạn của một run là ngân sách cho **toàn bộ chuỗi K**, không phải từng lần gọi solver. Mỗi probe nhận thời gian còn lại (`max(0, deadline − now)`).
+- `t_total` gồm thời gian build model/encoding, heuristic và mọi lần gọi solver. Với exact solver, time limit dành cho optimizer là `max(0, time_limit của run − t_build)`; không được cộng thời gian build vượt quá ngân sách rồi vẫn báo run như đúng hạn.
+- Số liệu official là wall-time do runner đo. Runner kill cứng tại `time_limit + 30 s` chỉ để dự phòng khởi động/cleanup; 30 s không phải ngân sách solve thêm.
 
 ### 6.3. Memory limit
 
@@ -123,8 +127,10 @@ Runner phải thực thi giới hạn bộ nhớ thật, không chỉ ghi `memor
 
 ### 6.4. Seed, lặp, resume
 
-- Mỗi cặp (instance × phương pháp) chạy 1 lần, `seed = 0`. Hạn chế đã biết: runtime không có khoảng tin cậy từ nhiều lần chạy; nêu trong Limitations.
-- Runner bỏ qua run đã có kết quả hợp lệ. Run thiếu hoặc `ERR` được chạy lại ở W5; mọi lần chạy lại được ghi nhận, không ghi đè lịch sử.
+- Mỗi cặp (instance × phương pháp × cấu hình) chạy 1 lần, `seed = 0`. Hạn chế: runtime không có khoảng tin cậy từ nhiều lần chạy; nêu trong Limitations.
+- `resume` chỉ được skip khi raw JSON đọc được, schema hợp lệ, `run_id` và cấu hình lưu khớp cấu hình được yêu cầu, và record qua validation. File hỏng/thiếu trường, `ERR` hoặc record không khớp phải được xem là cần điều tra/chạy lại, không skip im lặng.
+- Khi chạy lại, giữ lịch sử attempt cũ (archive hoặc lưu tách theo attempt); không ghi đè raw evidence duy nhất. Chỉ `runs.csv` mới nhất được chọn sau validation, còn mọi attempt raw vẫn truy vết được.
+- Worker/solver phải checkpoint incumbent **đã verify** sau mỗi probe K (ghi atomically). Nếu bị kill cứng, runner đọc checkpoint, tự verify lại trên instance gốc rồi ghi `FEAS` nếu incumbent còn hợp lệ; nếu không có incumbent hợp lệ thì `TO`. Checkpoint hỏng hoặc labeling không hợp lệ được ghi nhận là lỗi validation, không dùng làm nghiệm.
 
 ## 7. Status và validation
 
@@ -136,7 +142,7 @@ Runner phải thực thi giới hạn bộ nhớ thật, không chỉ ghi `memor
 | `MO` | Vượt memory limit đã cấu hình |
 | `ERR` | Lỗi thực thi, license, output hỏng hoặc lỗi khác làm run không hoàn thành đúng quy trình |
 
-Lỗi license ghi `ERR`, không ghi `TO`.
+Lỗi license ghi `ERR`, không ghi `TO`. Output có labeling không hợp lệ hoặc không khớp objective cũng là lỗi validation (`ERR`) theo `CONTRACT.md`; tuyệt đối không dùng labeling đó làm incumbent. Nếu chỉ hết giờ và không có labeling hợp lệ nào, status là `TO`.
 
 **Kiểm tra nghiệm:** là hoán vị hợp lệ của 1..n, không trùng nhãn; objective tính lại độc lập và khớp output solver.
 
@@ -160,10 +166,10 @@ Báo cáo kích thước CNF và status của mọi instance, kể cả khi `TO`
 
 ### 9.1. Thứ tự
 
-1. **RQ1:** 10 instance × 4 cấu hình (CaDiCaL) = 40 run → chọn (ABP encoding, AMO).
-2. **RQ2:** thêm Glucose và Kissat với cấu hình vừa chọn = 20 run mới; 10 run CaDiCaL lấy lại từ RQ1. Tổng SAT pilot: 60 run.
-3. **Pilot exact:** 10 instance × 4 exact solver = 40 run (kiểm tra formulation, license, tài nguyên).
-4. **Pilot-large:** 3 instance × (4 cấu hình SAT của RQ1 với CaDiCaL + 4 exact solver) = 24 run, để lộ sớm CNF quá lớn, MIP yếu, vấn đề memory và kiểm tra kill/resume. Kết quả có thể kích hoạt sửa lỗi hoặc điều chỉnh giới hạn tài nguyên theo freeze policy, nhưng không thay đổi quy tắc chọn config ở Mục 9.2.
+1. **RQ1:** 10 instance × 3 cấu hình CNF khác nhau (CaDiCaL) = 30 run → chọn ABP encoding/AMO. Không chạy cấu hình order × seqcounter trùng CNF với order × pairwise.
+2. **RQ2:** thêm Glucose và Kissat (chỉ nếu đã xác minh chạy đúng) với cấu hình vừa chọn. Nếu cả hai khả dụng: tối đa 20 run mới; 10 run CaDiCaL được tái sử dụng từ RQ1. Nếu Kissat không khả dụng: chỉ thêm 10 run Glucose và nêu rõ giới hạn so sánh.
+3. **Pilot exact:** 10 instance × 4 exact solver = 40 run (600 s/run; kiểm tra formulation, license, tài nguyên).
+4. **Pilot-large:** 3 instance × (3 cấu hình CNF khác nhau của RQ1 với CaDiCaL + 4 exact solver) = 21 run (1800 s/run), để lộ sớm CNF quá lớn, MIP yếu, vấn đề memory và kiểm tra kill/resume. Chỉ bắt đầu sau test hard memory limit; kết quả pilot-large không dùng để đổi quy tắc chọn canonical config.
 
 Nếu một solver không khả dụng, ghi lại số run thực tế và lý do; không giữ nguyên tổng dự kiến như thể mọi run đã xong.
 
@@ -172,11 +178,11 @@ Nếu một solver không khả dụng, ghi lại số run thực tế và lý d
 So sánh theo thứ tự:
 
 1. Nhiều instance `OPT` hơn.
-2. Hòa: PAR2 thấp hơn (run không `OPT` bị phạt 2 × time limit).
+2. Hòa: PAR2 thấp hơn. Với mỗi batch, run không `OPT` bị phạt `2 × time_limit` của chính batch đó: 3600 s cho RQ1/RQ2 (1800 s/run), 1200 s cho pilot exact (600 s/run); áp dụng nhất quán cho `FEAS`, `TO`, `MO`, `ERR` và run thiếu chưa được thay thế hợp lệ.
 3. Hòa: `peak_memory` trung vị thấp hơn.
-4. Hòa: `clauses` trung vị thấp hơn.
+4. Hòa: `clauses` trung vị thấp hơn; với order encoding, `amo_encoding` là no-op và không dùng như chỉ số phân biệt cấu hình.
 
-Xử lý run lỗi, thiếu hoặc chưa hoàn thành nhất quán giữa các cấu hình; không loại run bất lợi nếu không có lý do kỹ thuật được ghi nhận. Kết quả pilot, quy tắc đã áp dụng và lý do chọn lưu trong `docs/` trước M2.
+Không loại run bất lợi nếu không có lý do kỹ thuật được ghi nhận. Run lỗi/thiếu cần được lưu trong audit trail và chạy lại theo cùng cấu hình; khi tính PAR2, chỉ thay bằng attempt hợp lệ mới sau validation, không xóa dấu vết attempt cũ. Kết quả pilot, quy tắc đã áp dụng và lý do chọn lưu tại `docs/canonical_sat_config.md` trước M2.
 
 Cố định toàn bộ benchmark: `search_mode = multi`, `symmetry = false`, `warm_start = false`.
 
@@ -194,14 +200,16 @@ Run `ERR` hoặc thiếu được điều tra và chạy lại ở W5. Nếu lic
 
 Core-giờ worst case = (số run × time limit) / 3600.
 
-| Giai đoạn | Số run | Time limit | Core-giờ |
+| Giai đoạn | Số run | Time limit | Core-giờ worst case |
 |---|---:|---:|---:|
-| Pilot RQ1 + RQ2 | 60 | 600 s | 10 |
+| Pilot RQ1 (3 CNF/configurations uniques) | 30 | 1800 s | 15,0 |
+| Pilot RQ2 (run mới; nếu Glucose + Kissat đều dùng được) | tối đa 20 | 1800 s | tối đa 10,0 |
 | Pilot exact | 40 | 600 s | 6,7 |
-| Pilot-large | 24 | 600 s | 4,0 |
-| Official RQ3 | 120 | 1800 s | 60 |
+| Pilot-large (3 SAT + 4 exact × 3 instance) | 21 | 1800 s | 10,5 |
+| Official RQ3 | 120 | 1800 s | 60,0 |
+| **Tổng worst case** | **231** | — | **102,2** |
 
-Đây là ngân sách CPU, không phải cam kết thời gian lịch; thời gian thực còn phụ thuộc số run song song, license và overhead runner. Ở W3 chạy `--dry-run` và pilot để thay bằng số đo thật. Nếu vượt ngân sách: thu nhỏ pilot RQ1/RQ2 trước; không bỏ instance lớn hay thu hẹp RQ3.
+Nếu Kissat không qua xác minh và RQ2 chỉ dùng Glucose, RQ2 còn 10 run mới (5,0 core-giờ), tổng dự kiến giảm còn 97,2 core-giờ và 221 run bao gồm official. Đây là ngân sách CPU worst case, không phải cam kết thời gian lịch; thời gian thực còn phụ thuộc số run song song, license và overhead runner. Pilot-large chỉ chạy sau khi test hard memory limit pass. `--dry-run` phải cập nhật dự toán bằng số đo thật trước freeze; nếu vượt ngân sách, thu nhỏ RQ1/RQ2 trước, không bỏ instance lớn hay thu hẹp RQ3.
 
 **Môi trường (điền trước freeze, không để ở trạng thái giả định):** máy, CPU, RAM, hệ điều hành; phiên bản Python; OR-Tools, Gurobi, CPLEX/CP Optimizer; PySAT, CaDiCaL, Glucose, Kissat và cách gọi từng solver; git tag/commit; loại license và giới hạn kích thước model; memory limit, time limit, chính sách chạy song song.
 
@@ -211,11 +219,11 @@ Core-giờ worst case = (số run × time limit) / 3600.
 
 1. Có đủ 24 file dữ liệu, `MANIFEST.csv` đã tạo, loader qua test cả 24 instance.
 2. Correctness test và oracle/cross-solver check đạt.
-3. Canonical SAT config đã chọn từ pilot, ghi lý do, đã review.
-4. Runner thực thi memory limit thật; kill/resume đã kiểm thử.
-5. Time limit của exact tính đúng cả thời gian build.
+3. Canonical SAT config được chọn từ pilot RQ1/RQ2, có raw JSON + report lựa chọn tại `docs/canonical_sat_config.md`, và được P1/P2/P3 review.
+4. Runner thực thi memory limit ở cấp process/OS; test process vượt ngưỡng bị chặn đúng và được phân loại `MO` đã lưu. Kill/resume test chứng minh checkpoint incumbent, validation lại và audit trail.
+5. SAT và exact đều tính `t_total` theo toàn ngân sách run, bao gồm build/encoding; test xác minh thời gian còn lại truyền cho từng probe/optimizer.
 6. Tập con, RQ, time/memory limit, máy và version solver đã khóa; khả năng chạy và giới hạn license của từng solver đã ghi rõ.
-7. P2 và P3 đã review các phần liên quan.
+7. `docs/sat_spec.md` được review chéo P1/P2 cho semantics encoding/K-search; P2 và P3 xác nhận các góp ý protocol đã được xử lý hoặc có quyết định được ghi rõ.
 
 Nếu còn điều kiện chưa đạt, giữ `1.0-rc`; không tag chỉ để kịp mốc.
 
@@ -227,19 +235,22 @@ Nếu còn điều kiện chưa đạt, giữ `1.0-rc`; không tag chỉ để k
 
 ## 13. Việc cần xong trước freeze
 
-| Việc | Owner | Review | Xong khi |
+| Đầu ra / việc cần làm | Owner | Review | Bằng chứng nghiệm thu bắt buộc |
 |---|---|---|---|
-| Xin thầy 24 file `.mtx.rnd` và hỏi ý nghĩa `.rnd` | P1 | — | Có đủ file, nguồn và định dạng được ghi nhận |
-| Loader + `MANIFEST.csv` + test 24 instance | P2 | P3 | Đối chiếu n, m, chênh lệch sau làm sạch |
-| Thực thi memory limit cứng trong runner | P3 | P1 | Có bằng chứng giới hạn được thực thi |
-| Time limit của exact tính cả thời gian build | P1 | P3 | Test chứng minh tổng ngân sách đúng |
-| Kiểm tra AMO pairwise có loại clause trùng | P2 | P1 | Có kết quả; rủi ro MO được xử lý hoặc ghi nhận |
-| Kiểm tra license Gurobi/CPLEX và giới hạn kích thước model | P1 | — | Ghi rõ solver chạy được trên instance lớn |
-| `--dry-run` và ước tính ngân sách thật | P3 | P1 | Bảng Mục 11 được cập nhật bằng số đo |
-| Pilot RQ1/RQ2, chọn canonical config | P2 | P1 | Báo cáo trong `docs/` theo Mục 9.2 |
-| Review protocol (Mục 3, 5, 9) và pipeline (Mục 7–8) | P2, P3 | P1 | Các điểm chặn freeze được xác nhận |
+| Xin thầy 24 file `.mtx.rnd`, xác minh ý nghĩa `.rnd`, xác nhận nguồn/định dạng | P1 | P2 | Cập nhật trạng thái từng file; lưu câu trả lời/nguồn vào `docs/w3_preflight.md`; không điền số liệu chưa xác minh |
+| `instances.csv`, loader, `MANIFEST.csv` và test cả 24 instance | P2 | P3 + P1 | `benchmark/hb/instances.csv`, `benchmark/hb/MANIFEST.csv`; SHA-256, n/header m/cleaned m; test pass 24/24 hoặc danh sách lỗi cụ thể |
+| Kiểm tra cận `UB = n − Δ` và review semantics encoding/K-search | P1 | P2 | Lập bảng `n, m, Δ, UB` cho 24 instance; P2 xác nhận lập luận và đối chiếu `docs/sat_spec.md` |
+| Kiểm tra license Gurobi/CPLEX và inventory môi trường/máy/RAM | P1 | P2 + P3 | `docs/w3_preflight.md` có CPU, RAM, OS, Python, version solver, cách gọi, giới hạn license; không chứa secret/license key |
+| Time limit SAT/exact tính cả build và toàn chuỗi K | P1 | P3 + P2 | Test xác nhận `t_total`, thời gian còn lại mỗi probe/optimizer, timeout và status theo contract |
+| Kiểm tra AMO pairwise có clause trùng; xác nhận order AMO no-op | P2 | P1 | Test/report clause duplicate; bảng 3 cấu hình CNF khác nhau và lý do bỏ ô order × seqcounter khỏi pilot |
+| Hard memory limit ở cấp process/OS | P3 | P1 | Test subprocess vượt cap bị kill; raw evidence chứng minh ngưỡng và status `MO`; xác nhận chạy trên đúng OS/máy official |
+| Checkpoint incumbent + hard kill + resume/audit trail | P3 | P1 + P2 | Test kill sau một probe: incumbent được verify lại thành `FEAS`; không có incumbent hợp lệ thành `TO`; raw attempts cũ không bị ghi đè; resume không skip JSON hỏng/ERR |
+| `--dry-run`, CNF estimate và budget | P3 | P1 + P2 | Lệnh không gọi solver; estimate vars/clauses/memory cho từng cấu hình trên n lớn (bao gồm n = 715) và budget được cập nhật trong Mục 11 |
+| Pilot RQ1/RQ2 và chọn canonical config | P2 | P1 + P3 | Raw JSON cho từng run; validation pass; `docs/canonical_sat_config.md` ghi số OPT/status/PAR2/memory/clauses, khả năng solver và lý do chọn |
+| Kiểm tra correctness suite + technical appendix | P2 | P1 | Test oracle/toy/random/edge cases pass; appendix giải thích assignment/permutation, AMO, distance và soundness/completeness của K-search |
+| Review cuối protocol và freeze checklist | P1 điều phối; P2/P3 review | Cả nhóm | Mọi blocker được đóng bằng commit/test/evidence hoặc có quyết định nhóm được ghi; vẫn giữ `1.0-rc` nếu chưa đạt Mục 12 |
 
-Phân công theo vai trò trong work breakdown; giao task chính thức thực hiện trên GitHub.
+Phân công cụ thể theo vai trò trong work breakdown. Mỗi đầu ra phải có commit/PR hoặc raw test evidence gắn với issue; không đánh dấu xong chỉ dựa trên lời xác nhận miệng.
 
 ## 14. Tài liệu tham khảo
 
