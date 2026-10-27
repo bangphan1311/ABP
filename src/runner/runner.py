@@ -23,6 +23,11 @@ from typing import Any
 from src.common.models import Config, Result
 from src.common.checkpoint import load_valid_incumbent_checkpoint
 from src.common.verify import verify
+from src.runner.memory_limit import (
+    WindowsMemoryJob,
+    make_posix_memory_preexec,
+    memory_limit_to_bytes,
+)
 from src.runner.schema import RUN_FIELDS, build_record, make_run_id
 from src.sat.loader import read_instance
 
@@ -123,27 +128,61 @@ def run_one(
         cfg_file.write_text(json.dumps(asdict(config)), encoding="utf-8")
 
         hard_limit = None if config.time_limit is None else config.time_limit + KILL_GRACE_SECONDS
-        start = perf_counter()
-        timed_out_hard = False
+        limit_bytes = memory_limit_to_bytes(config.memory_limit)
         env = os.environ.copy()
         env["ABP_CHECKPOINT_PATH"] = str(checkpoint_file.resolve())
         env["ABP_CHECKPOINT_RUN_ID"] = run_id
-        try:
-            proc = subprocess.run(
-                [sys.executable, "-m", "src.runner.worker",
-                 str(instance_path), str(cfg_file), str(res_file)],
-                cwd=REPO_ROOT, capture_output=True, text=True, timeout=hard_limit,
-                env=env,
-            )
-        except subprocess.TimeoutExpired:
-            timed_out_hard = True
-            proc = None
-        wall = perf_counter() - start
+        command = [
+            sys.executable, "-m", "src.runner.worker",
+            str(instance_path), str(cfg_file), str(res_file),
+        ]
+        popen_kwargs: dict[str, Any] = {
+            "cwd": REPO_ROOT,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "text": True,
+            "env": env,
+        }
+        memory_job = None
+        if limit_bytes is not None:
+            if os.name == "nt":
+                # Tạo suspended để không có bước chạy solver nào xảy ra trước khi
+                # Job Object áp hard limit. Nếu gắn job thất bại, không chạy worker.
+                memory_job = WindowsMemoryJob(limit_bytes)
+                popen_kwargs["creationflags"] = subprocess.CREATE_SUSPENDED
+            elif os.name == "posix":
+                popen_kwargs["preexec_fn"] = make_posix_memory_preexec(limit_bytes)
+            else:
+                raise OSError(
+                    f"memory_limit chưa được hỗ trợ trên OS {os.name!r}; từ chối chạy không giới hạn."
+                )
 
-        record = _to_record(
-            instance, config, proc, res_file, wall, timed_out_hard,
-            checkpoint_file=checkpoint_file, run_id=run_id,
-        )
+        start = perf_counter()
+        timed_out_hard = False
+        try:
+            proc = subprocess.Popen(command, **popen_kwargs)
+            if memory_job is not None:
+                memory_job.assign_and_resume(proc)
+            try:
+                stdout, stderr = proc.communicate(timeout=hard_limit)
+            except subprocess.TimeoutExpired:
+                timed_out_hard = True
+                if memory_job is not None:
+                    memory_job.terminate()
+                elif proc.poll() is None:
+                    proc.kill()
+                stdout, stderr = proc.communicate()
+            completed = subprocess.CompletedProcess(
+                command, proc.returncode, stdout, stderr
+            )
+            wall = perf_counter() - start
+            record = _to_record(
+                instance, config, completed, res_file, wall, timed_out_hard,
+                checkpoint_file=checkpoint_file, run_id=run_id,
+            )
+        finally:
+            if memory_job is not None:
+                memory_job.close()
 
     out_file.write_text(
         json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8"

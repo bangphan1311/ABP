@@ -30,3 +30,14 @@ def solve_checkpoint_slow(instance, config):
         },
     )
     time.sleep(60)
+
+
+
+def solve_memory_hog(instance, config):
+    """Cố cấp phát 192 MiB; nếu OS cap hoạt động, worker phải nhận MemoryError."""
+    chunks = []
+    for _ in range(24):
+        chunks.append(bytearray(8 * 1024 * 1024))
+    # Nếu giới hạn không được áp dụng, trả sai contract để test chắc chắn fail.
+    from src.common.models import Result
+    return Result(status="FEAS", lb=0, ub=instance.n - 1, solution=None)

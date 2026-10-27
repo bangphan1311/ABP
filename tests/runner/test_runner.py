@@ -115,3 +115,18 @@ def test_hard_timeout_recovers_verified_checkpoint(path4, tmp_path, monkeypatch)
     )
     checkpoint = tmp_path / "raw" / "checkpoints" / f"{rec['run_id']}.json"
     assert checkpoint.is_file()
+
+
+
+def test_os_memory_limit_returns_mo_when_worker_exceeds_cap(path4, tmp_path):
+    # 128 MiB hard cap; solver thử giữ 192 MiB. Không có cap thì test phải fail.
+    cfg = Config(
+        method="tests.runner.slow_solver:solve_memory_hog",
+        time_limit=30.0,
+        memory_limit=0.125,
+    )
+    rec = runner_mod.run_one(path4, cfg, tmp_path / "raw")
+
+    assert rec["status"] == "MO", rec
+    assert rec["memory_limit"] == 0.125
+    assert rec["error"] == "MemoryError"
