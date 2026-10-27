@@ -1,35 +1,45 @@
-# Harwell–Boeing ABP benchmark inputs
+# Bộ dữ liệu Harwell–Boeing cho bài toán ABP
 
-## Canonical source
+## Nguồn dữ liệu chính thức
 
-The Optsicom Antibandwidth Problem page describes the Harwell–Boeing benchmark as 24 graphs (12 smaller and 12 larger), derived from matrices by treating nonzero matrix entries as graph edges:
+Trang Optsicom mô tả bộ benchmark Harwell–Boeing cho Antibandwidth Problem (ABP) gồm 24 đồ thị: 12 đồ thị nhỏ và 12 đồ thị lớn. Các cạnh được xây dựng từ các phần tử khác 0 của ma trận.
 
-- Dataset page: https://grafo.etsii.urjc.es/optsicom/abp.html
-- Download URL linked from that page: https://grafo.etsii.urjc.es/optsicom/abp/hb.zip
+- Trang dữ liệu: https://grafo.etsii.urjc.es/optsicom/abp.html
+- Tệp tải được liên kết từ trang chính thức: https://grafo.etsii.urjc.es/optsicom/abp/hb.zip
 
-The official archive was downloaded and its 24 `.mtx.rnd` files were validated locally on 2026-10-27. The downloaded ZIP SHA-256 is `C7B39A13A37707A09F36408273DB75D6A8BC1CB40E071AC960C724E1F58F6E7E`. The raw payloads remain local under `benchmark/hb/raw/` and are not committed to Git. `MANIFEST.csv` records the SHA-256 and graph measurements of each file. To reproduce the validation, download the official archive from the URL above, extract the 24 graph files to `benchmark/hb/raw/`, and run `python scripts/inspect_hb.py`.
+Tại máy chạy kiểm tra ngày 27/10/2026, tệp ZIP đã tải có SHA-256:
 
-## What `instances.csv` and `MANIFEST.csv` mean
+`C7B39A13A37707A09F36408273DB75D6A8BC1CB40E071AC960C724E1F58F6E7E`
 
-`instances.csv` is the source inventory of 24 canonical names with **published reference values** for `n`, edge count `m_table`, and historical literature ABP bounds. These are reference numbers only—not measurements from raw files. The references are cross-checked against Sinnl (2021), Table 1 and its appendix reproduction of Lozano et al. (2012): https://link.springer.com/article/10.1007/s10100-020-00688-4.
+24 tệp `.mtx.rnd` đã được kiểm tra bằng `scripts/inspect_hb.py`. Tất cả 24 dòng trong `MANIFEST.csv` có trạng thái `VALID`. Các tệp dữ liệu thô hiện được giữ cục bộ trong `benchmark/hb/raw/`, không được commit lên Git; manifest lưu SHA-256 và các số liệu được tính từ từng tệp.
 
-`MANIFEST.csv` carries both reference columns and separate file-derived fields. Right now each row is `MISSING`; `sha256`, header values, cleaned edge counts, `delta_max`, and `ub_n_minus_delta` remain blank until the matching raw file exists.
+## Phân biệt danh sách tham chiếu và kết quả kiểm tra
 
-## Download, inspect, and plan commands
+- `instances.csv`: danh sách 24 instance, gồm tên chuẩn và các giá trị tham chiếu từ tài liệu đã công bố (`n`, `m_table`, cận ABP tham khảo). Đây không phải số liệu được đọc trực tiếp từ tệp dữ liệu cục bộ.
+- `MANIFEST.csv`: kết quả kiểm tra tệp thực tế, gồm SHA-256, kích thước header, số dòng cạnh, số cạnh sau làm sạch, số self-loop/cạnh trùng bị loại, bậc lớn nhất `delta_max` và cận `ub_n_minus_delta = n - delta_max`.
 
-Extract only the ABP graph edge-list files to `benchmark/hb/raw/`. Do not rename MatrixMarket `.mtx`/`.mtx.gz` files to `.mtx.rnd`. Then run:
+Kết quả hiện tại: 24/24 tệp `VALID`; tất cả đều khớp `n` và `m` tham chiếu, không có self-loop hoặc cạnh vô hướng trùng lặp. Giá trị `delta_max` và `UB` trong manifest được tính từ danh sách cạnh thực tế.
+
+## Cách kiểm tra lại
+
+Giải nén đúng các tệp danh sách cạnh ABP vào `benchmark/hb/raw/` (giữ nguyên tên chuẩn, bao gồm dấu gạch dưới kép), sau đó chạy tại thư mục gốc repository:
 
 ```powershell
-python scripts/inspect_hb.py
-python scripts/dry_run_benchmark.py --stage pilot-rq1 --output results/pilot-rq1-plan.csv
-python scripts/dry_run_benchmark.py --stage pilot-exact --output results/pilot-exact-plan.csv
-python scripts/dry_run_benchmark.py --stage pilot-large --output results/pilot-large-plan.csv
-python scripts/dry_run_benchmark.py --stage official --output results/official-plan.csv
-python scripts/estimate_hb_cnf.py --name can__715
+uv run python scripts/inspect_hb.py
 ```
 
-`inspect_hb.py` is the real-file validator; it computes SHA-256 and checks the expected `n n m` header, edge row count, endpoints, self-loops and duplicate undirected edges. It then computes `m_clean`, `delta_max = max(degree(v))`, and `UB_degree = n − delta_max`. This header convention is the protocol's expectation and must be confirmed against the archive; an `INVALID_FORMAT` result is evidence to investigate, not a reason to rename or rewrite the file.
+Lệnh sẽ tạo/cập nhật `benchmark/hb/MANIFEST.csv`. Các trạng thái `MISSING`, `INVALID_FORMAT`, `REFERENCE_MISMATCH` và `INVALID_GRAPH` cần được điều tra; không được thay bằng số tham chiếu để tạo kết quả có vẻ hợp lệ.
 
-`dry_run_benchmark.py` is a **plan-only matrix checker**, not the execution queue and not a solver test. It checks run counts and duplicate plan IDs, reports whether raw input files exist, leaves canonical SAT config pending until provided, and does not launch a solver or enforce a memory cap. `estimate_hb_cnf.py` produces formula-only clause/variable counts from published `n,m`; it does not allocate the full CNF or estimate peak RAM.
+## Các lệnh liên quan khác
 
-Keep actual file-derived evidence separate from `instances.csv`: never copy reference `n,m_table` into `n_header`, `m_header`, or `m_clean` as a placeholder.
+```powershell
+uv run python scripts/dry_run_benchmark.py --stage pilot-rq1 --output results/pilot-rq1-plan.csv
+uv run python scripts/dry_run_benchmark.py --stage pilot-exact --output results/pilot-exact-plan.csv
+uv run python scripts/dry_run_benchmark.py --stage pilot-large --output results/pilot-large-plan.csv
+uv run python scripts/dry_run_benchmark.py --stage official --output results/official-plan.csv
+uv run python scripts/estimate_hb_cnf.py --name can__715
+```
+
+`dry_run_benchmark.py` chỉ kiểm tra ma trận kế hoạch, số run và sự hiện diện của dữ liệu; nó không phải hàng đợi thực thi, không chạy solver và không tự áp giới hạn bộ nhớ. `estimate_hb_cnf.py` tính số biến/mệnh đề theo công thức ước lượng, không dựng toàn bộ CNF và không đo RAM đỉnh. Không dựng CNF lớn trước khi giới hạn bộ nhớ ở cấp hệ điều hành đã được kiểm chứng.
+
+Nguồn tham chiếu cho các giá trị trong `instances.csv`: Sinnl (2021), bao gồm bảng tham chiếu lại Lozano et al. (2012): https://link.springer.com/article/10.1007/s10100-020-00688-4
