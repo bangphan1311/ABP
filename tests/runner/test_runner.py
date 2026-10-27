@@ -4,6 +4,7 @@ import pytest
 
 import src.runner.runner as runner_mod
 from src.common.models import Config
+from src.common.verify import verify
 from src.runner.schema import RUN_FIELDS, make_run_id
 from src.sat import generator
 from src.sat.loader import write_instance
@@ -96,3 +97,21 @@ def test_resume_retries_err_and_preserves_previous_attempt(path4, tmp_path):
     assert len(archived) == 1
     prior = json.loads(archived[0].read_text(encoding="utf-8"))
     assert prior["status"] == "ERR"
+
+
+
+def test_hard_timeout_recovers_verified_checkpoint(path4, tmp_path, monkeypatch):
+    # Worker ghi incumbent rồi bị runner kill; runner phải phục hồi FEAS và verify lại.
+    monkeypatch.setattr(runner_mod, "KILL_GRACE_SECONDS", 0.0)
+    cfg = Config(method="tests.runner.slow_solver:solve_checkpoint_slow", time_limit=1.0)
+
+    rec = runner_mod.run_one(path4, cfg, tmp_path / "raw", resume=True)
+
+    assert rec["status"] == "FEAS"
+    assert rec["metadata"]["checkpoint_recovered"] is True
+    assert rec["metadata"]["metrics_are_partial"] is True
+    assert rec["lb"] == verify(
+        generator.path(4), {int(k): v for k, v in rec["solution"].items()}
+    )
+    checkpoint = tmp_path / "raw" / "checkpoints" / f"{rec['run_id']}.json"
+    assert checkpoint.is_file()

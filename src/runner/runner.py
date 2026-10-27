@@ -11,6 +11,7 @@ Hỗ trợ resume: chỉ skip raw JSON hợp lệ đã khớp run/config và ki�
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,7 @@ from time import perf_counter, time_ns
 from typing import Any
 
 from src.common.models import Config, Result
+from src.common.checkpoint import load_valid_incumbent_checkpoint
 from src.common.verify import verify
 from src.runner.schema import RUN_FIELDS, build_record, make_run_id
 from src.sat.loader import read_instance
@@ -104,6 +106,8 @@ def run_one(
     out_dir.mkdir(parents=True, exist_ok=True)
     run_id = make_run_id(instance, config)
     out_file = out_dir / f"{run_id}.json"
+    checkpoint_file = out_dir / "checkpoints" / f"{run_id}.json"
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
 
     if out_file.exists():
         if resume:
@@ -121,18 +125,25 @@ def run_one(
         hard_limit = None if config.time_limit is None else config.time_limit + KILL_GRACE_SECONDS
         start = perf_counter()
         timed_out_hard = False
+        env = os.environ.copy()
+        env["ABP_CHECKPOINT_PATH"] = str(checkpoint_file.resolve())
+        env["ABP_CHECKPOINT_RUN_ID"] = run_id
         try:
             proc = subprocess.run(
                 [sys.executable, "-m", "src.runner.worker",
                  str(instance_path), str(cfg_file), str(res_file)],
                 cwd=REPO_ROOT, capture_output=True, text=True, timeout=hard_limit,
+                env=env,
             )
         except subprocess.TimeoutExpired:
             timed_out_hard = True
             proc = None
         wall = perf_counter() - start
 
-        record = _to_record(instance, config, proc, res_file, wall, timed_out_hard)
+        record = _to_record(
+            instance, config, proc, res_file, wall, timed_out_hard,
+            checkpoint_file=checkpoint_file, run_id=run_id,
+        )
 
     out_file.write_text(
         json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -140,12 +151,48 @@ def run_one(
     return record
 
 
-def _to_record(instance, config, proc, res_file: Path, wall: float, timed_out_hard: bool):
+def _to_record(
+    instance, config, proc, res_file: Path, wall: float, timed_out_hard: bool,
+    *, checkpoint_file: Path | None = None, run_id: str | None = None,
+):
     if timed_out_hard:
-        # Bị kill cứng, không có nghiệm đã verify -> TO (theo CONTRACT §5).
+        checkpoint = (
+            load_valid_incumbent_checkpoint(checkpoint_file, instance, config, run_id)
+            if checkpoint_file is not None and run_id is not None
+            else None
+        )
+        if checkpoint is not None:
+            # Checkpoint chỉ cung cấp incumbent FEAS; runner không tự tuyên bố OPT.
+            objective = checkpoint["objective"]
+            upper_bound = instance.n - 1
+            metrics = checkpoint["metrics"]
+            result = Result(
+                status="FEAS",
+                lb=objective,
+                ub=upper_bound,
+                gap=float(upper_bound - objective),
+                t_encode=float(metrics.get("t_encode", 0.0)),
+                t_solve=float(metrics.get("t_solve", 0.0)),
+                t_total=float(metrics.get("t_total", 0.0)),
+                variables=metrics.get("variables"),
+                clauses=metrics.get("clauses"),
+                peak_memory=metrics.get("peak_memory"),
+                solution=checkpoint["solution"],
+                metadata={
+                    "checkpoint_recovered": True,
+                    "checkpoint_version": checkpoint["version"],
+                    "checkpoint_updated_at": checkpoint["updated_at"],
+                    "checkpoint_file": checkpoint_file.name,
+                    "metrics_are_partial": True,
+                    "recovery_reason": "worker bị kill cứng trước khi ghi result.json",
+                },
+            )
+            return _recheck(instance, config, result, wall)
+
+        # Không có checkpoint hợp lệ: chỉ khi đó mới trả TO vì chưa có incumbent.
         return build_record(
             instance, config, None, wall_time=wall, status_override="TO",
-            error=f"Hết {config.time_limit}s + grace, worker bị kill.",
+            error=f"Hết {config.time_limit}s + grace, worker bị kill; không có checkpoint hợp lệ.",
         )
 
     if not res_file.exists():

@@ -14,6 +14,7 @@ from ctypes import wintypes
 from time import perf_counter
 
 from src.common.models import Config, Instance, Result
+from src.common.checkpoint import write_incumbent_checkpoint
 from src.common.verify import verify
 from src.sat import order
 from src.sat.backend import (
@@ -196,6 +197,20 @@ def solve_sat(
                     f"ub={ub} nhỏ hơn B={value} đã verify: ub không hợp lệ."
                 )
             lo, best_solution, best_cnf = value, solution, cnf
+            write_incumbent_checkpoint(
+                instance,
+                cfg,
+                objective=value,
+                solution=solution,
+                metrics={
+                    "t_encode": t_encode,
+                    "t_solve": t_solve,
+                    "t_total": perf_counter() - start,
+                    "variables": cnf.n_vars if cnf is not None else None,
+                    "clauses": len(cnf.clauses) if cnf is not None else None,
+                    "peak_memory": peak_ws,
+                },
+            )
         elif status == "UNSAT":
             # Ngưỡng K = lo + 1 đã bị bác -> B = lo là tối ưu.
             hi, unsat_source = k, "solver"

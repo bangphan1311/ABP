@@ -20,7 +20,7 @@
 | Gurobi | `TINY_PROBE_PASS_LICENSE_LIMIT_UNRESOLVED` | Thông báo môi trường ghi nhận license restricted, non-production, hết hạn 2027-11-29. Phải xác minh giới hạn kích thước mô hình và quyền sử dụng cho benchmark; không suy ra từ tiny probe rằng mô hình lớn chạy được. |
 | Kissat native | `NOT_VERIFIED` | Không tìm thấy executable `kissat` trên PATH tại lần kiểm tra. Không tính Kissat là solver đã sẵn sàng cho benchmark cho đến khi kiểm tra binary độc lập. |
 | Giới hạn bộ nhớ cấp hệ điều hành | `BLOCKER` | Chưa có bằng chứng test xác nhận một process vượt giới hạn bị hệ điều hành chặn và được ghi status `MO`. Chỉ ghi cấu hình `memory_limit` hoặc bắt `MemoryError` không đủ. |
-| Checkpoint và khôi phục sau khi bị kill | `BLOCKER` | Chưa có bằng chứng test end-to-end chứng minh incumbent hợp lệ được checkpoint bền vững, được xác minh lại sau hard kill và được khôi phục đúng status. |
+| Checkpoint và khôi phục sau khi bị kill | `IMPLEMENTED; TESTS PENDING` | Đã thêm checkpoint nguyên tử cho incumbent SAT đã qua `verify()`; runner đối chiếu instance/config/run ID, xác minh lại nghiệm và chỉ phục hồi `FEAS` sau hard timeout. Đã thêm test phục hồi và test dữ liệu checkpoint bị sửa; chưa chạy test suite trên commit mới nên chưa đóng blocker. Exact solver hiện chưa checkpoint incumbent trong quá trình tối ưu. |
 | Dry-run của hàng đợi thực thi | `NOT_EQUIVALENT_TO_PLAN_CHECKER` | `scripts/dry_run_benchmark.py` kiểm tra ma trận kế hoạch, không phải hàng đợi thực thi tích hợp với runner; không chạy solver và không enforce giới hạn bộ nhớ. |
 | License và máy chính thức | `PENDING_CONFIRMATION` | Cần xác nhận máy official, quyền dùng solver và giới hạn kích thước mô hình trước khi chạy benchmark chính thức. Không đưa license key, mật khẩu, token hoặc dump biến môi trường vào repository. |
 
@@ -59,7 +59,7 @@ Các mục sau vẫn là blocker, không được đánh dấu hoàn tất chỉ
 2. **Xác minh license:** ghi loại license và giới hạn kích thước mô hình/quyền sử dụng của Gurobi, CPLEX MIP và CPLEX CP; nếu không chạy được, phải ghi rõ phạm vi thực nghiệm thực tế.
 3. **Kissat:** cài/kiểm tra binary native độc lập hoặc ghi rõ Kissat không khả dụng; không tính là đã kiểm thử nếu chưa có bằng chứng.
 4. **Hard memory limit:** chứng minh process vượt ngưỡng bị chặn ở cấp hệ điều hành, có raw evidence và status `MO` đúng.
-5. **Checkpoint/resume:** kiểm thử hard kill sau một probe; incumbent đã verify phải được lưu bền vững, kiểm tra lại khi khôi phục, và raw attempt cũ không bị ghi đè. Nếu không có incumbent hợp lệ, phân loại theo contract.
+5. **Checkpoint/resume:** đã bổ sung checkpoint nguyên tử cho incumbent SAT và đường phục hồi sau hard timeout; cần chạy test end-to-end trên nhánh, xác nhận checkpoint hỏng bị từ chối và kiểm tra khôi phục khi chạy lại. Exact solver chưa checkpoint incumbent giữa quá trình tối ưu, nên không tuyên bố phần này đã hoàn tất cho chúng. Raw attempt cũ vẫn phải được giữ trong audit trail.
 6. **Ngân sách thời gian:** xác minh `t_total` tính cả build/encoding và toàn bộ chuỗi K; mỗi solver nhận phần thời gian còn lại, không được khởi động lại time limit cho từng probe.
 7. **Review và kiểm thử cuối:** chạy lại test suite trên commit chuẩn bị freeze; xử lý các nhận xét của P2/P3 trên PR #50 và ghi bằng chứng cho từng mục đã xử lý.
 
