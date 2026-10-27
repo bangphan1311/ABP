@@ -125,7 +125,7 @@ P1 viết formulation, P2 review. MIP dùng biến nhị phân theo cạnh cho |
 
 ### 6.3. Memory limit
 
-Mức mục tiêu: 30 GB mỗi run. Chỉ dùng mức này sau khi xác minh RAM vật lý và khả năng thực thi giới hạn trên máy chạy; nếu không đáp ứng, chốt ngưỡng thấp hơn trước freeze, ghi rõ trong paper và giảm số run song song.
+Mức mục tiêu ghi trong protocol: 30 GB mỗi run; đây không phải giá trị mặc định đã được xác minh. Trong code, `Config.memory_limit` và CLI `--memory-limit` nhận đơn vị **GiB** (1 GiB = 1024³ byte). Trước freeze phải chốt cap cụ thể theo GiB trên máy official và ghi rõ trong paper. Máy đã được preflight ở giai đoạn W3 có RAM 15.21 GiB; nếu dùng máy này, cap 30 GB/30 GiB không khả thi, phải chọn mức thấp hơn RAM vật lý và chừa headroom cho hệ điều hành. Chỉ giảm số run song song sau khi đã chốt cap, không chạy nhiều worker sao cho tổng cap vượt RAM vật lý.
 
 Runner phải thực thi giới hạn bộ nhớ thật, không chỉ ghi `memory_limit` trong config. Chỉ ghi `MO` khi có bằng chứng run vượt giới hạn; lỗi không rõ nguyên nhân thì điều tra, không tự gán `MO`.
 
