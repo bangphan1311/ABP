@@ -149,7 +149,7 @@ def run_one(
                 # Tạo suspended để không có bước chạy solver nào xảy ra trước khi
                 # Job Object áp hard limit. Nếu gắn job thất bại, không chạy worker.
                 memory_job = WindowsMemoryJob(limit_bytes)
-                popen_kwargs["creationflags"] = subprocess.CREATE_SUSPENDED
+                popen_kwargs["creationflags"] = 0x00000004  # Win32 CREATE_SUSPENDED
             elif os.name == "posix":
                 popen_kwargs["preexec_fn"] = make_posix_memory_preexec(limit_bytes)
             else:
