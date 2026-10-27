@@ -5,7 +5,7 @@ Một lần chạy = một (instance, config). Runner:
   2. chạy worker trong subprocess có timeout cứng,
   3. verify lại nghiệm một lần nữa ở phía runner (không tin worker),
   4. ghi ``<out_dir>/<run_id>.json`` theo schema.
-Hỗ trợ resume: nếu raw JSON của run_id đã tồn tại thì bỏ qua.
+Hỗ trợ resume: chỉ skip raw JSON hợp lệ đã khớp run/config và kiểm chứng nghiệm; attempt lỗi được lưu riêng.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def _valid_resume_record(path: Path, instance, config: Config, run_id: str) -> d
         if raw_solution is None:
             if status in {"OPT", "FEAS"}:
                 return None
-            if status == "TO" and record.get("lb") is not None:
+            if status in {"TO", "MO"} and record.get("lb") is not None:
                 return None
         else:
             if not isinstance(raw_solution, dict):
@@ -65,7 +65,11 @@ def _valid_resume_record(path: Path, instance, config: Config, run_id: str) -> d
                 return None
             if status == "OPT" and record.get("ub") != objective:
                 return None
-            if status in {"FEAS", "MO"} and record.get("ub") is not None:
+            if status == "FEAS":
+                ub_value = record.get("ub")
+                if isinstance(ub_value, bool) or not isinstance(ub_value, int) or ub_value < objective:
+                    return None
+            if status == "MO" and record.get("ub") is not None:
                 if record["ub"] < objective:
                     return None
             if status == "TO":
