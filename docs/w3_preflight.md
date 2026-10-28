@@ -55,6 +55,22 @@ uv run python scripts/w3_preflight_env.py --probe-solvers
 
 Không xuất toàn bộ biến môi trường và không commit license file, key, token, password hoặc email/license identifier. Tiny probe không thay thế việc xác minh giới hạn kích thước, quyền sử dụng, binary native và chạy thử trên host đã chốt.
 
+
+### Ước lượng kích thước CNF cho instance lớn nhất
+
+Từ `MANIFEST.csv`, `can__715` có (n=715), (m=2975), (Delta=104), nên (UB=n-Delta=611). Đếm công thức (không dựng CNF, không đo RAM) tại (K=UB=611) cho thấy rủi ro kích thước rất lớn:
+
+| Encoding | Biến ước lượng | Clause ước lượng tại K=611 |
+|---|---:|---:|
+| Pairwise ABP + AMO pairwise | 511,225 | 1,851,296,330 |
+| Pairwise ABP + AMO sequential counter | 1,532,245 | 1,489,343,310 |
+| Order encoding | 510,510 | 1,669,297,370 |
+
+Trong cả ba cấu hình, riêng distance clauses ước lượng là 1,486,280,250 tại (K=611). Đây là **cận cảnh báo theo công thức**, không phải số đo RAM hoặc số liệu từ một CNF đã dựng; số clause thực tế của run phụ thuộc K từng lần dò. Dự toán sequential-counter dùng dạng chuẩn (n-1) biến phụ và (3n-4) clause mỗi ràng buộc AMO; phải xác minh lại bằng `scripts/estimate_hb_cnf.py --name can__715 --k 611` trong môi trường dự án có PySAT.
+
+Hệ quả thực tế: không chạy pilot-large hoặc official SAT trên `can__715` chỉ vì CI pass. Trước hết P3 phải xác nhận worker bị chặn đúng bởi memory cap; sau đó pilot-large phải chạy tuần tự/kiểm soát tài nguyên và lưu raw evidence. Nếu estimate/tool output khác các số trên, điều tra công thức hoặc phiên bản encoder trước khi freeze.
+
+
 ## 4. Gates còn mở trước freeze
 
 1. **Chốt máy benchmark chính thức:** nhóm xác nhận máy, OS, CPU, RAM, Python/package/solver versions, policy chạy song song và memory cap. Snapshot RAM 15.21 GiB đã có; không cần đo lại chỉ để điền tài liệu.
