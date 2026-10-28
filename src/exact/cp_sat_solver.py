@@ -8,6 +8,7 @@ from ortools.sat.python import cp_model
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
+from src.exact.common import remaining_time_budget
 
 def _safe_upper_bound(status_code: int, best_bound: float, n: int) -> int:
     """Return a safe integer upper bound for the ABP objective."""
@@ -79,6 +80,17 @@ def solve_cp_sat(instance: Instance, config: Config | None = None) -> Result:
         if config.time_limit <= 0:
             raise ValueError("time_limit phải lớn hơn 0.")
         solver.parameters.max_time_in_seconds = config.time_limit
+
+    remaining = remaining_time_budget(config.time_limit, perf_counter() - start_total)
+    if remaining is not None:
+        if remaining <= 0:
+            return Result(
+                status="TO", ub=n - 1, t_encode=t_encode, t_solve=0.0,
+                t_total=perf_counter() - start_total,
+                variables=len(model.proto.variables), clauses=None,
+                metadata={"solver": "CP-SAT", "time_budget_exhausted_during_build": True},
+            )
+        solver.parameters.max_time_in_seconds = remaining
 
     status_code = solver.solve(model)
     t_solve = solver.wall_time

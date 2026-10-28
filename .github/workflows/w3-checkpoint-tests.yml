@@ -1,0 +1,35 @@
+name: W3 checkpoint and runner tests
+
+on:
+  pull_request:
+    paths:
+      - "src/common/checkpoint.py"
+      - "src/sat/solve.py"
+      - "src/runner/**"
+      - "tests/runner/**"
+      - ".github/workflows/w3-checkpoint-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checkpoint-runner-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    name: Runner tests (${{ matrix.os }})
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+      - name: Cài Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cài phụ thuộc tối thiểu
+        run: python -m pip install pytest python-sat
+      - name: Chạy test checkpoint và runner
+        run: python -m pytest tests/runner/test_checkpoint.py tests/runner/test_sat_checkpoint.py tests/runner/test_runner.py -q

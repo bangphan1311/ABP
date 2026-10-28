@@ -1,0 +1,88 @@
+# Kiểm tra trước thí nghiệm (W3) — ABP Harwell–Boeing
+
+**Trạng thái:** `PARTIAL / NOT READY TO FREEZE`  
+**Phụ trách:** P1 (điều phối)  
+**Nhánh:** `p1/w3-experimental-protocol-rc`  
+**Mục đích:** ghi bằng chứng hiện có và các điều kiện còn thiếu. Không khẳng định benchmark chính thức đã sẵn sàng cho đến khi các gate ở Mục 4 được đóng.
+
+## 1. Tóm tắt bằng chứng hiện có
+
+| Hạng mục | Trạng thái | Bằng chứng / ghi chú |
+|---|---|---|
+| Nguồn dữ liệu | `CONFIRMED_FROM_SOURCE` | Trang Optsicom mô tả bộ ABP Harwell–Boeing gồm 24 đồ thị, chia thành 12 đồ thị nhỏ và 12 đồ thị lớn: https://grafo.etsii.urjc.es/optsicom/abp.html |
+| Tệp ZIP chính thức | `DOWNLOADED_AND_HASHED_LOCALLY` | Tệp được liên kết từ trang Optsicom: https://grafo.etsii.urjc.es/optsicom/abp/hb.zip. SHA-256 của ZIP đã tải: `C7B39A13A37707A09F36408273DB75D6A8BC1CB40E071AC960C724E1F58F6E7E`. |
+| Kiểm tra 24 tệp dữ liệu | `PASS_LOCAL_CHECK` | `benchmark/hb/MANIFEST.csv` có 24 dòng, tất cả `VALID`; `n` và `m` khớp giá trị tham chiếu; không phát hiện self-loop hoặc cạnh vô hướng trùng lặp. Các tệp dữ liệu thô nằm cục bộ trong `benchmark/hb/raw/`, không commit lên Git. |
+| Số liệu đồ thị thực tế | `RECORDED_IN_MANIFEST` | Manifest ghi SHA-256 từng tệp, header, số dòng cạnh, `m_clean`, số cạnh bị loại, `delta_max` và `ub_n_minus_delta = n - delta_max`. |
+| Kiểm thử tự động | `LOCAL_FULL_SUITE_PASS_REPORTED` | Lần chạy mới nhất được báo cáo trên máy Windows: `uv run pytest tests -q` → **511 passed in 21.31s**. Đây là kết quả local; chạy lại trên commit/code cuối trước khi freeze và giữ log làm bằng chứng. |
+| Kiểm tra nhanh solver | `TINY_PROBES_PASS; LARGE_MODEL_LIMITS_SEPARATELY_CHECKED` | Smoke test nhỏ PASS cho CP-SAT, CaDiCaL, Glucose, Gurobi MIP, CPLEX MIP và CPLEX CP. Tiny probe chỉ chứng minh mô hình nhỏ chạy được, không chứng minh năng lực xử lý instance benchmark. |
+| Máy đã kiểm tra | `LOCAL_HOST_SNAPSHOT; OFFICIAL_HOST_NOT_DECLARED` | Windows 10.0.26200; Python 3.11.16; AMD64; 12 logical CPUs; RAM 15.21 GiB. Snapshot đã được ghi nhận; nhóm vẫn phải xác nhận đây có phải máy benchmark chính thức hay không. |
+| Phiên bản gói ghi nhận | `LOCAL_ENVIRONMENT` | OR-Tools 9.15.6755; python-sat 1.9.dev15; pytest 9.1.1; gurobipy 13.0.3; cplex 22.2.0.1; docplex 2.32.264. `psutil` không có; script preflight có fallback đọc RAM trên Windows. |
+| Gurobi MIP | `ACADEMIC_LICENSE_TINY_PROBE_PASS` | Đã cấu hình `GRB_LICENSE_FILE` trong PowerShell hiện tại và mô hình binary nhỏ trả `PROBE_OK`, license được nhận diện là Academic/non-commercial. Không ghi license ID, email, file license hoặc secret vào repository. Chưa có bằng chứng benchmark thực trên máy official. |
+| CPLEX MIP | `COMMUNITY_EDITION_SIZE_LIMIT_CONFIRMED` | Tiny probe PASS; probe riêng với 1.001 biến nhị phân và 1.001 ràng buộc bị CPLEX báo lỗi 1016: Community Edition problem size limits exceeded. Chưa có CPLEX Academic license được xác minh. |
+| CPLEX CP / CP Optimizer | `COMMUNITY_EDITION_SEARCH_LIMIT_CONFIRMED` | Tiny probe PASS; probe 1.001 biến nhị phân bị giới hạn search space vượt (2^{1000}). Chưa có CP Optimizer Academic license được xác minh. |
+| Kissat native | `NOT_VERIFIED` | `kissat` không có trên PATH ở lần preflight. Không tính Kissat vào RQ2 cho đến khi một binary native riêng được xác minh; protocol cho phép giới hạn RQ2 ở CaDiCaL và Glucose nếu Kissat không khả dụng và ghi rõ limitation. |
+| Giới hạn bộ nhớ cấp hệ điều hành | `CI_PASS; LOCAL_WINDOWS_TEST_PASS_REPORTED; OFFICIAL_HOST_DECISION_PENDING` | CI đã PASS trên Ubuntu/Windows (run [40622690634](https://github.com/bangphan1311/ABP/actions/runs/40622690634)). Người dùng báo full suite local Windows **511 passed**; suite gồm `test_os_memory_limit_returns_mo_when_worker_exceeds_cap`, thử cap 0.125 GiB với worker cấp phát 192 MiB và assert status `MO`/`MemoryError`. Vì vậy enforcement đã có bằng chứng trên máy Windows 15.21 GiB nếu nhóm chọn nó làm host official; quyết định host và cap dùng cho benchmark vẫn cần ghi rõ. POSIX `RLIMIT_AS` và Windows Job Object giới hạn loại tài nguyên khác nhau. |
+| Checkpoint / kill / resume | `CI_PASS; LOCAL_WINDOWS_FULL_SUITE_PASS_REPORTED; OFFICIAL_HOST_DECISION_PENDING` | Checkpoint SAT lưu incumbent đã qua `verify()`; runner đối chiếu instance/config/run ID, xác minh lại nghiệm và giữ audit trail. CI PASS trên Ubuntu/Windows ở run [40622690634](https://github.com/bangphan1311/ABP/actions/runs/40622690634), và full suite local Windows 511 passed đã được báo cáo. Nếu chọn máy Windows này làm official host, checkpoint/kill/resume có bằng chứng test tại máy đó; lưu ý exact solvers chưa checkpoint incumbent trong quá trình tối ưu. |
+| Ngân sách thời gian | `IMPLEMENTED_AND_TESTED; FINAL_REVIEW_PENDING` | Code exact truyền phần thời gian còn lại sau model build; nếu build đã dùng hết ngân sách thì không bắt đầu search. Có test ở `tests/exact/test_time_budget.py`; full local suite được báo cáo PASS. P2/P3 cần xác nhận contract, code và status accounting thống nhất trong review cuối. |
+| Dry-run / ước lượng CNF | `PLAN_ONLY_TOOLS_AVAILABLE` | `scripts/dry_run_benchmark.py` sinh ma trận kế hoạch, không gọi solver và không enforce memory limit; `scripts/estimate_hb_cnf.py` là ước lượng công thức, không dựng CNF hoặc đo peak RAM. Trước freeze cần lưu đầu ra plan/estimate, kiểm tra số run và ghi rõ ước lượng không phải số đo thực nghiệm. |
+| Canonical SAT config | `NOT_SELECTED` | Chưa có `docs/canonical_sat_config.md` với raw pilot results, validation, status/PAR2/memory/clauses và lý do chọn cấu hình. Chưa chạy pilot chính thức theo protocol. |
+| Máy chính thức và phạm vi solver | `PENDING_GROUP_DECISION` | Cần chốt máy/OS/RAM/cap, xác nhận Gurobi sẽ dùng trên máy đó, xử lý giới hạn CPLEX MIP/CP (xin Academic hoặc nhóm chấp nhận ghi `ERR` và giới hạn phạm vi báo cáo), và loại Kissat khỏi RQ2 nếu không xác minh được. |
+
+## 2. Cách tái tạo kiểm tra dữ liệu
+
+Từ thư mục gốc repository, sau khi dữ liệu danh sách cạnh ABP được giải nén vào `benchmark/hb/raw/`, chạy:
+
+```powershell
+uv run python scripts/inspect_hb.py
+```
+
+Lệnh sẽ tạo/cập nhật `benchmark/hb/MANIFEST.csv`. Chỉ chấp nhận dữ liệu khi mọi instance có trạng thái hợp lệ và các sai khác so với giá trị tham chiếu đã được điều tra. Không đổi tên ma trận nguồn khác thành `.mtx.rnd` để ép qua kiểm tra.
+
+Phân biệt:
+- `instances.csv`: tên instance và số liệu tham chiếu đã công bố.
+- `MANIFEST.csv`: số liệu được tính từ nội dung tệp thực tế, gồm SHA-256, header, số cạnh, bậc lớn nhất và cận `UB = n - Δ`.
+
+Nguồn đối chiếu số liệu tham chiếu: Sinnl (2021), bảng tham chiếu lại Lozano et al. (2012): https://link.springer.com/article/10.1007/s10100-020-00688-4.
+
+## 3. Tái tạo preflight môi trường
+
+Chạy trong đúng môi trường dự định dùng để benchmark:
+
+```powershell
+uv run python scripts/w3_preflight_env.py
+uv run python scripts/w3_preflight_env.py --probe-solvers
+```
+
+Không xuất toàn bộ biến môi trường và không commit license file, key, token, password hoặc email/license identifier. Tiny probe không thay thế việc xác minh giới hạn kích thước, quyền sử dụng, binary native và chạy thử trên host đã chốt.
+
+
+### Ước lượng kích thước CNF cho instance lớn nhất
+
+Từ `MANIFEST.csv`, `can__715` có (n=715), (m=2975), (Delta=104), nên (UB=n-Delta=611). Đếm công thức (không dựng CNF, không đo RAM) tại (K=UB=611) cho thấy rủi ro kích thước rất lớn:
+
+| Encoding | Biến ước lượng | Clause ước lượng tại K=611 |
+|---|---:|---:|
+| Pairwise ABP + AMO pairwise | 511,225 | 1,851,296,330 |
+| Pairwise ABP + AMO sequential counter | 1,532,245 | 1,489,343,310 |
+| Order encoding | 510,510 | 1,669,297,370 |
+
+Trong cả ba cấu hình, riêng distance clauses ước lượng là 1,486,280,250 tại (K=611). Đây là **cận cảnh báo theo công thức**, không phải số đo RAM hoặc số liệu từ một CNF đã dựng; số clause thực tế của run phụ thuộc K từng lần dò. Dự toán sequential-counter dùng dạng chuẩn (n-1) biến phụ và (3n-4) clause mỗi ràng buộc AMO; phải xác minh lại bằng `scripts/estimate_hb_cnf.py --name can__715 --k 611` trong môi trường dự án có PySAT.
+
+Hệ quả thực tế: không chạy pilot-large hoặc official SAT trên `can__715` chỉ vì CI pass. Trước hết P3 phải xác nhận worker bị chặn đúng bởi memory cap; sau đó pilot-large phải chạy tuần tự/kiểm soát tài nguyên và lưu raw evidence. Nếu estimate/tool output khác các số trên, điều tra công thức hoặc phiên bản encoder trước khi freeze.
+
+
+## 4. Gates còn mở trước freeze
+
+1. **Chốt máy benchmark chính thức:** nhóm xác nhận máy, OS, CPU, RAM, Python/package/solver versions, policy chạy song song và memory cap. Snapshot RAM 15.21 GiB đã có; không cần đo lại chỉ để điền tài liệu.
+2. **Chốt khả năng dùng solver:** Gurobi Academic tiny probe đã PASS. CPLEX MIP/CP hiện bị chặn bởi Community Edition ở probe lớn; xin Academic license hoặc ghi quyết định nhóm về phạm vi/nhãn `ERR`. Xác minh Kissat native hoặc loại khỏi RQ2 theo phương án contingency trong protocol.
+3. **Memory limit:** đã có CI PASS và full suite local Windows 511 passed được báo cáo; suite chứa test cap 0.125 GiB/worker 192 MiB và assert `MO`/`MemoryError`. Nếu chọn máy Windows snapshot 15.21 GiB làm host official, có thể dùng đây làm bằng chứng kiểm tra enforcement cơ bản. Chốt cap benchmark thực tế theo RAM và chính sách chạy song song; không cần đo RAM lại chỉ để lặp thông tin đã có.
+4. **Checkpoint/resume:** CI và local full-suite report bao gồm test hard kill, restore incumbent SAT đã verify, và audit trail/corrupt JSON. Nếu chọn máy Windows snapshot làm official host, ghi nhận evidence này. Exact incumbent checkpoint chưa được implement; giữ rõ giới hạn này, không tuyên bố exact có khả năng resume incumbent.
+5. **Final review của P2/P3:** P2 xác nhận `docs/sat_spec.md`, ánh xạ khoảng cách/K-search, cận `UB = n - Δ`, correctness và pilot design. P3 xác nhận runner/schema, kill/resume, memory/status, thời gian tổng và dry-run/budget. Ghi quyết định cho từng góp ý thay vì để trạng thái mơ hồ.
+6. **Pilot và canonical config:** chạy pilot RQ1/RQ2 theo protocol trên target host; lưu raw JSON, kiểm tra nghiệm, tổng hợp status/PAR2/clauses/memory và chọn canonical config trong `docs/canonical_sat_config.md`. Nếu chưa có dữ liệu pilot thì không được giả định đã chọn config.
+7. **Freeze evidence:** kiểm tra số run/budget từ output plan và CNF estimate; test report 511 passed là trên code ở commit `799cfa0` (các commit `b1f37ef` và `a11911d` sau đó chỉ cập nhật tài liệu). Nếu có sửa code nữa, chạy lại full suite; gắn mọi số liệu với commit, cấu hình, máy và raw evidence.
+
+## 5. Quyết định hiện tại
+
+**Giữ phiên bản `1.0-rc`; chưa tạo tag `v1.0`.** Những phần đã có bằng chứng gồm manifest 24 instance, snapshot máy/RAM, local test-suite report, tiny probes, Gurobi Academic tiny probe và CI checkpoint/memory-limit tương ứng. Các blocker còn lại là quyết định máy official/phạm vi solver, kiểm thử trên target host, re-review P2/P3 và pilot/canonical SAT config. Không đánh dấu benchmark chính thức sẵn sàng chỉ dựa trên CI hoặc mô hình nhỏ.
+
+PR theo dõi: https://github.com/bangphan1311/ABP/pull/50
