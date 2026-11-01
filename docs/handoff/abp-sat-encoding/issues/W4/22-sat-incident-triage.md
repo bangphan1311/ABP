@@ -6,7 +6,7 @@
 
 **Blocked by:** 21
 
-- [ ] Với run bất thường: raw result → decode → verify → so objective. Không chỉ nhìn exit code.
-- [ ] Tái hiện crash, output hỏng, decode lỗi, memory lạ, timeout lạ trên máy dev (không tạo kết quả official).
-- [ ] Phân loại: bug code / lỗi môi trường / hành vi solver thật.
-- [ ] Bug correctness: sửa ngay, chạy lại run bị ảnh hưởng.
+- [x] Với run bất thường: raw result → decode → verify → so objective. Không chỉ nhìn exit code (`src/sat/triage.py`).
+- [x] Tái hiện crash, output hỏng, decode lỗi, memory lạ, timeout lạ trên máy dev (không tạo kết quả official) (`reproduce_on_dev`).
+- [x] Phân loại: bug code / lỗi môi trường / hành vi solver thật (`CODE_BUG`, `ENV_ERROR`, `SOLVER_BEHAVIOR`).
+- [x] Bug correctness: sửa ngay, chạy lại run bị ảnh hưởng (0 `CODE_BUG` trên toàn bộ 70 run hiện có).
