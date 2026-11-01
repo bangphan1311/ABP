@@ -18,6 +18,7 @@ from pathlib import Path
 if __package__ in (None, ""):  # cho phép `python experiments/make_validation_subset.py`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from experiments.pilot_common import use_utf8_output
 from src.common.models import Instance
 from src.sat.loader import write_instance
 
@@ -101,10 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     args = parser.parse_args(argv)
 
-    for stream in (sys.stdout, sys.stderr):  # Windows redirect mặc định cp1252
-        reconfigure = getattr(stream, "reconfigure", None)
-        if reconfigure is not None:
-            reconfigure(encoding="utf-8")
+    use_utf8_output()
 
     written = generate_subset(args.root, args.seed)
     for group, paths in written.items():

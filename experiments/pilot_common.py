@@ -12,6 +12,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Any
+import argparse
 
 from src.common.models import Config
 from src.runner.runner import DEFAULT_OUT_DIR, run_one
@@ -71,8 +72,22 @@ def instance_paths(directory: str | Path) -> list[Path]:
     return paths
 
 
-def _seconds(value: Any) -> float | None:
+def _round6(value: Any) -> float | None:
     return None if value is None else round(float(value), 6)
+
+
+def add_common_pilot_args(
+    parser: argparse.ArgumentParser, *, default_csv: Path
+) -> argparse.ArgumentParser:
+    """Thêm các cờ CLI dùng chung giữa pilot RQ1 và RQ2."""
+    parser.add_argument("--validation-dir", type=Path, default=DEFAULT_VALIDATION_DIR)
+    parser.add_argument("--large-dir", type=Path, default=DEFAULT_LARGE_DIR)
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--csv", type=Path, default=default_csv)
+    parser.add_argument("--time-limit", type=float, default=60.0)
+    parser.add_argument("--max-vars", type=int, default=DEFAULT_MAX_VARS)
+    parser.add_argument("--slow-encode", type=float, default=DEFAULT_SLOW_ENCODE)
+    return parser
 
 
 def collect_metrics(record: dict[str, Any]) -> dict[str, Any]:
@@ -93,12 +108,12 @@ def collect_metrics(record: dict[str, Any]) -> dict[str, Any]:
         "lb": lb,
         "ub": ub,
         "gap": gap,
-        "t_encode": _seconds(record.get("t_encode")),
-        "t_solve": _seconds(record.get("t_solve")),
-        "t_total": _seconds(record.get("t_total")),
+        "t_encode": _round6(record.get("t_encode")),
+        "t_solve": _round6(record.get("t_solve")),
+        "t_total": _round6(record.get("t_total")),
         "variables": record.get("variables"),
         "clauses": record.get("clauses"),
-        "peak_memory": _seconds(record.get("peak_memory")),
+        "peak_memory": _round6(record.get("peak_memory")),
         "n_probes": len((record.get("metadata") or {}).get("probes") or []),
         "warnings": "",
         "error": record.get("error"),

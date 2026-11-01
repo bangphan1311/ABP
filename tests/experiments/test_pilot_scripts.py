@@ -49,6 +49,14 @@ def test_rq1_grid_is_the_2x2_of_encodings():
         assert cfg.warm_start is False
         assert cfg.time_limit == 5.0
 
+    unique_grid = build_rq1_grid(base_config(time_limit=5.0), unique_only=True)
+    assert len(unique_grid) == 3
+    assert {(cfg.abp_encoding, cfg.amo_encoding) for cfg in unique_grid} == {
+        ("pairwise", "pairwise"),
+        ("pairwise", "seqcounter"),
+        ("order", "pairwise"),
+    }
+
 
 def test_rq2_grid_varies_only_the_solver():
     base = replace(

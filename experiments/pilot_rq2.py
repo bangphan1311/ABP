@@ -18,11 +18,8 @@ if __package__ in (None, ""):  # cho phép `python experiments/pilot_rq2.py`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments.pilot_common import (
-    DEFAULT_LARGE_DIR,
-    DEFAULT_MAX_VARS,
-    DEFAULT_SLOW_ENCODE,
-    DEFAULT_VALIDATION_DIR,
     REPO_ROOT,
+    add_common_pilot_args,
     base_config,
     group_counts,
     instance_paths,
@@ -32,11 +29,12 @@ from experiments.pilot_common import (
     write_csv,
 )
 from src.common.models import Config
-from src.runner.runner import DEFAULT_OUT_DIR
 from src.sat.backend import KISSAT_LIMITATION, PYSAT_KISSAT_FAMILIES, solver_family
 
 # Bốn solver dựng được bằng PySAT trong môi trường này và giới hạn được thời gian.
 RQ2_SOLVERS = ("cadical195", "glucose4", "glucose42", "minisat22")
+# Tập solver Core trong Experimental Protocol §1 / §4 khi Kissat bị loại.
+PROTOCOL_CORE_SOLVERS = ("cadical195", "glucose4")
 
 
 def solver_note() -> str:
@@ -65,17 +63,11 @@ def build_rq2_grid(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--validation-dir", type=Path, default=DEFAULT_VALIDATION_DIR)
-    parser.add_argument("--large-dir", type=Path, default=DEFAULT_LARGE_DIR)
-    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
-    parser.add_argument(
-        "--csv", type=Path, default=REPO_ROOT / "results" / "pilot_rq2.csv"
+    add_common_pilot_args(
+        parser, default_csv=REPO_ROOT / "results" / "pilot_rq2.csv"
     )
     parser.add_argument("--abp-encoding", default="pairwise")
     parser.add_argument("--amo-encoding", default="pairwise")
-    parser.add_argument("--time-limit", type=float, default=60.0)
-    parser.add_argument("--max-vars", type=int, default=DEFAULT_MAX_VARS)
-    parser.add_argument("--slow-encode", type=float, default=DEFAULT_SLOW_ENCODE)
     return parser.parse_args(argv)
 
 

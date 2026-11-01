@@ -19,11 +19,8 @@ if __package__ in (None, ""):  # cho phép `python experiments/pilot_rq1.py`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments.pilot_common import (
-    DEFAULT_LARGE_DIR,
-    DEFAULT_MAX_VARS,
-    DEFAULT_SLOW_ENCODE,
-    DEFAULT_VALIDATION_DIR,
     REPO_ROOT,
+    add_common_pilot_args,
     base_config,
     group_counts,
     instance_paths,
@@ -33,35 +30,42 @@ from experiments.pilot_common import (
     write_csv,
 )
 from src.common.models import Config
-from src.runner.runner import DEFAULT_OUT_DIR
 from src.sat.solve import ABP_ENCODINGS
 
 # Hai trục của lưới. ``order`` không có ràng buộc AMO (ticket 05), nên hai ô
 # order x {pairwise, seqcounter} phải giống nhau — đó là kết quả cần ghi lại.
 AMO_ENCODINGS = ("pairwise", "seqcounter")
+# Ba cấu hình CNF thực sự khác nhau theo Experimental Protocol §4 / §9.1.
+UNIQUE_ENCODING_PAIRS = (
+    ("pairwise", "pairwise"),
+    ("pairwise", "seqcounter"),
+    ("order", "pairwise"),
+)
 
 
-def build_rq1_grid(base: Config) -> list[Config]:
-    """Bốn cấu hình của lưới 2x2; giữ nguyên mọi field khác của ``base``."""
+def build_rq1_grid(base: Config, *, unique_only: bool = False) -> list[Config]:
+    """Lưới 2x2 (4 cấu hình) hoặc 3 cấu hình CNF duy nhất (``unique_only=True``)."""
+    pairs = (
+        UNIQUE_ENCODING_PAIRS
+        if unique_only
+        else tuple((abp, amo) for abp in ABP_ENCODINGS for amo in AMO_ENCODINGS)
+    )
     return [
-        replace(base, abp_encoding=abp, amo_encoding=amo)
-        for abp in ABP_ENCODINGS
-        for amo in AMO_ENCODINGS
+        replace(base, abp_encoding=abp, amo_encoding=amo) for abp, amo in pairs
     ]
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--validation-dir", type=Path, default=DEFAULT_VALIDATION_DIR)
-    parser.add_argument("--large-dir", type=Path, default=DEFAULT_LARGE_DIR)
-    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
-    parser.add_argument(
-        "--csv", type=Path, default=REPO_ROOT / "results" / "pilot_rq1.csv"
+    add_common_pilot_args(
+        parser, default_csv=REPO_ROOT / "results" / "pilot_rq1.csv"
     )
     parser.add_argument("--solver", default="cadical195")
-    parser.add_argument("--time-limit", type=float, default=60.0)
-    parser.add_argument("--max-vars", type=int, default=DEFAULT_MAX_VARS)
-    parser.add_argument("--slow-encode", type=float, default=DEFAULT_SLOW_ENCODE)
+    parser.add_argument(
+        "--unique-cnf-only",
+        action="store_true",
+        help="Bỏ ô order x seqcounter trùng CNF với order x pairwise (Protocol §4).",
+    )
     return parser.parse_args(argv)
 
 
@@ -70,7 +74,8 @@ def main(argv: list[str] | None = None) -> int:
     use_utf8_output()
     paths = instance_paths(args.validation_dir) + instance_paths(args.large_dir)
     configs = build_rq1_grid(
-        base_config(time_limit=args.time_limit, sat_solver=args.solver)
+        base_config(time_limit=args.time_limit, sat_solver=args.solver),
+        unique_only=args.unique_cnf_only,
     )
     print(
         f"RQ1: {len(paths)} instance x {len(configs)} cấu hình, "
