@@ -26,12 +26,12 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from experiments.pilot_common import REPO_ROOT, collect_metrics, use_utf8_output
+from experiments.pilot_common import REPO_ROOT, use_utf8_output
 from src.sat.triage import DEFAULT_RAW_DIR, TriageReport, triage_directory
 
 DEFAULT_RUNS_CSV = REPO_ROOT / "results" / "runs.csv"
@@ -145,6 +145,21 @@ class G3GateSummary:
     passed_gate: bool
 
 
+def _compute_par2(
+    grp: Sequence[dict[str, Any]], default_time_limit: float = 60.0
+) -> float:
+    """Tính tổng PAR2 của một nhóm run (phạt 2 * time_limit nếu khác OPT)."""
+    return round(
+        sum(
+            (r["t_total"] or 0.0)
+            if r["status"] == "OPT"
+            else 2.0 * (r.get("time_limit") or default_time_limit)
+            for r in grp
+        ),
+        4,
+    )
+
+
 def summarize_rq1(
     rows: Sequence[dict[str, Any]], *, default_time_limit: float = 60.0
 ) -> list[RQ1ConfigSummary]:
@@ -160,12 +175,6 @@ def summarize_rq1(
         vars_list = [r["variables"] for r in grp if r["variables"] is not None]
         cls_list = [r["clauses"] for r in grp if r["clauses"] is not None]
         mem_list = [r["peak_memory"] for r in grp if r["peak_memory"] is not None]
-        par2 = sum(
-            (r["t_total"] or 0.0)
-            if r["status"] == "OPT"
-            else 2.0 * (r.get("time_limit") or default_time_limit)
-            for r in grp
-        )
         summaries.append(
             RQ1ConfigSummary(
                 abp_encoding=abp,
@@ -176,7 +185,7 @@ def summarize_rq1(
                 to=sum(r["status"] == "TO" for r in grp),
                 mo=sum(r["status"] == "MO" for r in grp),
                 err=sum(r["status"] == "ERR" for r in grp),
-                par2=round(par2, 4),
+                par2=_compute_par2(grp, default_time_limit),
                 total_encode_s=round(sum(r["t_encode"] or 0.0 for r in grp), 4),
                 total_solve_s=round(sum(r["t_solve"] or 0.0 for r in grp), 4),
                 total_time_s=round(sum(r["t_total"] or 0.0 for r in grp), 4),
@@ -253,12 +262,6 @@ def summarize_rq2(
     for solver, grp in sorted(grouped.items()):
         times = [r["t_total"] or 0.0 for r in grp]
         mem_list = [r["peak_memory"] for r in grp if r["peak_memory"] is not None]
-        par2 = sum(
-            (r["t_total"] or 0.0)
-            if r["status"] == "OPT"
-            else 2.0 * (r.get("time_limit") or default_time_limit)
-            for r in grp
-        )
         summaries.append(
             RQ2SolverSummary(
                 solver=solver,
@@ -268,7 +271,7 @@ def summarize_rq2(
                 to=sum(r["status"] == "TO" for r in grp),
                 mo=sum(r["status"] == "MO" for r in grp),
                 err=sum(r["status"] == "ERR" for r in grp),
-                par2=round(par2, 4),
+                par2=_compute_par2(grp, default_time_limit),
                 total_solve_s=round(sum(r["t_solve"] or 0.0 for r in grp), 4),
                 total_time_s=round(sum(times), 4),
                 median_time_s=round(float(statistics.median(times)), 4)

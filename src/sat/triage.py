@@ -269,6 +269,25 @@ def inspect_record(
                         f"Probe K={p_k} trả SAT nhưng đạt B={p_b} < K (lỗi encoding)."
                     ],
                 )
+        if (
+            p_status == "UNSAT"
+            and isinstance(p_k, int)
+            and verified_obj is not None
+            and p_k <= verified_obj
+        ):
+            return TriageReport(
+                run_id=run_id,
+                instance_id=instance_id,
+                status=status,
+                category="CODE_BUG",
+                is_anomaly=True,
+                verified_objective=verified_obj,
+                recorded_lb=lb,
+                recorded_ub=ub,
+                reasons=[
+                    f"Probe K={p_k} trả UNSAT nhưng đã có nghiệm verify đạt {verified_obj} >= K."
+                ],
+            )
 
     if status == "MO":
         reasons.append(error_msg or "Vượt giới hạn bộ nhớ (MO).")
@@ -323,6 +342,19 @@ def inspect_record(
                 recorded_lb=lb,
                 recorded_ub=ub,
                 reasons=["Status TO nhưng vẫn chứa solution (phải là FEAS hoặc None)."],
+            )
+        if "license" in error_msg.lower():
+            return TriageReport(
+                run_id=run_id,
+                instance_id=instance_id,
+                status=status,
+                category="CODE_BUG",
+                is_anomaly=True,
+                recorded_lb=lb,
+                recorded_ub=ub,
+                reasons=[
+                    f"Lỗi giấy phép bị ghi nhầm thành TO (vi phạm CONTRACT §5): {error_msg}"
+                ],
             )
         if _is_env_error_text(error_msg):
             reasons.append(error_msg)

@@ -121,6 +121,27 @@ def test_inspect_record_detects_probe_contradiction_as_code_bug():
     assert report.category == "CODE_BUG"
     assert any("Probe K=3" in r for r in report.reasons)
 
+    # UNSAT tại ngưỡng K=2 trong khi nghiệm đã verify đạt 2 >= K -> CODE_BUG
+    bad_unsat = _valid_path4_record()
+    bad_unsat["metadata"]["probes"] = [{"k": 2, "status": "UNSAT", "b": None}]
+    report_unsat = inspect_record(bad_unsat, instance=instance)
+    assert report_unsat.category == "CODE_BUG"
+    assert any("trả UNSAT nhưng đã có nghiệm verify" in r for r in report_unsat.reasons)
+
+
+def test_inspect_record_flags_license_error_recorded_as_to_as_code_bug():
+    instance = generator.path(4)
+    bad_to = _valid_path4_record()
+    bad_to["status"] = "TO"
+    bad_to["solution"] = None
+    bad_to["lb"] = None
+    bad_to["ub"] = None
+    bad_to["error"] = "CPLEX error: license limit exceeded"
+
+    report = inspect_record(bad_to, instance=instance)
+    assert report.category == "CODE_BUG"
+    assert any("CONTRACT §5" in r for r in report.reasons)
+
 
 def test_inspect_record_classifies_mo_and_hard_kill_as_env_error():
     instance = generator.path(4)
