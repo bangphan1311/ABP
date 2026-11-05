@@ -9,7 +9,13 @@ from src.common.models import Config, Instance
 from src.common.verify import verify
 from src.exact.oracle import solve_oracle
 from src.sat import generator
-from src.sat.solve import summarise_result, solve_decision, solve_sat
+from src.sat.solve import (
+    CANONICAL_SAT_CONFIG,
+    canonical_sat_config,
+    summarise_result,
+    solve_decision,
+    solve_sat,
+)
 
 TOY_INSTANCES = (
     generator.path(4),
@@ -348,6 +354,25 @@ def test_ignored_config_fields_emit_one_warning():
 def test_default_config_fields_emit_no_warning(recwarn):
     solve_sat(generator.path(4))
 
+    assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]
+
+
+def test_canonical_sat_config_emits_no_warning_and_matches_oracle(recwarn):
+    cfg = canonical_sat_config(time_limit=10.0)
+    assert cfg.method == "sat"
+    assert cfg.abp_encoding == "order"
+    assert cfg.amo_encoding == "pairwise"
+    assert cfg.sat_solver == "glucose4"
+    assert cfg.search_mode == "multi"
+    assert cfg.symmetry is False
+    assert cfg.warm_start is False
+    assert cfg.seed == 0
+    assert CANONICAL_SAT_CONFIG.abp_encoding == "order"
+
+    instance = generator.path(4)
+    result = solve_sat(instance, cfg)
+    assert result.status == "OPT"
+    assert result.lb == 2
     assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]
 
 

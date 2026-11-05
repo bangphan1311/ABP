@@ -34,6 +34,43 @@ from src.sat.pairwise import (
 
 METHOD = "sat"
 ABP_ENCODINGS = (DEFAULT_ABP_ENCODING, "order")
+DEFAULT_SEARCH_MODE = "multi"
+
+# Canonical SAT configuration khóa ở M2 (ticket 18 / 21, docs/canonical_sat_config.md).
+CANONICAL_SAT_CONFIG = Config(
+    method=METHOD,
+    abp_encoding="order",
+    amo_encoding="pairwise",
+    sat_solver="glucose4",
+    search_mode=DEFAULT_SEARCH_MODE,
+    symmetry=False,
+    warm_start=False,
+    seed=0,
+    time_limit=1800.0,
+    memory_limit=None,
+)
+
+
+def canonical_sat_config(
+    *,
+    time_limit: float | None = 1800.0,
+    memory_limit: float | None = None,
+    sat_solver: str = "glucose4",
+) -> Config:
+    """Trả bản sao ``Config`` chuẩn cho SAT (M2 freeze, ticket 21)."""
+    return Config(
+        method=METHOD,
+        abp_encoding=CANONICAL_SAT_CONFIG.abp_encoding,
+        amo_encoding=CANONICAL_SAT_CONFIG.amo_encoding,
+        sat_solver=sat_solver,
+        search_mode=CANONICAL_SAT_CONFIG.search_mode,
+        symmetry=CANONICAL_SAT_CONFIG.symmetry,
+        warm_start=CANONICAL_SAT_CONFIG.warm_start,
+        seed=CANONICAL_SAT_CONFIG.seed,
+        time_limit=time_limit,
+        memory_limit=memory_limit,
+    )
+
 
 # Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.
 IGNORED_CONFIG_FIELDS = (
@@ -46,6 +83,7 @@ IGNORED_CONFIG_FIELDS = (
 _CONFIG_DEFAULTS = {
     name: getattr(Config(method=METHOD), name) for name in IGNORED_CONFIG_FIELDS
 }
+_IMPLEMENTED_SEARCH_MODES = (None, DEFAULT_SEARCH_MODE)
 
 
 def _warn_ignored_config(cfg: Config) -> None:
@@ -53,7 +91,10 @@ def _warn_ignored_config(cfg: Config) -> None:
     ignored = [
         name
         for name in IGNORED_CONFIG_FIELDS
-        if getattr(cfg, name) != _CONFIG_DEFAULTS[name]
+        if (
+            name == "search_mode" and cfg.search_mode not in _IMPLEMENTED_SEARCH_MODES
+        )
+        or (name != "search_mode" and getattr(cfg, name) != _CONFIG_DEFAULTS[name])
     ]
     if not ignored:
         return
