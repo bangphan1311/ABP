@@ -92,9 +92,23 @@ Hệ quả thực tế: không chạy pilot-large hoặc official SAT trên `can
 6. **Pilot và canonical config:** pilot RQ1/RQ2 W3 đã được chạy và merge qua PR #51 trên tập synthetic (10 instance, 60 s/run), có CSV và raw evidence trong branch P2 trước khi merge. `docs/canonical_sat_config.md` đề xuất `order/pairwise/glucose4` cho Core `{cadical195, glucose4}`; P1/P3 vẫn phải xác nhận lựa chọn và phạm vi solver trước M2 freeze. Không coi pilot synthetic là benchmark 24 instance HB; official RQ3 vẫn phải chạy trên dữ liệu HB theo protocol và lưu raw JSON.
 7. **Freeze evidence:** kiểm tra số run/budget từ output plan và CNF estimate; test report 511 passed là trên code ở commit `799cfa0` (các commit `b1f37ef` và `a11911d` sau đó chỉ cập nhật tài liệu). Nếu có sửa code nữa, chạy lại full suite; gắn mọi số liệu với commit, cấu hình, máy và raw evidence.
 
-## 4.1. Blocker tích hợp dữ liệu với runner (phát hiện trong P1 review)
+## 4.1. HB loader integration — implemented; CI pending
 
-`benchmark/hb/raw/*.mtx.rnd` là file text benchmark; `src.runner.run_one()` hiện đọc instance qua `src.sat.loader.read_instance()` và loader này chỉ nhận JSON theo schema chung. `scripts/dry_run_benchmark.py` chỉ xác nhận file nguồn tồn tại, không chuyển đổi sang JSON và không gọi solver. Do đó chưa có đường chạy end-to-end từ manifest HB tới exact pilot. P2/P3 phải cung cấp adapter/converter dùng chung, giữ đỉnh cô lập, quy tắc làm sạch cạnh và kiểm tra hash/header/n/m trước khi P1 chạy pilot.
+`src.sat.loader.read_instance()` now accepts `.mtx.rnd` directly and
+validates each file against the sibling `MANIFEST.csv` and `instances.csv`
+(hash, header, edge counts, cleaning counts, `delta_max`, `UB=n-Δ`, and
+inventory reference values). `src.runner.run_one()` and its worker can use
+the raw file path directly; no private P1 parser or intermediate JSON is
+required. Tests cover the parser and an end-to-end runner subprocess using a
+small fixture. The Linux/Windows workflow now includes these tests; its
+result must be checked before calling this gate PASS.
+
+The remaining data-level limitation is separate: `benchmark/hb/raw/` is
+gitignored, and the real 24 files are not present in the current agent
+workspace. Therefore this update closes the shared-code integration gap,
+not the actual 40-run exact pilot. The pilot still requires the real raw
+files plus the matching manifest on the execution host and the remaining
+resource/host gates.
 
 ## 5. Quyết định hiện tại
 
