@@ -53,23 +53,36 @@ method from the audit trail. The pilot must record the actual run count if
 a solver is unavailable. No pilot result is asserted in this document.
 
 
-## 2.2 Integration blocker: HB input format versus runner input format
+## 2.2 HB input → shared runner integration (implemented)
 
-The selected benchmark files are text `.mtx.rnd` edge-list files. The
-current shared runner calls `src.sat.loader.read_instance()`, whose contract
-accepts JSON objects with `id, name, n, edges, source, tier`. The plan-only
-`scripts/dry_run_benchmark.py` only checks that the `.mtx.rnd` source file
-exists; it does not convert the file, and it does not launch a solver.
+The shared `src.sat.loader.read_instance()` now accepts official
+`.mtx.rnd` paths directly; `src.runner.run_one()` and its worker therefore
+use the same shared `Instance` contract without an intermediate JSON file.
+The loader:
 
-Therefore the 40-run exact pilot is **not yet executable end-to-end** from
-the current manifest paths through `src.runner.run_one()`. Before P1 runs
-the exact pilot, P2/P3 must provide and test one agreed integration path:
-(a) a deterministic HB `.mtx.rnd` → shared `Instance`/JSON conversion step,
-or (b) a loader adapter used by the runner. It must preserve isolated vertices,
-apply the documented undirected-edge de-duplication/self-loop policy, and
-check `n`, header `m`, `m_clean`, SHA-256 and instance ID against
-`MANIFEST.csv`. Do not build a private P1-only parser or claim the pilot ran
-until this common path and tests exist.
+- converts source vertex IDs from 1-based to the shared 0-based convention;
+- preserves all `n` vertices, including isolated vertices;
+- removes self-loops and repeated undirected edges using the policy in
+  `scripts/inspect_hb.py`;
+- requires sibling `MANIFEST.csv` and `instances.csv`;
+- checks the source SHA-256, header dimensions, header/row edge counts,
+  cleaned edge count, removed-edge counts, `delta_max`, `UB=n-Δ`, and
+  the inventory's `n`/`m_table` before returning an `Instance`.
+
+Regression tests in `tests/sat/test_hb_loader.py` cover parsing, one-based
+index conversion, isolated-vertex preservation, edge cleaning, hash/manifest
+mismatch, missing provenance files, continued JSON compatibility, and an
+end-to-end `run_one()` subprocess test using the brute-force oracle on a
+small fixture. The workflow `W3 checkpoint, runner and HB loader tests` was
+expanded to execute this test on Ubuntu and Windows. CI was queued/in progress
+at the time of this update; do not record it as PASS until GitHub reports a
+completed successful run.
+
+This closes the **code integration** gap. It does not establish that the real
+24 raw files are present in a given checkout: `benchmark/hb/raw/` is
+gitignored. The 40-run HB exact pilot is still pending until the official raw
+files and matching manifest are available on the machine where the pilot is
+executed, and until the protocol's resource/host gates are met.
 
 ## 3. P1 degree-bound audit for the 24 HB instances
 
