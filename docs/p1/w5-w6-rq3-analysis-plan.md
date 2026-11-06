@@ -2,10 +2,10 @@
 
 **Owner:** P1 (Exact + Oracle + RQ3 technical analysis)  
 **Prepared:** 2026-11-06  
-**Status:** Analysis framework prepared; official results not yet available  
+**Status:** PLANNING ONLY — no W5–W6 execution or completion is claimed; official results are not yet available  
 **Depends on:** P3's validated official run export; P2's frozen canonical SAT configuration
 
-This document prepares the analysis workflow and report structure before benchmark results exist. It is not a record of experimental findings. Do not fill placeholders with estimates or pilot outcomes.
+This document is a forward-looking plan for the work intended in W5–W6. Its checklist is not evidence of execution or completion. It is not a record of experimental findings. Do not fill placeholders with estimates or pilot outcomes.
 
 ## 1. Keep the three result sets separate
 
