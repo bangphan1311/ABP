@@ -31,11 +31,20 @@ predeclared sample of exact runs; P1 does not take over P3's runner.
 | Whole-run exact time accounting | Exact backends subtract model-build elapsed time before passing the remaining budget to the optimizer; `tests/exact/test_time_budget.py` covers remaining-budget arithmetic | Implemented in code; protocol/documentation alignment needed |
 | Upper bound audit | 24/24 manifest rows are `VALID`; each row records `delta_max` and `ub_n_minus_delta` | Values tabulated in §3 below |
 | Gurobi/CPLEX entitlement check | Gurobi Academic small probe PASS; CPLEX MIP and CP Community Edition size/search limits confirmed; no CPLEX Academic entitlement verified | Partial; benchmark-scale Gurobi capacity and CPLEX entitlement remain unverified |
-| Exact pilot on actual HB validation subset | Preflight records tiny probes, but no saved 10-instance × 4-exact pilot result set or raw evidence | **Not evidenced / still to run** |
+| Exact pilot on actual HB validation subset | `experiments/pilot_exact_p1.py` now builds and runs the 10 × 4 plan with 600 s/run, resume, raw JSON and summary; CI plan/loader tests PASS on Ubuntu and Windows | **Script ready; actual 40 HB runs still not executed because raw files are absent from this workspace** |
 | Pilot on large HB instances | Protocol plans a 3-instance early-warning pilot after memory enforcement is verified; no saved exact pilot-large result set is recorded | **Blocked by host and memory-cap sign-off** |
 | Review SAT semantics/canonical candidate | P1 review agrees with `order / pairwise / glucose4` within the Core candidate set `{cadical195, glucose4}`; `minisat22` is outside that Core set | P1 proposal accepted within Core; synthetic-pilot transfer limitation must be reported |
 
 ### 2.1 Exact pilot that remains
+
+P1's executable pilot command (run from repository root on the selected Windows host, after confirming the raw HB files and manifest are present):
+
+```powershell
+uv run python experiments/pilot_exact_p1.py
+```
+
+The script enforces one worker, 600 seconds per validation run, a 12 GiB Windows Job Object cap and resume. Use `--include-large` only for the additional 12 exact pilot-large runs (three large instances × four methods, 1800 seconds/run), after the host memory-limit test has been checked. It refuses to start if any selected raw file or manifest entry is missing/invalid.
+
 
 The protocol plan is:
 
@@ -49,8 +58,7 @@ The protocol plan is:
 A pilot is an environment/formulation risk check, not evidence for RQ3.
 Where a CPLEX Community Edition limit is hit, retain the raw error and
 classify the affected run as `ERR`; do not rewrite it as `TO` or omit the
-method from the audit trail. The pilot must record the actual run count if
-a solver is unavailable. No pilot result is asserted in this document.
+method from the audit trail. The pilot must record the actual run count if a solver is unavailable. CPLEX Community Edition errors remain raw `ERR` records and do not stop later methods. The script writes raw JSON through the shared runner plus a derived `results/pilot_exact/summary.csv`. No pilot result is asserted in this document until the script has run against the real HB raw files.
 
 
 ## 2.2 HB input → shared runner integration (implemented)
@@ -152,7 +160,7 @@ contradicts the current code.
 | Confirm exact configuration and formulations | Formulations are represented in code and small-oracle tests | Re-run correctness suite on the freeze candidate and retain log + commit SHA |
 | Confirm canonical SAT configuration | P1 agrees with `order / pairwise / glucose4` within the Core set `{cadical195, glucose4}` | Keep this as the pre-official proposal; record that the pilot was synthetic (10 graphs, 60 s/run), not the HB validation subset |
 | Protocol review | P1 has incorporated W3 review comments on K-search, UB, whole-run time budget, pilot budget, PAR2 and checkpoint semantics | Obtain final P2/P3 review; do not interpret earlier comments as final sign-off |
-| Resource/host freeze | Windows snapshot: 15.21 GiB RAM; official host and benchmark memory cap are not declared | Whole group must name the host and choose a cap below physical RAM with OS headroom; 30 GB is not feasible on this snapshot |
+| Resource/host freeze | P1 selected Windows build `10.0.26200`, 12 logical CPUs, 15.21 GiB RAM; 12.0 GiB/run cap, one worker | Recheck the exact host before running; the script enforces Windows build and minimum RAM, and the shared runner applies the Job Object cap |
 | Solver entitlement | Gurobi Academic tiny probe PASS; CPLEX Community limits confirmed; Kissat native not verified and protocol contingency excludes it from RQ2 | If CPLEX Academic is unavailable, retain CPLEX runs as `ERR` where entitlement blocks execution and state the limitation |
 | P1/P2 SAT specification cross-review | Protocol refers to `docs/sat_spec.md`; verify that the actual approved spec exists at that path and review it against K-search/encoding semantics | The referenced path returned 404 during this review; P2 must supply the canonical spec or P1 must update the protocol link to the approved existing document before freeze |
 | PR and release gates | PR #50 and PR #52 are open; P1 review on #52 is `CHANGES_REQUESTED`; P1 branch is diverged from `main` | Resolve #52 blockers, recheck compare and sync P1 branch after #52 settles, re-run tests, merge only after review gates |
@@ -177,22 +185,19 @@ P3 operates the queue. P1's exact-side responsibilities are:
    TO/MO/ERR patterns, exact-vs-SAT differences, and limitations. Do not
    claim a method is inferior merely because a license-blocked run is `ERR`.
 
-## 7. Decisions and blockers that P1 cannot make alone
+## 7. Decisions and remaining blockers
 
-- Official host, operating system, parallel-run policy and benchmark memory
-  cap require group confirmation. The 0.125 GiB cap in tests is a test fixture,
-  not the benchmark cap.
-- A CPLEX Academic entitlement is not verified. The agreed contract says
-  license failures are `ERR`; the group should document whether it accepts
-  this limitation or obtains Academic access.
+P1 has selected the candidate host, cap and solver fallback policy for the execution plan; this is not a claim that `v1.0` freeze conditions are complete.
+
+- Candidate host and cap are set by P1 for the current run plan: Windows build `10.0.26200`, 15.21 GiB RAM, 12 GiB per run, one worker. Recheck before execution; the 0.125 GiB cap in tests is only a test fixture.
+- A CPLEX Academic entitlement is not verified. P1's execution choice is to keep both CPLEX baselines in the plan and record Community Edition size/search/license blocks as `ERR` with raw reason, rather than waiting indefinitely for Academic entitlement or changing them to `TO`.
 - The official HB raw data are locally held and ignored by Git. The manifest
   is present, but the raw files must be available on the selected official
   host and their hashes must match the manifest.
 - The source page confirms the 24-instance ABP benchmark, but the semantic
   meaning of the `.rnd` suffix is still listed for confirmation in the
   preflight checklist. Do not invent that explanation in the paper.
-- P3 must confirm runner/schema/memory/checkpoint/resume and the dry-run
-  budget. P2 must resolve the SAT-side review points on PR #52.
+- P3 remains official queue operator and must own official runner/schema/memory/checkpoint/resume validation and dry-run budget. P2 owns SAT-side changes/review; P1 has independently accepted `order/pairwise/glucose4` within the Core candidate set.
 
 ## 8. Freeze rule
 
