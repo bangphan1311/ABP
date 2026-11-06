@@ -126,9 +126,20 @@ P1 viết formulation, P2 review. MIP dùng biến nhị phân theo cạnh cho |
 
 ### 6.3. Memory limit
 
-Mức mục tiêu ghi trong protocol: 30 GB mỗi run; đây không phải giá trị mặc định đã được xác minh. Trong code, `Config.memory_limit` và CLI `--memory-limit` nhận đơn vị **GiB** (1 GiB = 1024³ byte). Trước freeze phải chốt cap cụ thể theo GiB trên máy official và ghi rõ trong paper. Máy đã được preflight ở giai đoạn W3 có RAM 15.21 GiB; nếu dùng máy này, cap 30 GB/30 GiB không khả thi, phải chọn mức thấp hơn RAM vật lý và chừa headroom cho hệ điều hành. Chỉ giảm số run song song sau khi đã chốt cap, không chạy nhiều worker sao cho tổng cap vượt RAM vật lý.
+**P1 đã chọn cấu hình vận hành cho candidate host:** máy Windows đã preflight ở W3
+(Windows build `10.0.26200`, 12 logical CPUs, RAM `15.21 GiB`, Python
+`3.11.16`). Memory cap là **12.0 GiB mỗi run** (đơn vị của
+`Config.memory_limit`/CLI là GiB, 1 GiB = 1024³ byte), chạy **một worker
+tại một thời điểm**. Cấu hình này để lại khoảng 3.21 GiB RAM vật lý cho OS và
+tiến trình nền; không chạy song song nhiều worker. P1 exact-pilot runner
+`experiments/pilot_exact_p1.py` mặc định áp cap 12.0 GiB và từ chối chạy nếu
+không phải Windows build đã chọn hoặc RAM vật lý dưới 15.0 GiB.
 
-Runner phải thực thi giới hạn bộ nhớ thật, không chỉ ghi `memory_limit` trong config. Chỉ ghi `MO` khi có bằng chứng run vượt giới hạn; lỗi không rõ nguyên nhân thì điều tra, không tự gán `MO`.
+Cap OS phải được thực thi ở process/job level, không chỉ ghi trong config.
+Windows Job Object giới hạn memory của process tree. Chỉ ghi `MO` khi có
+bằng chứng run vượt giới hạn; lỗi không rõ nguyên nhân phải điều tra, không
+tự gán `MO`. Nếu host thực tế khác snapshot, dừng trước benchmark và chạy
+preflight/điều chỉnh protocol thay vì âm thầm đổi cap hoặc OS.
 
 ### 6.4. Seed, lặp, resume
 
@@ -216,7 +227,7 @@ Core-giờ worst case = (số run × time limit) / 3600.
 
 Nếu Kissat không qua xác minh và RQ2 chỉ dùng Glucose, RQ2 còn 10 run mới (5,0 core-giờ), tổng dự kiến giảm còn 97,2 core-giờ và 221 run bao gồm official. Đây là ngân sách CPU worst case, không phải cam kết thời gian lịch; thời gian thực còn phụ thuộc số run song song, license và overhead runner. Pilot-large chỉ chạy sau khi test hard memory limit pass. `--dry-run` phải cập nhật dự toán bằng số đo thật trước freeze; nếu vượt ngân sách, thu nhỏ RQ1/RQ2 trước, không bỏ instance lớn hay thu hẹp RQ3.
 
-**Môi trường (điền trước freeze, không để ở trạng thái giả định):** máy, CPU, RAM, hệ điều hành; phiên bản Python; OR-Tools, Gurobi, CPLEX/CP Optimizer; PySAT, CaDiCaL, Glucose, Kissat và cách gọi từng solver; git tag/commit; loại license và giới hạn kích thước model; memory limit, time limit, chính sách chạy song song.
+**Môi trường candidate đã ghi nhận:** Windows build `10.0.26200`, AMD64, 12 logical CPUs, RAM 15.21 GiB, Python 3.11.16; OR-Tools 9.15.6755, python-sat 1.9.dev15, gurobipy 13.0.3, cplex 22.2.0.1, docplex 2.32.264; Gurobi Academic tiny probe PASS; CPLEX MIP/CP Community Edition limits confirmed; Kissat native chưa xác minh và bị loại khỏi RQ2 Core. P1 chọn memory cap 12.0 GiB/run, một worker tuần tự. Các thông tin solver/license phải được tái xác nhận trên host ở thời điểm chạy; không commit license secret.
 
 ## 12. Freeze policy
 
