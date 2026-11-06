@@ -41,14 +41,15 @@ Tên ma trận (ví dụ `bcsstk06`) là id dùng trong dữ liệu và paper; c
 
 ### 2.2. Định dạng file
 
-Dự kiến `*.mtx.rnd`: dòng đầu `n n m`, các dòng sau mỗi dòng một cạnh `u v` (đánh số từ 1). Cần xác nhận định dạng thực tế của cả 24 file; ý nghĩa hậu tố `.rnd` được xác minh nếu cần mô tả trong Experimental setup.
+Bộ benchmark dùng các file `*.mtx.rnd`. Loader hỗ trợ dòng tên bài toán tùy chọn (`Nombre del problema: ...`), tiếp theo là header `n n m`, rồi `m` dòng cạnh `u v` với đỉnh đánh số từ 1. Ý nghĩa hậu tố `.rnd` không được suy diễn; chỉ mô tả định dạng byte/thực tế đã kiểm tra, không gán ý nghĩa cho hậu tố khi chưa có nguồn xác nhận.
 
 ### 2.3. Quy tắc chuyển thành đồ thị (loader)
 
-1. Giữ nguyên tập đỉnh 1..n, kể cả đỉnh cô lập.
+1. Giữ nguyên tập đỉnh 1..n, kể cả đỉnh cô lập; ánh xạ ID nguồn 1-based sang chỉ số `Instance` 0-based.
 2. Bỏ self-loop.
 3. Coi cạnh là vô hướng, loại cạnh trùng.
-4. Ghi vào `MANIFEST.csv`: sha256 của file, `m` trong header, `m` sau làm sạch.
+4. Ghi vào `MANIFEST.csv`: SHA-256 của file, `m` trong header, `m` sau làm sạch, số self-loop/cạnh trùng, `Δ` và `UB=n−Δ`.
+5. `read_instance()` đọc trực tiếp `.mtx.rnd`, bắt buộc tìm thấy `MANIFEST.csv` và `instances.csv`, sau đó kiểm tra hash/header/counts/cleaning/degree/UB và metadata inventory. Runner và worker dùng cùng đường đọc; không yêu cầu chuyển tay sang JSON.
 
 Kiểm tra bắt buộc: `n` khớp `instances.csv` cho cả 24 instance; `m` trong header khớp `m_table`; nếu `m` đổi sau làm sạch, ghi chênh lệch và giải thích trong Experimental setup. Không âm thầm sửa file nguồn hay bỏ đỉnh để dữ liệu khớp kỳ vọng.
 
