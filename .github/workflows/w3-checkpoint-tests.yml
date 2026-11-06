@@ -1,6 +1,17 @@
 name: W3 checkpoint, runner and HB loader tests
 
 on:
+  push:
+    branches:
+      - p1/w3-experimental-protocol-rc
+    paths:
+      - "src/common/checkpoint.py"
+      - "src/sat/loader.py"
+      - "src/sat/solve.py"
+      - "src/runner/**"
+      - "tests/runner/**"
+      - "tests/sat/test_hb_loader.py"
+      - ".github/workflows/w3-checkpoint-tests.yml"
   pull_request:
     paths:
       - "src/common/checkpoint.py"
