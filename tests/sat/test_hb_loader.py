@@ -138,7 +138,7 @@ def test_runner_executes_official_hb_file_without_intermediate_json(tmp_path):
     name = "path4.mtx.rnd"
     raw_dir = tmp_path / "benchmark" / "hb" / "raw"
     raw_dir.mkdir(parents=True)
-    content = "Nombre del problema: path4\\n4 4 3\\n1 2\\n2 3\\n3 4\\n"
+    content = "Nombre del problema: path4\n4 4 3\n1 2\n2 3\n3 4\n"
     sha = write_hb(raw_dir / name, content)
     write_metadata(tmp_path, name, sha, n=4, m=3, delta=2)
 
@@ -159,7 +159,7 @@ def test_read_hb_requires_manifest_and_inventory(tmp_path):
     raw_dir = tmp_path / "benchmark" / "hb" / "raw"
     raw_dir.mkdir(parents=True)
     path = raw_dir / "path4.mtx.rnd"
-    write_hb(path, "4 4 3\\n1 2\\n2 3\\n3 4\\n")
+    write_hb(path, "4 4 3\n1 2\n2 3\n3 4\n")
 
     with pytest.raises(ValueError, match="requires sibling"):
         read_instance(path)
