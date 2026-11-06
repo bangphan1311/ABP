@@ -82,9 +82,10 @@ index conversion, isolated-vertex preservation, edge cleaning, hash/manifest
 mismatch, missing provenance files, continued JSON compatibility, and an
 end-to-end `run_one()` subprocess test using the brute-force oracle on a
 small fixture. The workflow `W3 checkpoint, runner and HB loader tests` was
-expanded to execute this test on Ubuntu and Windows. CI was queued/in progress
-at the time of this update; do not record it as PASS until GitHub reports a
-completed successful run.
+expanded to execute these checks plus the P1 exact-pilot plan tests on Ubuntu
+and Windows. GitHub Actions run `42156873444` completed successfully on the
+final documented branch head: Ubuntu **23 passed**, Windows **23 passed**.
+This is fixture/plan CI evidence, not an actual HB solver pilot.
 
 This closes the **code integration** gap. It does not establish that the real
 24 raw files are present in a given checkout: `benchmark/hb/raw/` is
