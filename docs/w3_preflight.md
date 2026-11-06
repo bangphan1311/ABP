@@ -33,9 +33,9 @@
 
 - P2 PR #51 (`p2/w3-pilots`) đã merge vào `main` ngày 01/11/2026, commit merge `276c6c0`; gồm pilot RQ1/RQ2, CSV kết quả và bản nháp technical appendix.
 - P2 PR #52 (`p2/w4-sat`) đang mở; thêm canonical config trong code, SAT triage và phân tích RQ1/RQ2/G3. PR body báo cáo 514 passed, 3 skipped; tài liệu `docs/w4-sat/21-m2-freeze-v1.md` lại ghi 512 passed, 3 skipped — cần P2 thống nhất số liệu theo đúng commit/test log.
-- PR P1 #50 hiện có nhánh `p1/w3-experimental-protocol-rc` diverged so với `main`: 30 commit ahead, 11 commit behind tại thời điểm kiểm tra. Cần đồng bộ `main` trước merge; nên làm sau khi PR #52 chốt để tránh phải đồng bộ lặp lại.
+- PR P1 #50 hiện có nhánh `p1/w3-experimental-protocol-rc` diverged so với `main`. Cần kiểm tra lại compare ngay trước khi đồng bộ; nên cập nhật `main` sau khi PR #52 chốt để tránh phải đồng bộ lặp lại.
 - PR #50 và #52 chưa được merge; chưa tạo tag `v1.0`.
-- P1 đã cập nhật `docs/exact_models.md` (commit `4c00db3`) về formulation, cận độ bậc và timing; thêm `docs/p1/w3-w4-exact-readiness.md` (commit ban đầu `e49bb81`, sau đó cập nhật) làm checklist W3–W4 và bảng UB cho 24 instance.
+- P1 đã cập nhật `docs/exact_models.md` về formulation, cận độ bậc và timing; thêm/cập nhật `docs/p1/w3-w4-exact-readiness.md` làm checklist W3–W4 và bảng UB cho 24 instance.
 - Review code phát hiện `src/runner.run_one()` hiện nhận JSON qua `read_instance()`, trong khi dữ liệu HB là `.mtx.rnd`; `scripts/dry_run_benchmark.py` chỉ lập kế hoạch, không chuyển dữ liệu. P2/P3 cần chốt adapter/chuyển đổi chung và test trước exact pilot.
 - Đường dẫn `docs/sat_spec.md` được protocol viện dẫn không tồn tại trên nhánh PR hiện tại. Protocol đã được cập nhật để tham chiếu bản draft hiện có `docs/handoff/w2-sat/14-sat-methodology.md`; cần P2 xác nhận đây là spec ràng buộc trước freeze.
 
