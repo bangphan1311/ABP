@@ -21,7 +21,7 @@ official results so P1 cannot select only successful or suspicious runs.
 | # | Tier | Instance | Method | Run ID |
 |---:|---|---|---|---|
 | 1 | small | `pores_1` | `cp_sat` | `pores_1__cp_sat__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
-| 2 | large | `can__715` | `cp_sat` | `can__715__cp_sat__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
+| 2 | large | `can_715` (`can__715`) | `cp_sat` | `can_715__cp_sat__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 3 | small | `will57` | `cp_sat` | `will57__cp_sat__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 4 | small | `bcsstk01` | `gurobi_mip` | `bcsstk01__gurobi_mip__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 5 | large | `can__445` | `gurobi_mip` | `can__445__gurobi_mip__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
