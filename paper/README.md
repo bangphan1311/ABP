@@ -11,11 +11,12 @@ Do not describe those sections as reviewed or complete. When the master manuscri
 
 ## P1 material prepared
 
+- `p1_intro_background_related_work.tex`: modular P1 contributions for Introduction, Problem Background, and Related Work; integrate with the full manuscript and team-wide research framing.
 - `p1_exact_methodology.tex`: paper-ready description of the four implemented Exact backends, common model semantics, verification, bounds, and result statuses.
 - `p1_exact_experimental_setup.tex`: Exact-only experimental setup plus the P1 candidate environment snapshot and unresolved environment/host confirmations.
 - `p1_references.bib`: bibliographic entries cited by the P1 sections.
 
-These files are modular section drafts, not a complete paper and not a claim that W5 or W6 deliverables have been completed. The RQ3 analysis-plan document is planning material only; it contains no experimental findings.
+These files are modular section drafts, not a complete paper. The Introduction/Background/Related Work file contains only P1-supported passages and does not complete the team-wide sections. The Exact Experimental Setup covers only P1-owned Exact methods and candidate environment details; P3 must confirm official queue/host/resource operations. The RQ3 analysis-plan document is planning material only. **No W5 or W6 execution or completion is claimed**; result validation, official analysis, figures, and final reporting remain future work.
 
 ## Ownership boundary
 
