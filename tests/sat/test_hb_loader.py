@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from src.common.models import Config
+from src.runner.runner import run_one
 from src.sat.loader import read_instance
 
 
@@ -129,3 +131,35 @@ def test_json_instance_reader_remains_compatible(tmp_path):
     instance = read_instance(path)
     assert instance.id == "path4"
     assert instance.edges == ((0, 1), (1, 2), (2, 3))
+
+
+
+def test_runner_executes_official_hb_file_without_intermediate_json(tmp_path):
+    name = "path4.mtx.rnd"
+    raw_dir = tmp_path / "benchmark" / "hb" / "raw"
+    raw_dir.mkdir(parents=True)
+    content = "Nombre del problema: path4\\n4 4 3\\n1 2\\n2 3\\n3 4\\n"
+    sha = write_hb(raw_dir / name, content)
+    write_metadata(tmp_path, name, sha, n=4, m=3, delta=2)
+
+    record = run_one(
+        raw_dir / name,
+        Config(method="oracle", time_limit=30),
+        tmp_path / "results" / "raw",
+    )
+
+    assert record["instance"] == "path4"
+    assert record["method"] == "oracle"
+    assert record["status"] == "OPT"
+    assert record["lb"] == record["ub"] == 2
+    assert record["solution"] is not None
+
+
+def test_read_hb_requires_manifest_and_inventory(tmp_path):
+    raw_dir = tmp_path / "benchmark" / "hb" / "raw"
+    raw_dir.mkdir(parents=True)
+    path = raw_dir / "path4.mtx.rnd"
+    write_hb(path, "4 4 3\\n1 2\\n2 3\\n3 4\\n")
+
+    with pytest.raises(ValueError, match="requires sibling"):
+        read_instance(path)
