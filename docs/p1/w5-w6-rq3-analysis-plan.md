@@ -85,7 +85,7 @@ Create every figure and table from validated raw records using version-controlle
 | PAR2 comparison | Combine proof coverage and timeout cost under the frozen rule | Label 1800 s budget and 3600 s penalty; show ERR causes separately |
 | Runtime cactus plot | Show cumulative solved-instance coverage over time | State whether only OPT counts as solved; do not silently mix pilot and official runs |
 | Pairwise runtime/objective scatter | Inspect agreement and relative behavior on matched instances | Compare only matched records; mark non-OPT cases distinctly |
-| Scale/difficulty view | Explore runtime/status against n, |E|, density and maximum degree | Treat as descriptive analysis, not a predictive model |
+| Scale/difficulty view | Explore runtime/status against n, m_clean, density and maximum degree | Treat as descriptive analysis, not a predictive model |
 
 The main RQ3 table should include, at minimum, instance, n, m_clean, Δ, and each method's status, verified lb, valid ub, wall_time, and available peak_memory. Keep the status visible even when a metric is unavailable.
 
