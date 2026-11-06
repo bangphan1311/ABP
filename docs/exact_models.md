@@ -1,73 +1,147 @@
-# Exact formulations for ABP (W2 draft)
+# Exact formulations for ABP (P1 W3 review)
 
-Given an undirected graph `G=(V,E)`, `n=|V|`, assign each vertex an integer label
-`x_v` in `1..n` and maximize the minimum label distance over all edges.
+Given an undirected simple graph `G=(V,E)`, let `n=|V|`. Assign each
+vertex an integer label `x_v ∈ {1,...,n}`; the labels must form a
+permutation. The antibandwidth is
 
-## Common optimization model
+```
+AB(G) = max_x min_{(u,v) ∈ E} |x_u - x_v|.
+```
+
+The four exact backends solve this same optimization problem. Every returned
+incumbent must pass the shared `verify(instance, labeling)`; a solver status
+alone is not a certificate.
+
+## Common optimization semantics
 
 Maximize integer `K`, subject to:
 
-- `x_v in {1, ..., n}` for every vertex;
-- labels are all different (equivalently, the labels form a permutation of `1..n`);
-- `|x_u - x_v| >= K` for each edge `(u,v)`;
-- `K in {1, ..., n-1}` for a graph with at least one edge and at least two vertices.
+- `1 ≤ x_v ≤ n` for every vertex;
+- `x_u ≠ x_v` for every distinct pair of vertices (equivalently, the labels
+  form a permutation of `1,...,n`);
+- `|x_u - x_v| ≥ K` for every edge `(u,v)`;
+- `1 ≤ K ≤ n-1` for an instance with at least one edge.
 
 ## Gurobi MIP and CPLEX MIP
 
-Use integer label variables `x_v`, integer objective variable `K`, and binary orientation
-variables. For every vertex pair `i<j`, one binary chooses either `x_i+1 <= x_j`
-or `x_j+1 <= x_i`, guaranteeing distinct labels. For every edge `(u,v)`, one binary
-chooses either `x_u-x_v >= K` or `x_v-x_u >= K`. The implications are represented
-with indicator constraints; no manually selected big-M constant is used.
+Use integer label variables `x_v`, integer objective variable `K`, and
+binary orientation variables:
+
+- For every vertex pair `i<j`, one binary chooses either
+  `x_i + 1 ≤ x_j` or `x_j + 1 ≤ x_i`. This enforces pairwise distinct
+  labels.
+- For every edge `(u,v)`, one binary chooses either
+  `x_u - x_v ≥ K` or `x_v - x_u ≥ K`.
+
+Both implementations use indicator constraints for these implications; they
+do not rely on a manually selected big-M constant. The CPLEX MIP and Gurobi
+MIP formulations therefore share the same mathematical semantics.
 
 ## CPLEX CP
 
-Use integer variables `x_v`, a global `all_diff(x)` constraint, and for each edge
-`abs(x_u-x_v) >= K`. Maximize `K`.
+Use integer variables `x_v ∈ {1,...,n}`, a global
+`all_diff(x)` constraint, and `abs(x_u-x_v) ≥ K` for every edge. Maximize
+`K`.
+
+## CP-SAT
+
+Use integer variables `x_v ∈ {1,...,n}`, `add_all_different(x)`, and
+for each edge an integer distance variable `d_uv` with
+`d_uv = abs(x_u-x_v)` and `K ≤ d_uv`. Maximize `K`. The solver is
+configured with one search worker.
+
+## Degree-based upper bound for the ABP objective
+
+For every instance with at least one edge, let
+`Δ = max_v deg(v)`. A safe upper bound is
+
+```
+UB_degree = n - Δ.
+```
+
+Reason: choose a vertex of degree `Δ`. If the antibandwidth is at least
+`K`, the labels of all its `Δ` neighbours must be at distance at least
+`K` from the label of that vertex. For any fixed label in `{1,...,n}`,
+there are at most `n-K` other labels at distance at least `K`.
+Therefore `Δ ≤ n-K`, hence `K ≤ n-Δ`.
+
+The value is recorded in `benchmark/hb/MANIFEST.csv` as
+`ub_n_minus_delta`. It is a safe external bound for the SAT K-search and
+for checking reported results; it is **not** an optimality certificate.
+Under the current protocol, an `OPT` claim still requires the solver's
+prescribed proof (for SAT, the required UNSAT probe). The current exact
+formulations retain the natural model domain `K ≤ n-1`; this document does
+not claim that `UB_degree` is already passed into every exact model.
 
 ## Result semantics
 
-Every returned incumbent is checked using the shared `verify(instance, labeling)`.
-`OPT` is returned only for a solver's proven-optimal status. A valid incumbent without
-an optimality proof is `FEAS`; a time limit with no verified incumbent is `TO`;
-execution, backend, and licensing errors are `ERR`. For non-optimal feasible runs,
-`ub` records an available solver bound when possible, otherwise the safe generic bound
-`n-1` is used.
+- `OPT`: solver has proved optimality and the incumbent has passed
+  `verify()`; the reported `lb` and `ub` must equal the verified objective.
+- `FEAS`: a verified incumbent exists, but optimality was not proved before
+  the time budget ended.
+- `TO`: time budget ended without a verified incumbent.
+- `MO`: the runner/process supervisor confirmed that the configured memory
+  limit was exceeded.
+- `ERR`: execution, backend, license, malformed output, invalid incumbent,
+  or objective-consistency error. A license failure is never relabelled
+  `TO`.
 
-## Input validation and ignored configuration
+For non-optimal feasible runs, preserve the verified objective as `lb`;
+use a solver bound when available and otherwise a safe upper bound. Never
+promote an unverified labeling to an incumbent.
 
-Malformed caller input is rejected with `ValueError` before the solver error-normalization
-block: fewer than two vertices, no edges, invalid endpoints, self-loops, and a
-non-finite or non-positive `time_limit`. This distinguishes invalid input from
-backend execution/license errors, which are returned as `ERR`.
+## Input validation and configuration scope
 
-Exact solvers warn when non-default shared configuration fields are ignored.
-`memory_limit` is **not** enforced as a hard cap. The exact solvers currently
-support `time_limit` and their documented seed behavior; `search_mode`,
-`symmetry`, and `warm_start` are not implemented in these exact backends.
+The shared exact validation rejects instances with fewer than two vertices,
+no edges, invalid endpoints, self-loops, and invalid time limits before
+solver error normalization. The exact backends warn when non-default shared
+configuration fields are ignored. In particular, the exact solver functions
+do not independently enforce `Config.memory_limit`; the process
+supervisor/runner owns the common OS-level memory cap. Backend-specific
+parameters such as Gurobi `SoftMemLimit` and CPLEX `WorkMem` have different
+semantics and are not substitutes for the runner's cap.
 
-## Timing and memory-limit scope
+## Time accounting
 
-For exact solvers, `Config.time_limit` is passed to the backend's solve phase and
-does not include model construction. The SAT method uses `Config.time_limit` as a
-budget for the full sequence of K probes, including encoding and clause loading.
-The runner provides an end-to-end wall-clock measurement and hard-kills a worker
-after `time_limit + 30 seconds` to allow for startup and shutdown overhead.
-**Official SAT-vs-exact timing comparisons must use runner `wall_time`, not
-solver `t_total` or the raw `time_limit` semantics.**
+Each exact implementation starts its run timer before model construction.
+After building the model, it computes the remaining whole-run budget:
 
-The current exact solver functions do **not** enforce `Config.memory_limit`. The
-field is retained in the shared run contract, but a comparable hard memory ceiling
-must be enforced by the process supervisor/runner for every backend. Do not
-describe `memory_limit` as enforced, and do not use it as an official experimental
-control until that supervisor-level enforcement is implemented and tested.
-Backend-specific parameters such as Gurobi's `SoftMemLimit` and CPLEX's `WorkMem`
-have different semantics and should not be treated as equivalent caps. Native
-Gurobi/CPLEX memory-limit stops and Python `MemoryError` are normalized to `MO`;
-a verified incumbent is preserved when the backend exposes one.
+```
+remaining = max(0, time_limit - elapsed_since_run_start)
+```
 
-## Small-instance validation
+Only the remaining budget is passed to the optimizer. If construction has
+already consumed the budget, the solver is not started and the result is
+`TO` (there is no verified incumbent). The returned `Result.t_total`
+includes model construction and optimization time for the exact solver call.
 
-`tests/exact/test_exact_solvers.py` compares CP-SAT, Gurobi MIP, CPLEX MIP, and CPLEX CP
-against the brute-force oracle on `path4`, `cycle5`, and `complete5`. These are correctness
-smoke tests, not official performance benchmark results.
+The runner separately records `wall_time`, measured around the subprocess.
+Per Experimental Protocol §6.2, use this runner-measured `wall_time` as the
+official end-to-end wall-clock metric; retain `t_encode`, `t_solve`, and
+`t_total` as solver-reported diagnostic metrics. Do not mix `wall_time`
+and `t_total` within the same comparison or PAR2 calculation.
+
+The runner's hard kill at `time_limit + 30 seconds` is only startup/cleanup
+grace. It does not grant the optimizer an extra 30 seconds: the solver itself
+receives the remaining whole-run budget after model construction.
+
+## Small-instance correctness evidence
+
+`tests/exact/test_exact_solvers.py` compares CP-SAT, Gurobi MIP, CPLEX MIP,
+and CPLEX CP with the brute-force oracle on `path4`, `cycle5`, and
+`complete5`. These are correctness smoke tests, not benchmark-performance
+results. The preflight record reports a local full-suite run of 511 passed
+tests; that report is tied to its recorded commit/environment and must be
+re-run on the final freeze candidate before tagging `v1.0`.
+
+## Known environment limitations recorded in W3 preflight
+
+- Gurobi Academic: a small license probe passed; this does not prove
+  benchmark-scale capacity on the selected official host.
+- CPLEX MIP Community Edition: the recorded 1,001-variable / 1,001-constraint
+  probe exceeded the Community Edition problem-size limit (error 1016).
+- CPLEX CP Community Edition: the recorded 1,001-binary-variable probe
+  exceeded the documented 2^1000 search-space limit.
+- No CPLEX Academic entitlement has been verified in the preflight record.
+  Runs that fail because of license/edition limits must be recorded as
+  `ERR` with the reason, not as `TO`.
