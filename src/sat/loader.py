@@ -116,6 +116,11 @@ def _read_hb_instance(path: Path) -> Instance:
     delta_max = max(degree)
     sha256 = hashlib.sha256(raw_bytes).hexdigest()
     manifest_path, inventory_path = _find_hb_metadata(path)
+    if manifest_path is None or inventory_path is None:
+        raise ValueError(
+            "Official .mtx.rnd input requires sibling benchmark/hb/MANIFEST.csv "
+            "and benchmark/hb/instances.csv for provenance validation"
+        )
 
     instance_id = path.name[:-len(HB_SUFFIX)] if path.name.endswith(HB_SUFFIX) else path.stem
     instance_name = instance_id
