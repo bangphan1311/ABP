@@ -88,6 +88,9 @@ The project uses the following common result semantics:
 \end{itemize}
 For non-optimal feasible runs, the verified objective is retained as the lower bound. An upper bound is taken from the solver when available and otherwise from a valid safe bound. An unverified labeling is never promoted to an incumbent.
 
+\paragraph{Implementation-conformance note.}
+The status definitions above describe the intended project-level contract. A source audit found that the current adapters do not yet normalize every termination cause identically: for example, the tested CPLEX CP path returns \texttt{FEAS} when a verified incumbent exists at a memory stop, whereas the MIP adapters can return \texttt{MO} for a recognized memory-limit termination even when an incumbent is available. The CPLEX CP extraction path also requires a distinction between the absence of an incumbent and an incumbent that fails decoding or verification. These cases are tracked as open conformance items in the P1 Exact methodology review and must be resolved, or explicitly specified and handled in the analysis, before the status comparison is frozen.
+
 \subsection{Time accounting and implementation scope}
 Each Exact backend measures elapsed time from the beginning of its solver call, including backend import and model construction. The optimizer receives only the remaining portion of the configured whole-run budget after model construction. If the budget has already expired during construction, optimization is not started. The runner additionally records process-level \texttt{wall\_time}, which includes worker startup and input loading and is the primary end-to-end runtime used in the experimental comparison. Solver-reported \texttt{t\_encode}, \texttt{t\_solve}, and \texttt{t\_total} are retained as diagnostic measurements and are not mixed with \texttt{wall\_time} in one runtime or PAR2 comparison.
 
