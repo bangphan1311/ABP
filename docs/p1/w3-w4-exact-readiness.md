@@ -142,7 +142,7 @@ contradicts the current code.
 | Resource/host freeze | Windows snapshot: 15.21 GiB RAM; official host and benchmark memory cap are not declared | Whole group must name the host and choose a cap below physical RAM with OS headroom; 30 GB is not feasible on this snapshot |
 | Solver entitlement | Gurobi Academic tiny probe PASS; CPLEX Community limits confirmed; Kissat native not verified and protocol contingency excludes it from RQ2 | If CPLEX Academic is unavailable, retain CPLEX runs as `ERR` where entitlement blocks execution and state the limitation |
 | P1/P2 SAT specification cross-review | Protocol refers to `docs/sat_spec.md`; verify that the actual approved spec exists at that path and review it against K-search/encoding semantics | The referenced path returned 404 during this review; P2 must supply the canonical spec or P1 must update the protocol link to the approved existing document before freeze |
-| PR and release gates | PR #50 and PR #52 are open; P1 review on #52 is `CHANGES_REQUESTED`; P1 branch is 28 commits ahead / 11 behind main | Resolve #52 blockers, sync P1 branch after #52 settles, re-run tests, merge only after review gates |
+| PR and release gates | PR #50 and PR #52 are open; P1 review on #52 is `CHANGES_REQUESTED`; P1 branch is diverged from `main` | Resolve #52 blockers, recheck compare and sync P1 branch after #52 settles, re-run tests, merge only after review gates |
 | Git tag `v1.0` | No tag recorded; protocol freeze conditions remain open | **Do not tag yet** |
 
 ## 6. Required P1 work during W4 official execution
