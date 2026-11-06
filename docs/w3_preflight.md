@@ -15,7 +15,7 @@
 | Số liệu đồ thị thực tế | `RECORDED_IN_MANIFEST` | Manifest ghi SHA-256 từng tệp, header, số dòng cạnh, `m_clean`, số cạnh bị loại, `delta_max` và `ub_n_minus_delta = n - delta_max`. |
 | Kiểm thử tự động | `LOCAL_FULL_SUITE_PASS_REPORTED` | Lần chạy mới nhất được báo cáo trên máy Windows: `uv run pytest tests -q` → **511 passed in 21.31s**. Đây là kết quả local; chạy lại trên commit/code cuối trước khi freeze và giữ log làm bằng chứng. |
 | Kiểm tra nhanh solver | `TINY_PROBES_PASS; LARGE_MODEL_LIMITS_SEPARATELY_CHECKED` | Smoke test nhỏ PASS cho CP-SAT, CaDiCaL, Glucose, Gurobi MIP, CPLEX MIP và CPLEX CP. Tiny probe chỉ chứng minh mô hình nhỏ chạy được, không chứng minh năng lực xử lý instance benchmark. |
-| Máy đã kiểm tra | `LOCAL_HOST_SNAPSHOT; OFFICIAL_HOST_NOT_DECLARED` | Windows 10.0.26200; Python 3.11.16; AMD64; 12 logical CPUs; RAM 15.21 GiB. Snapshot đã được ghi nhận; nhóm vẫn phải xác nhận đây có phải máy benchmark chính thức hay không. |
+| Máy candidate do P1 chọn | `P1_SELECTED; RECHECK_BEFORE_RUN` | Windows 10.0.26200; Python 3.11.16; AMD64; 12 logical CPUs; RAM 15.21 GiB. P1 chọn cap 12.0 GiB/run và 1 worker tuần tự; script exact-pilot từ chối chạy nếu OS build/RAM không đạt điều kiện. |
 | Phiên bản gói ghi nhận | `LOCAL_ENVIRONMENT` | OR-Tools 9.15.6755; python-sat 1.9.dev15; pytest 9.1.1; gurobipy 13.0.3; cplex 22.2.0.1; docplex 2.32.264. `psutil` không có; script preflight có fallback đọc RAM trên Windows. |
 | Gurobi MIP | `ACADEMIC_LICENSE_TINY_PROBE_PASS` | Đã cấu hình `GRB_LICENSE_FILE` trong PowerShell hiện tại và mô hình binary nhỏ trả `PROBE_OK`, license được nhận diện là Academic/non-commercial. Không ghi license ID, email, file license hoặc secret vào repository. Chưa có bằng chứng benchmark thực trên máy official. |
 | CPLEX MIP | `COMMUNITY_EDITION_SIZE_LIMIT_CONFIRMED` | Tiny probe PASS; probe riêng với 1.001 biến nhị phân và 1.001 ràng buộc bị CPLEX báo lỗi 1016: Community Edition problem size limits exceeded. Chưa có CPLEX Academic license được xác minh. |
@@ -115,7 +115,7 @@ resource/host gates.
 - Workflow `W3 checkpoint, runner and HB loader tests` chạy trên commit `5bbfbdc0dc4be9c1065837caa51bc5807d0699d5`.
 - Ubuntu: **23 passed in 4.87s**; Windows: **23 passed in 5.52s**. GitHub Actions run [42156221091](https://github.com/bangphan1311/ABP/actions/runs/42156221091), commit `06e5f8646306e65cf16a5519367b46758c39258e`. Gồm parser HB, provenance/hash validation, `run_one()` subprocess fixture, checkpoint/runner regressions và test kế hoạch exact pilot.
 - `experiments/pilot_exact_p1.py` đã được thêm: 40 validation exact runs (600 s/run), một worker, cap 12 GiB; `--include-large` thêm 12 exact pilot-large runs (1800 s/run). Script prechecks Windows build/RAM, 24-row inventory/manifest và đủ raw inputs trước khi launch solver. CI đã test plan/parser/subprocess fixtures, chưa chạy solver trên HB raw data thật.
-- `docs/p1/exact_spot_check_plan.md` đóng băng trước danh sách 10 exact runs để P1 kiểm tra độc lập khi P3 hoàn tất official queue.
+- `docs/p1/exact_spot_check_plan.md` đóng băng trước danh sách 10 exact runs để P1 kiểm tra độc lập khi P3 hoàn tất official queue. Danh sách dùng canonical instance IDs `can_445` và `can_715` (display names `can__445`, `can__715`).
 - 24 raw `.mtx.rnd` files không nằm trong Git vì `benchmark/hb/raw/` được gitignore; chúng không có trong workspace của phiên này. Do đó CI chỉ chứng minh parser/runner với fixture, chưa chạy actual HB exact pilot.
 
 ## 5. Quyết định hiện tại
