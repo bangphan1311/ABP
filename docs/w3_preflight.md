@@ -33,8 +33,11 @@
 
 - P2 PR #51 (`p2/w3-pilots`) đã merge vào `main` ngày 01/11/2026, commit merge `276c6c0`; gồm pilot RQ1/RQ2, CSV kết quả và bản nháp technical appendix.
 - P2 PR #52 (`p2/w4-sat`) đang mở; thêm canonical config trong code, SAT triage và phân tích RQ1/RQ2/G3. PR body báo cáo 514 passed, 3 skipped; tài liệu `docs/w4-sat/21-m2-freeze-v1.md` lại ghi 512 passed, 3 skipped — cần P2 thống nhất số liệu theo đúng commit/test log.
-- PR P1 #50 hiện có nhánh `p1/w3-experimental-protocol-rc` diverged so với `main`: 27 commit ahead, 11 commit behind tại thời điểm kiểm tra. Cần đồng bộ `main` trước merge; nên làm sau khi PR #52 chốt để tránh phải đồng bộ lặp lại.
+- PR P1 #50 hiện có nhánh `p1/w3-experimental-protocol-rc` diverged so với `main`: 30 commit ahead, 11 commit behind tại thời điểm kiểm tra. Cần đồng bộ `main` trước merge; nên làm sau khi PR #52 chốt để tránh phải đồng bộ lặp lại.
 - PR #50 và #52 chưa được merge; chưa tạo tag `v1.0`.
+- P1 đã cập nhật `docs/exact_models.md` (commit `4c00db3`) về formulation, cận độ bậc và timing; thêm `docs/p1/w3-w4-exact-readiness.md` (commit ban đầu `e49bb81`, sau đó cập nhật) làm checklist W3–W4 và bảng UB cho 24 instance.
+- Review code phát hiện `src/runner.run_one()` hiện nhận JSON qua `read_instance()`, trong khi dữ liệu HB là `.mtx.rnd`; `scripts/dry_run_benchmark.py` chỉ lập kế hoạch, không chuyển dữ liệu. P2/P3 cần chốt adapter/chuyển đổi chung và test trước exact pilot.
+- Đường dẫn `docs/sat_spec.md` được protocol viện dẫn không tồn tại trên nhánh PR hiện tại. Protocol đã được cập nhật để tham chiếu bản draft hiện có `docs/handoff/w2-sat/14-sat-methodology.md`; cần P2 xác nhận đây là spec ràng buộc trước freeze.
 
 ## 2. Cách tái tạo kiểm tra dữ liệu
 
@@ -85,9 +88,13 @@ Hệ quả thực tế: không chạy pilot-large hoặc official SAT trên `can
 2. **Chốt khả năng dùng solver:** Gurobi Academic tiny probe đã PASS. CPLEX MIP/CP hiện bị chặn bởi Community Edition ở probe lớn; xin Academic license hoặc ghi quyết định nhóm về phạm vi/nhãn `ERR`. Xác minh Kissat native hoặc loại khỏi RQ2 theo phương án contingency trong protocol.
 3. **Memory limit:** đã có CI PASS và full suite local Windows 511 passed được báo cáo; suite chứa test cap 0.125 GiB/worker 192 MiB và assert `MO`/`MemoryError`. Nếu chọn máy Windows snapshot 15.21 GiB làm host official, có thể dùng đây làm bằng chứng kiểm tra enforcement cơ bản. Chốt cap benchmark thực tế theo RAM và chính sách chạy song song; không cần đo RAM lại chỉ để lặp thông tin đã có.
 4. **Checkpoint/resume:** CI và local full-suite report bao gồm test hard kill, restore incumbent SAT đã verify, và audit trail/corrupt JSON. Nếu chọn máy Windows snapshot làm official host, ghi nhận evidence này. Exact incumbent checkpoint chưa được implement; giữ rõ giới hạn này, không tuyên bố exact có khả năng resume incumbent.
-5. **Final review của P2/P3:** P2 xác nhận `docs/sat_spec.md`, ánh xạ khoảng cách/K-search, cận `UB = n - Δ`, correctness và pilot design. P3 xác nhận runner/schema, kill/resume, memory/status, thời gian tổng và dry-run/budget. Ghi quyết định cho từng góp ý thay vì để trạng thái mơ hồ.
+5. **Final review của P2/P3:** P2 xác nhận tài liệu SAT spec chính thức (hiện có bản draft `docs/handoff/w2-sat/14-sat-methodology.md`), ánh xạ khoảng cách/K-search, cận `UB = n - Δ`, correctness và pilot design. P3 xác nhận runner/schema, kill/resume, memory/status, thời gian tổng và dry-run/budget. Ghi quyết định cho từng góp ý thay vì để trạng thái mơ hồ.
 6. **Pilot và canonical config:** pilot RQ1/RQ2 W3 đã được chạy và merge qua PR #51 trên tập synthetic (10 instance, 60 s/run), có CSV và raw evidence trong branch P2 trước khi merge. `docs/canonical_sat_config.md` đề xuất `order/pairwise/glucose4` cho Core `{cadical195, glucose4}`; P1/P3 vẫn phải xác nhận lựa chọn và phạm vi solver trước M2 freeze. Không coi pilot synthetic là benchmark 24 instance HB; official RQ3 vẫn phải chạy trên dữ liệu HB theo protocol và lưu raw JSON.
 7. **Freeze evidence:** kiểm tra số run/budget từ output plan và CNF estimate; test report 511 passed là trên code ở commit `799cfa0` (các commit `b1f37ef` và `a11911d` sau đó chỉ cập nhật tài liệu). Nếu có sửa code nữa, chạy lại full suite; gắn mọi số liệu với commit, cấu hình, máy và raw evidence.
+
+## 4.1. Blocker tích hợp dữ liệu với runner (phát hiện trong P1 review)
+
+`benchmark/hb/raw/*.mtx.rnd` là file text benchmark; `src.runner.run_one()` hiện đọc instance qua `src.sat.loader.read_instance()` và loader này chỉ nhận JSON theo schema chung. `scripts/dry_run_benchmark.py` chỉ xác nhận file nguồn tồn tại, không chuyển đổi sang JSON và không gọi solver. Do đó chưa có đường chạy end-to-end từ manifest HB tới exact pilot. P2/P3 phải cung cấp adapter/converter dùng chung, giữ đỉnh cô lập, quy tắc làm sạch cạnh và kiểm tra hash/header/n/m trước khi P1 chạy pilot.
 
 ## 5. Quyết định hiện tại
 
