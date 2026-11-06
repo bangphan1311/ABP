@@ -35,7 +35,7 @@ VALIDATION_IDS = (
     "pores_1", "bcsstk01", "bcspwr02", "curtis54", "will57",
     "impcol_b", "ash85", "nos4", "dwt_234", "bcspwr03",
 )
-LARGE_IDS = ("bcsstk06", "nos6", "can__715")
+LARGE_IDS = ("bcsstk06", "nos6", "can_715")
 EXACT_METHODS = ("cp_sat", "gurobi_mip", "cplex_mip", "cplex_cp")
 PILOT_TIME_LIMIT = 600.0
 PILOT_LARGE_TIME_LIMIT = 1800.0
