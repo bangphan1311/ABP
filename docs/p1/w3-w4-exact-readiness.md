@@ -52,6 +52,25 @@ classify the affected run as `ERR`; do not rewrite it as `TO` or omit the
 method from the audit trail. The pilot must record the actual run count if
 a solver is unavailable. No pilot result is asserted in this document.
 
+
+## 2.2 Integration blocker: HB input format versus runner input format
+
+The selected benchmark files are text `.mtx.rnd` edge-list files. The
+current shared runner calls `src.sat.loader.read_instance()`, whose contract
+accepts JSON objects with `id, name, n, edges, source, tier`. The plan-only
+`scripts/dry_run_benchmark.py` only checks that the `.mtx.rnd` source file
+exists; it does not convert the file, and it does not launch a solver.
+
+Therefore the 40-run exact pilot is **not yet executable end-to-end** from
+the current manifest paths through `src.runner.run_one()`. Before P1 runs
+the exact pilot, P2/P3 must provide and test one agreed integration path:
+(a) a deterministic HB `.mtx.rnd` → shared `Instance`/JSON conversion step,
+or (b) a loader adapter used by the runner. It must preserve isolated vertices,
+apply the documented undirected-edge de-duplication/self-loop policy, and
+check `n`, header `m`, `m_clean`, SHA-256 and instance ID against
+`MANIFEST.csv`. Do not build a private P1-only parser or claim the pilot ran
+until this common path and tests exist.
+
 ## 3. P1 degree-bound audit for the 24 HB instances
 
 For `Δ = delta_max`, the safe bound is `UB_degree = n − Δ`. The proof is
