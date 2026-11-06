@@ -30,6 +30,18 @@ uv run python scripts/inspect_hb.py
 
 Lệnh sẽ tạo/cập nhật `benchmark/hb/MANIFEST.csv`. Các trạng thái `MISSING`, `INVALID_FORMAT`, `REFERENCE_MISMATCH` và `INVALID_GRAPH` cần được điều tra; không được thay bằng số tham chiếu để tạo kết quả có vẻ hợp lệ.
 
+## Tích hợp với runner
+
+Sau khi `inspect_hb.py` tạo manifest hợp lệ, có thể đưa trực tiếp đường dẫn `benchmark/hb/raw/<file>.mtx.rnd` vào `src.runner.run_one()` hoặc CLI `python -m src.runner --instance ...`; không cần xuất JSON trung gian. Loader sẽ đối chiếu file với cả `MANIFEST.csv` và `instances.csv` trước khi worker chạy. File `.mtx.rnd` không có metadata sibling hợp lệ sẽ bị từ chối.
+
+Ví dụ cấu hình một lệnh smoke trên máy dev (không phải official run; official run vẫn phải dùng frozen host, memory cap và plan):
+
+```powershell
+uv run python -m src.runner --instance benchmark/hb/raw/pores_1.mtx.rnd --method cp_sat --time-limit 600
+```
+
+Lệnh trên chỉ nên dùng sau khi đã kiểm tra quyền solver/license và tài nguyên máy; không coi một lần chạy thủ công là kết quả benchmark chính thức.
+
 ## Các lệnh liên quan khác
 
 ```powershell
@@ -40,6 +52,6 @@ uv run python scripts/dry_run_benchmark.py --stage official --output results/off
 uv run python scripts/estimate_hb_cnf.py --name can__715
 ```
 
-`dry_run_benchmark.py` chỉ kiểm tra ma trận kế hoạch, số run và sự hiện diện của dữ liệu; nó không phải hàng đợi thực thi, không chạy solver và không tự áp giới hạn bộ nhớ. `estimate_hb_cnf.py` tính số biến/mệnh đề theo công thức ước lượng, không dựng toàn bộ CNF và không đo RAM đỉnh. Không dựng CNF lớn trước khi giới hạn bộ nhớ ở cấp hệ điều hành đã được kiểm chứng.
+`dry_run_benchmark.py` chỉ kiểm tra ma trận kế hoạch, số run và sự hiện diện của dữ liệu; nó không phải hàng đợi thực thi và không chạy solver. Đường nạp `.mtx.rnd` trực tiếp thuộc `src.sat.loader.read_instance()`/runner, không thuộc dry-run. Dry-run cũng không tự áp giới hạn bộ nhớ. `estimate_hb_cnf.py` tính số biến/mệnh đề theo công thức ước lượng, không dựng toàn bộ CNF và không đo RAM đỉnh. Không dựng CNF lớn trước khi giới hạn bộ nhớ ở cấp hệ điều hành đã được kiểm chứng.
 
 Nguồn tham chiếu cho các giá trị trong `instances.csv`: Sinnl (2021), bao gồm bảng tham chiếu lại Lozano et al. (2012): https://link.springer.com/article/10.1007/s10100-020-00688-4
