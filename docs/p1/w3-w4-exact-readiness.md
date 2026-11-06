@@ -32,7 +32,7 @@ predeclared sample of exact runs; P1 does not take over P3's runner.
 | Upper bound audit | 24/24 manifest rows are `VALID`; each row records `delta_max` and `ub_n_minus_delta` | Values tabulated in §3 below |
 | Gurobi/CPLEX entitlement check | Gurobi Academic small probe PASS; CPLEX MIP and CP Community Edition size/search limits confirmed; no CPLEX Academic entitlement verified | Partial; benchmark-scale Gurobi capacity and CPLEX entitlement remain unverified |
 | Exact pilot on actual HB validation subset | `experiments/pilot_exact_p1.py` now builds and runs the 10 × 4 plan with 600 s/run, resume, raw JSON and summary; CI plan/loader tests PASS on Ubuntu and Windows | **Script ready; actual 40 HB runs still not executed because raw files are absent from this workspace** |
-| Pilot on large HB instances | Protocol plans a 3-instance early-warning pilot after memory enforcement is verified; no saved exact pilot-large result set is recorded | **Blocked by host and memory-cap sign-off** |
+| Pilot on large HB instances | P1 exact-pilot runner supports 12 additional exact runs on `bcsstk06`, `nos6`, `can_715` at 1800 s/run; host/cap selected, target-host memory gate still requires recheck | **Not executed; requires real raw HB files and target-host memory test** |
 | Review SAT semantics/canonical candidate | P1 review agrees with `order / pairwise / glucose4` within the Core candidate set `{cadical195, glucose4}`; `minisat22` is outside that Core set | P1 proposal accepted within Core; synthetic-pilot transfer limitation must be reported |
 
 ### 2.1 Exact pilot that remains
@@ -162,11 +162,13 @@ contradicts the current code.
 | Protocol review | P1 has incorporated W3 review comments on K-search, UB, whole-run time budget, pilot budget, PAR2 and checkpoint semantics | Obtain final P2/P3 review; do not interpret earlier comments as final sign-off |
 | Resource/host freeze | P1 selected Windows build `10.0.26200`, 12 logical CPUs, 15.21 GiB RAM; 12.0 GiB/run cap, one worker | Recheck the exact host before running; the script enforces Windows build and minimum RAM, and the shared runner applies the Job Object cap |
 | Solver entitlement | Gurobi Academic tiny probe PASS; CPLEX Community limits confirmed; Kissat native not verified and protocol contingency excludes it from RQ2 | If CPLEX Academic is unavailable, retain CPLEX runs as `ERR` where entitlement blocks execution and state the limitation |
-| P1/P2 SAT specification cross-review | Protocol refers to `docs/sat_spec.md`; verify that the actual approved spec exists at that path and review it against K-search/encoding semantics | The referenced path returned 404 during this review; P2 must supply the canonical spec or P1 must update the protocol link to the approved existing document before freeze |
+| P1/P2 SAT specification cross-review | Protocol now refers to the existing draft `docs/handoff/w2-sat/14-sat-methodology.md` for encoding/K-search semantics | P1 must complete the technical cross-review against that draft; P2 must confirm whether it is the binding freeze specification or supply the approved canonical spec |
 | PR and release gates | PR #50 and PR #52 are open; P1 review on #52 is `CHANGES_REQUESTED`; P1 branch is diverged from `main` | Resolve #52 blockers, recheck compare and sync P1 branch after #52 settles, re-run tests, merge only after review gates |
 | Git tag `v1.0` | No tag recorded; protocol freeze conditions remain open | **Do not tag yet** |
 
 ## 6. Required P1 work during W4 official execution
+
+The predeclared 10-run sample is frozen in `docs/p1/exact_spot_check_plan.md` before official outcomes are inspected. The sample covers all four exact methods and both small/large tiers; use these exact run IDs after P3's official runner completes the corresponding runs.
 
 P3 operates the queue. P1's exact-side responsibilities are:
 
