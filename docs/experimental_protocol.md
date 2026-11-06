@@ -6,7 +6,7 @@
 **Owner:** P1 (coordinator)  
 **Review:** P2, P3
 
-Tài liệu này là nguồn duy nhất cho **thiết kế thực nghiệm**. [`docs/sat_spec.md`](sat_spec.md) ghi đặc tả W1 cho pairwise và K-search; [`docs/handoff/w2-sat/14-sat-methodology.md`](handoff/w2-sat/14-sat-methodology.md) mở rộng phần giải thích cho order encoding và AMO. Đây là tài liệu đặc tả/nháp methodology hiện có, phải được review đối chiếu với code và `CONTRACT.md`, không thay thế các giới hạn thực nghiệm trong protocol. P1/P2 phải review chéo ánh xạ `|p − q| < K` (cặp nhãn bị cấm) với `|f(u) − f(v)| ≥ K` (điều kiện cần thỏa) trước freeze. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
+Tài liệu này là nguồn duy nhất cho **thiết kế thực nghiệm**. Đường dẫn `docs/sat_spec.md` từng được viện dẫn trong bản nháp nhưng không tồn tại trên nhánh PR hiện tại. Tài liệu SAT chi tiết đang có là [`docs/handoff/w2-sat/14-sat-methodology.md`](handoff/w2-sat/14-sat-methodology.md), bao gồm pairwise/order encoding, AMO và K-search. Đây vẫn là bản nháp methodology; P2 phải xác nhận đây là tài liệu đặc tả dùng cho freeze hoặc cung cấp `docs/sat_spec.md` chính thức. P1/P2 phải review chéo ánh xạ `|p − q| < K` (cặp nhãn bị cấm) với `|f(u) − f(v)| ≥ K` (điều kiện cần thỏa) trước freeze. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
 
 ---
 
@@ -227,7 +227,7 @@ Nếu Kissat không qua xác minh và RQ2 chỉ dùng Glucose, RQ2 còn 10 run m
 4. Runner thực thi memory limit ở cấp process/OS; test process vượt ngưỡng bị chặn đúng và được phân loại `MO` đã lưu. Kill/resume test chứng minh checkpoint incumbent, validation lại và audit trail.
 5. SAT và exact đều tính `t_total` theo toàn ngân sách run, bao gồm build/encoding; test xác minh thời gian còn lại truyền cho từng probe/optimizer.
 6. Tập con, RQ, time/memory limit, máy và version solver đã khóa; khả năng chạy và giới hạn license của từng solver đã ghi rõ.
-7. `docs/sat_spec.md` được review chéo P1/P2 cho semantics encoding/K-search; P2 và P3 xác nhận các góp ý protocol đã được xử lý hoặc có quyết định được ghi rõ.
+7. `docs/handoff/w2-sat/14-sat-methodology.md` (hoặc tài liệu SAT spec chính thức do P2 cung cấp) được P1/P2 review chéo cho semantics encoding/K-search; P2 và P3 xác nhận các góp ý protocol đã được xử lý hoặc có quyết định được ghi rõ.
 
 Nếu còn điều kiện chưa đạt, giữ `1.0-rc`; không tag chỉ để kịp mốc.
 
