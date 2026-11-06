@@ -113,8 +113,9 @@ resource/host gates.
 ## 4.2. CI bằng chứng HB loader và P1 exact-pilot plan (06/11/2026)
 
 - Workflow `W3 checkpoint, runner and HB loader tests` chạy trên commit `5bbfbdc0dc4be9c1065837caa51bc5807d0699d5`.
-- Ubuntu: **20 passed**; Windows: **20 passed**. Gồm parser HB, provenance/hash validation, `run_one()` subprocess fixture, checkpoint và runner regressions.
-- `experiments/pilot_exact_p1.py` đã được thêm: 40 validation exact runs (600 s/run), một worker, cap 12 GiB; `--include-large` thêm 12 exact pilot-large runs (1800 s/run). Script prechecks host, 24-row inventory/manifest và đủ raw inputs trước khi launch solver.
+- Ubuntu: **23 passed in 4.87s**; Windows: **23 passed in 5.52s**. GitHub Actions run [42156221091](https://github.com/bangphan1311/ABP/actions/runs/42156221091), commit `06e5f8646306e65cf16a5519367b46758c39258e`. Gồm parser HB, provenance/hash validation, `run_one()` subprocess fixture, checkpoint/runner regressions và test kế hoạch exact pilot.
+- `experiments/pilot_exact_p1.py` đã được thêm: 40 validation exact runs (600 s/run), một worker, cap 12 GiB; `--include-large` thêm 12 exact pilot-large runs (1800 s/run). Script prechecks Windows build/RAM, 24-row inventory/manifest và đủ raw inputs trước khi launch solver. CI đã test plan/parser/subprocess fixtures, chưa chạy solver trên HB raw data thật.
+- `docs/p1/exact_spot_check_plan.md` đóng băng trước danh sách 10 exact runs để P1 kiểm tra độc lập khi P3 hoàn tất official queue.
 - 24 raw `.mtx.rnd` files không nằm trong Git vì `benchmark/hb/raw/` được gitignore; chúng không có trong workspace của phiên này. Do đó CI chỉ chứng minh parser/runner với fixture, chưa chạy actual HB exact pilot.
 
 ## 5. Quyết định hiện tại
