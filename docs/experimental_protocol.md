@@ -6,7 +6,7 @@
 **Owner:** P1 (coordinator)  
 **Review:** P2, P3
 
-Tài liệu này là nguồn duy nhất cho **thiết kế thực nghiệm**. Đường dẫn `docs/sat_spec.md` từng được viện dẫn trong bản nháp nhưng không tồn tại trên nhánh PR hiện tại. Tài liệu SAT chi tiết đang có là [`docs/handoff/w2-sat/14-sat-methodology.md`](handoff/w2-sat/14-sat-methodology.md), bao gồm pairwise/order encoding, AMO và K-search. Đây vẫn là bản nháp methodology; P2 phải xác nhận đây là tài liệu đặc tả dùng cho freeze hoặc cung cấp `docs/sat_spec.md` chính thức. P1/P2 phải review chéo ánh xạ `|p − q| < K` (cặp nhãn bị cấm) với `|f(u) − f(v)| ≥ K` (điều kiện cần thỏa) trước freeze. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
+Tài liệu này là nguồn duy nhất cho **thiết kế thực nghiệm**. Đường dẫn `docs/handoff/w2-sat/14-sat-methodology.md` từng được viện dẫn trong bản nháp nhưng không tồn tại trên nhánh PR hiện tại. Tài liệu SAT chi tiết đang có là [`docs/handoff/w2-sat/14-sat-methodology.md`](handoff/w2-sat/14-sat-methodology.md), bao gồm pairwise/order encoding, AMO và K-search. Đây vẫn là bản nháp methodology; P2 phải xác nhận đây là tài liệu đặc tả dùng cho freeze hoặc cung cấp `docs/handoff/w2-sat/14-sat-methodology.md` chính thức. P1/P2 phải review chéo ánh xạ `|p − q| < K` (cặp nhãn bị cấm) với `|f(u) − f(v)| ≥ K` (điều kiện cần thỏa) trước freeze. Khi các điều kiện ở Mục 12 được đáp ứng và nhóm xác nhận, protocol được khóa bằng tag `v1.0`.
 
 ---
 
@@ -96,7 +96,7 @@ Không có RQ4; Bonus không đánh số RQ. Mỗi RQ trình bày theo chuỗi: 
 1. Khởi tạo `LB = 0`; có thể dùng heuristic để lấy incumbent ban đầu, nhưng thời gian heuristic tính vào `t_total`. Mọi incumbent phải qua `verify()` độc lập.
 2. Cận trên hợp lệ tính từ bậc lớn nhất `Δ = max_v deg(v)`: `UB = n − Δ` (với instance có ít nhất một cạnh). Lý do: một đỉnh bậc `Δ` phải có `Δ` nhãn hàng xóm cách nhãn của nó ít nhất K, trong khi có nhiều nhất `n − K` nhãn khả dụng ở khoảng cách đó; vì vậy `K ≤ n − Δ`. P1/P2 phải xác nhận lập luận và kiểm tra `1 ≤ UB ≤ n − 1` trên toàn bộ instance trước freeze. Không dùng cận từ literature làm đầu vào solver.
 3. Nếu incumbent đã verify có giá trị `B = UB`, về mặt toán học incumbent đạt cận trên. Tuy nhiên, theo contract/SAT methodology hiện tại, `ub` ngoài chỉ được kiểm tra và `OPT` vẫn cần bằng chứng UNSAT tại ngưỡng tiếp theo; **không** tự trả `OPT` chỉ từ cận ngoài. Tiếp tục probe `K = B + 1` để lưu bằng chứng UNSAT theo cơ chế hiện hành. Chỉ thay đổi quy tắc này nếu P1/P2 cập nhật đồng bộ `CONTRACT.md`, implementation và correctness tests trước freeze.
-4. Với mỗi K, mã hóa CNF bài toán quyết định `|f(u) − f(v)| ≥ K`. Trong encoding nhãn `p, q`, các cặp có `|p − q| < K` bị cấm; do đó P1/P2 phải review ánh xạ này cùng `docs/sat_spec.md` để tránh lệch một đơn vị.
+4. Với mỗi K, mã hóa CNF bài toán quyết định `|f(u) − f(v)| ≥ K`. Trong encoding nhãn `p, q`, các cặp có `|p − q| < K` bị cấm; do đó P1/P2 phải review ánh xạ này cùng `docs/handoff/w2-sat/14-sat-methodology.md` để tránh lệch một đơn vị.
 5. Nếu SAT: giải mã nghiệm, chạy `verify()`, tính antibandwidth thực tế `B`, cập nhật incumbent và đặt `K ← B + 1` (không chỉ `K + 1`). Nếu UNSAT tại K sau một incumbent đã verify B, thì B là tối ưu (`OPT`).
 6. Mỗi lần gọi solver nhận **thời gian còn lại của ngân sách toàn run**, không được khởi động lại toàn bộ time limit cho từng K. Nếu hết ngân sách mà đã có incumbent hợp lệ nhưng chưa chứng minh tối ưu, trả `FEAS`; nếu chưa có incumbent hợp lệ, trả `TO`.
 7. Labeling trả về nhưng không qua `verify()` không được nhận làm incumbent. Ghi rõ lỗi validation vào raw evidence và phân loại `ERR` theo `CONTRACT.md` (đầu ra sai/hỏng), không giả định nó là `FEAS` hoặc `TO` rồi bỏ qua lỗi.
@@ -255,7 +255,7 @@ Nếu còn điều kiện chưa đạt, giữ `1.0-rc`; không tag chỉ để k
 |---|---|---|---|
 | Xin thầy 24 file `.mtx.rnd`, xác minh ý nghĩa `.rnd`, xác nhận nguồn/định dạng | P1 | P2 | Cập nhật trạng thái từng file; lưu câu trả lời/nguồn vào `docs/w3_preflight.md`; không điền số liệu chưa xác minh |
 | `instances.csv`, loader, `MANIFEST.csv` và test cả 24 instance | P2 | P3 + P1 | `benchmark/hb/instances.csv`, `benchmark/hb/MANIFEST.csv`; SHA-256, n/header m/cleaned m; test pass 24/24 hoặc danh sách lỗi cụ thể |
-| Kiểm tra cận `UB = n − Δ` và review semantics encoding/K-search | P1 | P2 | Lập bảng `n, m, Δ, UB` cho 24 instance; P2 xác nhận lập luận và đối chiếu `docs/sat_spec.md` |
+| Kiểm tra cận `UB = n − Δ` và review semantics encoding/K-search | P1 | P2 | Lập bảng `n, m, Δ, UB` cho 24 instance; P2 xác nhận lập luận và đối chiếu `docs/handoff/w2-sat/14-sat-methodology.md` |
 | Kiểm tra license Gurobi/CPLEX và inventory môi trường/máy/RAM | P1 | P2 + P3 | `docs/w3_preflight.md` có CPU, RAM, OS, Python, version solver, cách gọi, giới hạn license; không chứa secret/license key |
 | Time limit SAT/exact tính cả build và toàn chuỗi K | P1 | P3 + P2 | Test xác nhận `t_total`, thời gian còn lại mỗi probe/optimizer, timeout và status theo contract |
 | Kiểm tra AMO pairwise có clause trùng; xác nhận order AMO no-op | P2 | P1 | Test/report clause duplicate; bảng 3 cấu hình CNF khác nhau và lý do bỏ ô order × seqcounter khỏi pilot |
