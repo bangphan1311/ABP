@@ -24,7 +24,7 @@ official results so P1 cannot select only successful or suspicious runs.
 | 2 | large | `can_715` (`can__715`) | `cp_sat` | `can_715__cp_sat__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 3 | small | `will57` | `cp_sat` | `will57__cp_sat__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 4 | small | `bcsstk01` | `gurobi_mip` | `bcsstk01__gurobi_mip__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
-| 5 | large | `can__445` | `gurobi_mip` | `can__445__gurobi_mip__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
+| 5 | large | `can_445` (`can__445`) | `gurobi_mip` | `can_445__gurobi_mip__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 6 | small | `bcspwr02` | `cplex_mip` | `bcspwr02__cplex_mip__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 7 | large | `bcsstk07` | `cplex_mip` | `bcsstk07__cplex_mip__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
 | 8 | small | `ash85` | `cplex_cp` | `ash85__cplex_cp__na__na__na__na__sym0__ws0__s0__tl1800.0__ml12.0` |
