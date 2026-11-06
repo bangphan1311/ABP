@@ -26,7 +26,7 @@
 | Ngân sách thời gian | `IMPLEMENTED_AND_TESTED; FINAL_REVIEW_PENDING` | Code exact truyền phần thời gian còn lại sau model build; nếu build đã dùng hết ngân sách thì không bắt đầu search. Có test ở `tests/exact/test_time_budget.py`; full local suite được báo cáo PASS. P2/P3 cần xác nhận contract, code và status accounting thống nhất trong review cuối. |
 | Dry-run / ước lượng CNF | `PLAN_ONLY_TOOLS_AVAILABLE` | `scripts/dry_run_benchmark.py` sinh ma trận kế hoạch, không gọi solver và không enforce memory limit; `scripts/estimate_hb_cnf.py` là ước lượng công thức, không dựng CNF hoặc đo peak RAM. Trước freeze cần lưu đầu ra plan/estimate, kiểm tra số run và ghi rõ ước lượng không phải số đo thực nghiệm. |
 | W3 pilot và canonical SAT config | `PILOT_COMPLETE_SYNTHETIC; GROUP_SIGNOFF_PENDING` | P2 đã merge PR #51 ngày 01/11/2026. Pilot chạy trên 10 đồ thị synthetic cố định (8 validation n=8..28, 2 large n=40,50), time limit 60 s/run; không phải 24 đồ thị Harwell–Boeing. RQ1: `order` 10/10 OPT; hai cấu hình `pairwise` 9/10 OPT + 1 FEAS. RQ2: cả 4 PySAT solver 10/10 OPT; trong Core `{cadical195, glucose4}`, `glucose4` có PAR2/tổng thời gian 17.13 s so với 23.24 s của CaDiCaL; `minisat22` nhanh nhất toàn bộ 4 solver (16.61 s) nhưng là baseline ngoài Core. `docs/canonical_sat_config.md` trên `main` đề xuất `order/pairwise/glucose4` theo Core; P1 đã xác nhận lựa chọn này trong review PR #52, còn sign-off P3 và việc cố định memory cap trong frozen run plan vẫn chờ. PR #52 đang đưa cấu hình này vào code. Không dùng pilot synthetic làm kết quả official RQ3. |
-| Máy chính thức và phạm vi solver | `PENDING_GROUP_DECISION` | Cần chốt máy/OS/RAM/cap, xác nhận Gurobi sẽ dùng trên máy đó, xử lý giới hạn CPLEX MIP/CP (xin Academic hoặc nhóm chấp nhận ghi `ERR` và giới hạn phạm vi báo cáo), và loại Kissat khỏi RQ2 nếu không xác minh được. |
+| Máy candidate và phạm vi solver | `P1_SELECTED; FINAL FREEZE GATES OPEN` | P1 chọn snapshot Windows build `10.0.26200`, 12 logical CPUs, RAM 15.21 GiB làm candidate host; cap 12.0 GiB/run, một worker tuần tự (headroom khoảng 3.21 GiB). Gurobi Academic được phép thử tiếp nhưng cần benchmark-scale evidence; CPLEX MIP/CP giữ trong kế hoạch, mọi Community Edition size/license failures ghi `ERR`; Kissat native chưa xác minh nên loại khỏi RQ2 Core; canonical SAT theo Core là `order/pairwise/glucose4`. Recheck host/version/license trước pilot và official; không tag v1.0 khi các gate khác còn mở. |
 
 
 ## 1.1. Cập nhật tích hợp GitHub (06/11/2026)
@@ -84,9 +84,9 @@ Hệ quả thực tế: không chạy pilot-large hoặc official SAT trên `can
 
 ## 4. Gates còn mở trước freeze
 
-1. **Chốt máy benchmark chính thức:** nhóm xác nhận máy, OS, CPU, RAM, Python/package/solver versions, policy chạy song song và memory cap. Snapshot RAM 15.21 GiB đã có; không cần đo lại chỉ để điền tài liệu.
+1. **Host candidate do P1 chọn:** dùng Windows build `10.0.26200`, 12 logical CPUs, RAM 15.21 GiB; cap 12.0 GiB/run và một worker tuần tự. Trước mỗi đợt, kiểm tra host còn khớp snapshot; nếu khác thì dừng và cập nhật protocol.
 2. **Chốt khả năng dùng solver:** Gurobi Academic tiny probe đã PASS. CPLEX MIP/CP hiện bị chặn bởi Community Edition ở probe lớn; xin Academic license hoặc ghi quyết định nhóm về phạm vi/nhãn `ERR`. Xác minh Kissat native hoặc loại khỏi RQ2 theo phương án contingency trong protocol.
-3. **Memory limit:** đã có CI PASS và full suite local Windows 511 passed được báo cáo; suite chứa test cap 0.125 GiB/worker 192 MiB và assert `MO`/`MemoryError`. Nếu chọn máy Windows snapshot 15.21 GiB làm host official, có thể dùng đây làm bằng chứng kiểm tra enforcement cơ bản. Chốt cap benchmark thực tế theo RAM và chính sách chạy song song; không cần đo RAM lại chỉ để lặp thông tin đã có.
+3. **Memory limit:** P1 chọn 12.0 GiB/run trên Windows, một worker. Local full-suite report 511 passed trước đó chứa test cap 0.125 GiB/worker 192 MiB và assert `MO`/`MemoryError`; CI W3 kiểm tra thêm runner trên Windows/Ubuntu. Đây là bằng chứng enforcement mức kiểm thử, không thay thế kiểm tra lần cuối trên đúng host trước pilot/official.
 4. **Checkpoint/resume:** CI và local full-suite report bao gồm test hard kill, restore incumbent SAT đã verify, và audit trail/corrupt JSON. Nếu chọn máy Windows snapshot làm official host, ghi nhận evidence này. Exact incumbent checkpoint chưa được implement; giữ rõ giới hạn này, không tuyên bố exact có khả năng resume incumbent.
 5. **Final review của P2/P3:** P2 xác nhận tài liệu SAT spec chính thức (hiện có bản draft `docs/handoff/w2-sat/14-sat-methodology.md`), ánh xạ khoảng cách/K-search, cận `UB = n - Δ`, correctness và pilot design. P3 xác nhận runner/schema, kill/resume, memory/status, thời gian tổng và dry-run/budget. Ghi quyết định cho từng góp ý thay vì để trạng thái mơ hồ.
 6. **Pilot và canonical config:** pilot RQ1/RQ2 W3 đã được chạy và merge qua PR #51 trên tập synthetic (10 instance, 60 s/run), có CSV và raw evidence trong branch P2 trước khi merge. `docs/canonical_sat_config.md` đề xuất `order/pairwise/glucose4` cho Core `{cadical195, glucose4}`; P1/P3 vẫn phải xác nhận lựa chọn và phạm vi solver trước M2 freeze. Không coi pilot synthetic là benchmark 24 instance HB; official RQ3 vẫn phải chạy trên dữ liệu HB theo protocol và lưu raw JSON.
@@ -110,8 +110,15 @@ not the actual 40-run exact pilot. The pilot still requires the real raw
 files plus the matching manifest on the execution host and the remaining
 resource/host gates.
 
+## 4.2. CI bằng chứng HB loader và P1 exact-pilot plan (06/11/2026)
+
+- Workflow `W3 checkpoint, runner and HB loader tests` chạy trên commit `5bbfbdc0dc4be9c1065837caa51bc5807d0699d5`.
+- Ubuntu: **20 passed**; Windows: **20 passed**. Gồm parser HB, provenance/hash validation, `run_one()` subprocess fixture, checkpoint và runner regressions.
+- `experiments/pilot_exact_p1.py` đã được thêm: 40 validation exact runs (600 s/run), một worker, cap 12 GiB; `--include-large` thêm 12 exact pilot-large runs (1800 s/run). Script prechecks host, 24-row inventory/manifest và đủ raw inputs trước khi launch solver.
+- 24 raw `.mtx.rnd` files không nằm trong Git vì `benchmark/hb/raw/` được gitignore; chúng không có trong workspace của phiên này. Do đó CI chỉ chứng minh parser/runner với fixture, chưa chạy actual HB exact pilot.
+
 ## 5. Quyết định hiện tại
 
-**Giữ phiên bản `1.0-rc`; chưa tạo tag `v1.0`.** Những phần đã có bằng chứng gồm manifest 24 instance, snapshot máy/RAM, local test-suite report, tiny probes, Gurobi Academic tiny probe và CI checkpoint/memory-limit tương ứng. Các blocker còn lại là quyết định máy official/phạm vi solver, kiểm thử trên target host, re-review P2/P3 và pilot/canonical SAT config. Không đánh dấu benchmark chính thức sẵn sàng chỉ dựa trên CI hoặc mô hình nhỏ.
+**Giữ phiên bản `1.0-rc`; chưa tạo tag `v1.0`.** P1 đã chọn candidate Windows host/cap 12 GiB, giữ CPLEX trong run plan với policy `ERR` khi Community Edition chặn, loại Kissat khỏi RQ2 Core và chấp nhận canonical SAT `order/pairwise/glucose4`. Vẫn còn: xác minh raw HB files trên candidate host, chạy exact pilot 40 runs, P3 kiểm tra resource/runner và vận hành official queue, re-review/freeze evidence theo §12. Không đánh dấu benchmark chính thức sẵn sàng chỉ dựa trên CI hoặc mô hình nhỏ.
 
 PR theo dõi: https://github.com/bangphan1311/ABP/pull/50
