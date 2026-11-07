@@ -58,7 +58,21 @@ Each cell is `STATUS (lb, ub)`; `ERR` means the backend did not produce a usable
 
 The `lb/ub` pairs above are the values recorded by the runner for each method. In particular, a `FEAS` row must not be described as an optimum. The degree-based bound `n - Δ` documented in `docs/exact_models.md` is a separate safe external bound and is not asserted to have been injected into every exact model.
 
-## 4. Interpretation and limitations
+
+## 4. PAR2 under the frozen pilot rule
+
+Experimental Protocol §9.2 assigns a 1,200 s penalty to every non-OPT exact-pilot run (including FEAS, TO, MO, ERR and an unreplaced missing run). OPT runs contribute their recorded runner `wall_time`.
+
+| Exact backend | OPT wall-time sum (s) | Non-OPT runs | PAR2 (s) |
+|---|---:|---:|---:|
+| CP-SAT | 127.012 | 4 | 4,927.012 |
+| Gurobi MIP | 0.000 | 10 | 12,000.000 |
+| CPLEX MIP | 0.000 | 10 | 12,000.000 |
+| CPLEX CP | 45.805 | 5 | 6,045.805 |
+
+The computed values apply the protocol formula literally. Because Gurobi MIP and CPLEX MIP are predominantly or entirely blocked by the installed license editions, their PAR2 values are audit results under the protocol's penalty rule, **not an isolated measure of intrinsic solver speed or formulation quality**. Do not use this table alone to rank the mathematical formulations.
+
+## 5. Interpretation and limitations
 
 1. **Proof coverage:** CP-SAT proved optimality on 6/10 validation instances; CPLEX CP proved optimality on 5/10. The pilot alone is not a statistically broad performance comparison.
 2. **Incumbent coverage:** both CP-SAT and CPLEX CP returned verified feasible incumbents on all 10 instances. Gurobi returned one feasible incumbent before its remaining nine runs were blocked by the size-limited license. CPLEX MIP returned no usable run under the installed Community Edition.
@@ -66,7 +80,7 @@ The `lb/ub` pairs above are the values recorded by the runner for each method. I
 4. **License limitations:** CPLEX MIP's 10 errors and Gurobi MIP's 9 errors must be disclosed as environment/license constraints. Do not compare their error totals as solver performance, and do not relabel them as `TO`.
 5. **Scope:** the subset pilot checks formulation, entitlement, runtime and incumbent behavior. It does not replace the 24-instance official benchmark, does not close the protocol freeze gates, and does not authorize claiming final RQ3 conclusions.
 
-## 5. Required follow-up
+## 6. Required follow-up
 
 - Preserve all 40 raw JSON attempts and the generated summary CSV as audit evidence; do not overwrite or discard the original attempts.
 - Decide with the team whether an academic/appropriately sized Gurobi and CPLEX entitlement can be made available. If not, retain the recorded failures and state the resulting comparison limitation.
