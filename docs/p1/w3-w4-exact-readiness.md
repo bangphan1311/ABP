@@ -31,11 +31,11 @@ predeclared sample of exact runs; P1 does not take over P3's runner.
 | Whole-run exact time accounting | Exact backends subtract model-build elapsed time before passing the remaining budget to the optimizer; `tests/exact/test_time_budget.py` covers remaining-budget arithmetic | Implemented in code; protocol/documentation alignment needed |
 | Upper bound audit | 24/24 manifest rows are `VALID`; each row records `delta_max` and `ub_n_minus_delta` | Values tabulated in §3 below |
 | Gurobi/CPLEX entitlement check | Gurobi Academic small probe PASS; CPLEX MIP and CP Community Edition size/search limits confirmed; no CPLEX Academic entitlement verified | Partial; benchmark-scale Gurobi capacity and CPLEX entitlement remain unverified |
-| Exact pilot on actual HB validation subset | `experiments/pilot_exact_p1.py` builds the 10 × 4 plan with 600 s/run, 12 GiB cap, sequential execution, resume, raw JSON and summary; CI pilot-plan/loader tests PASS on Ubuntu and Windows | **Script ready; actual 40 HB runs still not executed because raw files are absent from this workspace** |
+| Exact pilot on actual HB validation subset | `experiments/pilot_exact_p1.py`; local execution record and derived report `docs/p1/exact_pilot_report_2026-11-07.md`; 10 × 4 runs completed on the selected Windows host | **40/40 completed locally on 2026-11-07; raw JSON + summary remain untracked in the operator checkout and must be committed/preserved as audit evidence** |
 | Pilot on large HB instances | P1 exact-pilot runner supports 12 additional exact runs on `bcsstk06`, `nos6`, `can_715` at 1800 s/run; host/cap selected, target-host memory gate still requires recheck | **Not executed; requires real raw HB files and target-host memory test** |
 | Review SAT semantics/canonical candidate | P1 review agrees with `order / pairwise / glucose4` within the Core candidate set `{cadical195, glucose4}`; `minisat22` is outside that Core set | P1 proposal accepted within Core; synthetic-pilot transfer limitation must be reported |
 
-### 2.1 Exact pilot that remains
+### 2.1 Exact pilot execution record (completed 2026-11-07)
 
 P1's executable pilot command (run from repository root on the selected Windows host, after confirming the raw HB files and manifest are present):
 
