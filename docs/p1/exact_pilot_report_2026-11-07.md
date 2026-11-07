@@ -19,7 +19,7 @@
 | Resume | Enabled |
 | Planned / completed | 40 / 40 |
 
-The local runner wrote raw JSON under `results/pilot_exact/raw` and the derived table to `results/pilot_exact/summary.csv`. These are local execution artifacts; this report records the summary supplied from that run and does not claim that the raw JSON files have been committed to the repository.
+The branch `p1/w3-experimental-protocol-rc` contains all 40 individual raw JSON records under `results/pilot_exact/raw/` and the derived `results/pilot_exact/summary.csv`; the directory was checked on GitHub and contains exactly 40 JSON files. Preserve these original attempts as immutable audit evidence.
 
 ## 2. Overall outcomes
 
