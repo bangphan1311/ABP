@@ -31,7 +31,7 @@ predeclared sample of exact runs; P1 does not take over P3's runner.
 | Whole-run exact time accounting | Exact backends subtract model-build elapsed time before passing the remaining budget to the optimizer; `tests/exact/test_time_budget.py` covers remaining-budget arithmetic | Implemented in code; protocol/documentation alignment needed |
 | Upper bound audit | 24/24 manifest rows are `VALID`; each row records `delta_max` and `ub_n_minus_delta` | Values tabulated in §3 below |
 | Gurobi/CPLEX entitlement check | Gurobi Academic small probe PASS; CPLEX MIP and CP Community Edition size/search limits confirmed; no CPLEX Academic entitlement verified | Partial; benchmark-scale Gurobi capacity and CPLEX entitlement remain unverified |
-| Exact pilot on actual HB validation subset | `experiments/pilot_exact_p1.py`; local execution record and derived report `docs/p1/exact_pilot_report_2026-11-07.md`; 10 × 4 runs completed on the selected Windows host | **40/40 completed locally on 2026-11-07; raw JSON + summary remain untracked in the operator checkout and must be committed/preserved as audit evidence** |
+| Exact pilot on actual HB validation subset | `experiments/pilot_exact_p1.py`; local execution record and derived report `docs/p1/exact_pilot_report_2026-11-07.md`; 10 × 4 runs completed on the selected Windows host | **40/40 completed on 2026-11-07; GitHub branch contains all 40 raw JSON files and `summary.csv`. Independent solution verification and official-run spot-check remain pending.** |
 | Pilot on large HB instances | P1 exact-pilot runner supports 12 additional exact runs on `bcsstk06`, `nos6`, `can_715` at 1800 s/run; host/cap selected, target-host memory gate still requires recheck | **Not executed; requires real raw HB files and target-host memory test** |
 | Review SAT semantics/canonical candidate | P1 review agrees with `order / pairwise / glucose4` within the Core candidate set `{cadical195, glucose4}`; `minisat22` is outside that Core set | P1 proposal accepted within Core; synthetic-pilot transfer limitation must be reported |
 
@@ -58,7 +58,7 @@ The protocol plan is:
 A pilot is an environment/formulation risk check, not evidence for RQ3.
 Where a CPLEX Community Edition limit is hit, retain the raw error and
 classify the affected run as `ERR`; do not rewrite it as `TO` or omit the
-method from the audit trail. The pilot must record the actual run count if a solver is unavailable. CPLEX Community Edition errors remain raw `ERR` records and do not stop later methods. The script writes raw JSON through the shared runner plus a derived `results/pilot_exact/summary.csv`. No pilot result is asserted in this document until the script has run against the real HB raw files.
+method from the audit trail. The pilot must record the actual run count if a solver is unavailable. CPLEX Community Edition errors remain raw `ERR` records and do not stop later methods. The script writes raw JSON through the shared runner plus a derived `results/pilot_exact/summary.csv`. The actual 40-run HB validation pilot completed on 2026-11-07 using the real manifest-checked HB inputs. Outcomes and PAR2 are recorded in `docs/p1/exact_pilot_report_2026-11-07.md`; this remains an engineering pilot, not the official RQ3 benchmark.
 
 
 ## 2.2 HB input → shared runner integration (implemented)
@@ -87,11 +87,7 @@ and Windows. GitHub Actions run `42156873444` completed successfully on the
 final documented branch head: Ubuntu **23 passed**, Windows **23 passed**.
 This is fixture/plan CI evidence, not an actual HB solver pilot.
 
-This closes the **code integration** gap. It does not establish that the real
-24 raw files are present in a given checkout: `benchmark/hb/raw/` is
-gitignored. The 40-run HB exact pilot is still pending until the official raw
-files and matching manifest are available on the machine where the pilot is
-executed, and until the protocol's resource/host gates are met.
+This closes the **code integration** gap. The actual 40-run Exact Pilot has since completed on the selected Windows host against the HB validation subset; the branch contains 40 raw JSON files plus `summary.csv`, with details in `docs/p1/exact_pilot_report_2026-11-07.md`. `benchmark/hb/raw/` remains gitignored, so source files must be available on whichever host P3 selects for the official queue. The pilot's `memory_limit=12.0` metadata records the configured cap but does not include `peak_memory`; this does not replace P3's required hard-memory enforcement/kill evidence and sign-off.
 
 ## 3. P1 degree-bound audit for the 24 HB instances
 
@@ -159,11 +155,11 @@ contradicts the current code.
 | M2 requirement | Current state | P1 action |
 |---|---|---|
 | Confirm exact configuration and formulations | Formulations are represented in code and small-oracle tests | Re-run correctness suite on the freeze candidate and retain log + commit SHA |
-| Confirm canonical SAT configuration | P1 agrees with `order / pairwise / glucose4` within the Core set `{cadical195, glucose4}` | Keep this as the pre-official proposal; record that the pilot was synthetic (10 graphs, 60 s/run), not the HB validation subset |
+| Confirm canonical SAT configuration | P1 agrees with `order / pairwise / glucose4` within the Core set `{cadical195, glucose4}` | Keep `order / pairwise / glucose4` as the pre-official Core proposal, subject to P3 sign-off and a frozen run config with an explicit non-null memory cap. Distinguish the SAT selection pilot (10 synthetic graphs, 60 s/run) from the separately completed HB Exact Pilot (10 HB graphs × 4 exact solvers). |
 | Protocol review | P1 has incorporated W3 review comments on K-search, UB, whole-run time budget, pilot budget, PAR2 and checkpoint semantics | Obtain final P2/P3 review; do not interpret earlier comments as final sign-off |
 | Resource/host freeze | P1 selected Windows build `10.0.26200`, 12 logical CPUs, 15.21 GiB RAM; 12.0 GiB/run cap, one worker | Recheck the exact host before running; the script enforces Windows build and minimum RAM, and the shared runner applies the Job Object cap |
 | Solver entitlement | Gurobi Academic tiny probe PASS; CPLEX Community limits confirmed; Kissat native not verified and protocol contingency excludes it from RQ2 | If CPLEX Academic is unavailable, retain CPLEX runs as `ERR` where entitlement blocks execution and state the limitation |
-| P1/P2 SAT specification cross-review | Protocol now refers to the existing draft `docs/handoff/w2-sat/14-sat-methodology.md` for encoding/K-search semantics | P1 must complete the technical cross-review against that draft; P2 must confirm whether it is the binding freeze specification or supply the approved canonical spec |
+| P1/P2 SAT specification cross-review | Protocol now refers to the existing draft `docs/handoff/w2-sat/14-sat-methodology.md` for encoding/K-search semantics | P1 has reviewed the draft's K-search/objective/status semantics; P2 must confirm whether `docs/handoff/w2-sat/14-sat-methodology.md` is the binding freeze specification or supply the approved canonical spec. The draft is not silently promoted to a frozen spec. |
 | PR and release gates | PR #50 and PR #52 are open; P1 review on #52 is `CHANGES_REQUESTED`; P1 branch is diverged from `main` | Resolve #52 blockers, recheck compare and sync P1 branch after #52 settles, re-run tests, merge only after review gates |
 | Git tag `v1.0` | No tag recorded; protocol freeze conditions remain open | **Do not tag yet** |
 
