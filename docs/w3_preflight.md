@@ -13,7 +13,7 @@
 | Tệp ZIP chính thức | `DOWNLOADED_AND_HASHED_LOCALLY` | Tệp được liên kết từ trang Optsicom: https://grafo.etsii.urjc.es/optsicom/abp/hb.zip. SHA-256 của ZIP đã tải: `C7B39A13A37707A09F36408273DB75D6A8BC1CB40E071AC960C724E1F58F6E7E`. |
 | Kiểm tra 24 tệp dữ liệu | `PASS_LOCAL_CHECK` | `benchmark/hb/MANIFEST.csv` có 24 dòng, tất cả `VALID`; `n` và `m` khớp giá trị tham chiếu; không phát hiện self-loop hoặc cạnh vô hướng trùng lặp. Các tệp dữ liệu thô nằm cục bộ trong `benchmark/hb/raw/`, không commit lên Git. |
 | Số liệu đồ thị thực tế | `RECORDED_IN_MANIFEST` | Manifest ghi SHA-256 từng tệp, header, số dòng cạnh, `m_clean`, số cạnh bị loại, `delta_max` và `ub_n_minus_delta = n - delta_max`. |
-| Kiểm thử tự động | `LOCAL_FULL_SUITE_PASS_REPORTED` | Lần chạy mới nhất được báo cáo trên máy Windows: `uv run pytest tests -q` → **511 passed in 21.31s**. Đây là kết quả local; chạy lại trên commit/code cuối trước khi freeze và giữ log làm bằng chứng. |
+| Kiểm thử tự động | `LOCAL_FULL_SUITE_PASS_REPORTED; FINAL_CANDIDATE_RERUN_REQUIRED` | Bằng chứng cũ: `uv run pytest tests -q` → **511 passed in 21.31s** trên commit được ghi trong preflight. PR #52 báo cáo 514 passed/3 skipped nhưng review P1 phát hiện freeze doc ghi 512/3; P2 phải đối chiếu log và commit thật. Chạy lại suite trên freeze candidate sau khi PR #52 được sửa và nhánh được đồng bộ. |
 | Kiểm tra nhanh solver | `TINY_PROBES_PASS; LARGE_MODEL_LIMITS_SEPARATELY_CHECKED` | Smoke test nhỏ PASS cho CP-SAT, CaDiCaL, Glucose, Gurobi MIP, CPLEX MIP và CPLEX CP. Tiny probe chỉ chứng minh mô hình nhỏ chạy được, không chứng minh năng lực xử lý instance benchmark. |
 | Máy candidate do P1 chọn | `P1_SELECTED; RECHECK_BEFORE_RUN` | Windows 10.0.26200; Python 3.11.16; AMD64; 12 logical CPUs; RAM 15.21 GiB. P1 chọn cap 12.0 GiB/run và 1 worker tuần tự; script exact-pilot từ chối chạy nếu OS build/RAM không đạt điều kiện. |
 | Phiên bản gói ghi nhận | `LOCAL_ENVIRONMENT` | OR-Tools 9.15.6755; python-sat 1.9.dev15; pytest 9.1.1; gurobipy 13.0.3; cplex 22.2.0.1; docplex 2.32.264. `psutil` không có; script preflight có fallback đọc RAM trên Windows. |
@@ -32,11 +32,11 @@
 ## 1.1. Cập nhật tích hợp GitHub (06/11/2026)
 
 - P2 PR #51 (`p2/w3-pilots`) đã merge vào `main` ngày 01/11/2026, commit merge `276c6c0`; gồm pilot RQ1/RQ2, CSV kết quả và bản nháp technical appendix.
-- P2 PR #52 (`p2/w4-sat`) đang mở; thêm canonical config trong code, SAT triage và phân tích RQ1/RQ2/G3. PR body báo cáo 514 passed, 3 skipped; tài liệu `docs/w4-sat/21-m2-freeze-v1.md` lại ghi 512 passed, 3 skipped — cần P2 thống nhất số liệu theo đúng commit/test log.
+- P2 PR #52 (`p2/w4-sat`) vẫn mở. P1 review đang `CHANGES_REQUESTED` với sáu mục: G3 expected-run denominator; lọc trục RQ1/RQ2; default memory cap rỗng; triage thiếu instance; lệch test count 514/3 so với 512/3; PR summary chưa khai báo runner changes. P2 cần sửa và đính kèm test evidence trước re-review.
 - PR P1 #50 hiện có nhánh `p1/w3-experimental-protocol-rc` diverged so với `main`. Cần kiểm tra lại compare ngay trước khi đồng bộ; nên cập nhật `main` sau khi PR #52 chốt để tránh phải đồng bộ lặp lại.
 - PR #50 và #52 chưa được merge; chưa tạo tag `v1.0`.
 - P1 đã cập nhật `docs/exact_models.md` về formulation, cận độ bậc và timing; thêm/cập nhật `docs/p1/w3-w4-exact-readiness.md` làm checklist W3–W4 và bảng UB cho 24 instance.
-- Review code phát hiện `src/runner.run_one()` hiện nhận JSON qua `read_instance()`, trong khi dữ liệu HB là `.mtx.rnd`; `scripts/dry_run_benchmark.py` chỉ lập kế hoạch, không chuyển dữ liệu. P2/P3 cần chốt adapter/chuyển đổi chung và test trước exact pilot.
+- Loader `.mtx.rnd` đã được tích hợp trực tiếp vào shared `read_instance()`; CI có parser/hash/manifest và `run_one()` fixture tests. Không còn blocker adapter HB ở mức code. P3 vẫn phải sign-off pipeline chính thức: raw output → validation → `runs.csv`, resource limits và checkpoint/resume.
 - Đường dẫn `docs/sat_spec.md` được protocol viện dẫn không tồn tại trên nhánh PR hiện tại. Protocol đã được cập nhật để tham chiếu bản draft hiện có `docs/handoff/w2-sat/14-sat-methodology.md`; cần P2 xác nhận đây là spec ràng buộc trước freeze.
 
 ## 2. Cách tái tạo kiểm tra dữ liệu
@@ -103,23 +103,33 @@ required. Tests cover the parser and an end-to-end runner subprocess using a
 small fixture. The Linux/Windows workflow now includes these tests; its
 result must be checked before calling this gate PASS.
 
-The remaining data-level limitation is separate: `benchmark/hb/raw/` is
-gitignored, and the real 24 files are not present in the current agent
-workspace. Therefore this update closes the shared-code integration gap,
-not the actual 40-run exact pilot. The pilot still requires the real raw
-files plus the matching manifest on the execution host and the remaining
-resource/host gates.
+The remaining data-level limitation is separate: `benchmark/hb/raw/` is gitignored, so the source files must be present on the machine selected by P3 for the official queue. The 40-run HB validation-subset Exact Pilot has since completed on 2026-11-07; see §4.3 below. This does not sign off the official resource/host gates.
 
 ## 4.2. CI bằng chứng HB loader và P1 exact-pilot plan (06/11/2026)
 
 - Workflow `W3 checkpoint, runner and HB loader tests` chạy trên commit `5bbfbdc0dc4be9c1065837caa51bc5807d0699d5`.
 - Ubuntu: **23 passed in 4.92s**; Windows: **23 passed in 5.95s**. GitHub Actions run [42156873444](https://github.com/bangphan1311/ABP/actions/runs/42156873444), trên branch head `538a50a1bda772df4afac1aed22f298d10aa89f4`. Gồm parser HB, provenance/hash validation, `run_one()` subprocess fixture, checkpoint/runner regressions và exact-pilot plan tests; xác nhận cả thay đổi ID `can_715` mới nhất.
-- `experiments/pilot_exact_p1.py` đã được thêm: 40 validation exact runs (600 s/run), một worker, cap 12 GiB; `--include-large` thêm 12 exact pilot-large runs (1800 s/run). Script prechecks Windows build/RAM, 24-row inventory/manifest và đủ raw inputs trước khi launch solver. CI đã test plan/parser/subprocess fixtures, chưa chạy solver trên HB raw data thật.
+- `experiments/pilot_exact_p1.py` đã chạy đủ **40/40 HB validation exact runs** ngày 07/11/2026 (10 instance × 4 exact backend, 600 s/run, tuần tự, cap cấu hình 12 GiB). Kết quả: 11 OPT / 10 FEAS / 19 ERR (license/edition errors; không có TO/MO). Chi tiết ở `docs/p1/exact_pilot_report_2026-11-07.md`. `--include-large` thêm 12 exact pilot-large runs nhưng **chưa thực hiện**.
 - `docs/p1/exact_spot_check_plan.md` đóng băng trước danh sách 10 exact runs để P1 kiểm tra độc lập khi P3 hoàn tất official queue. Danh sách dùng canonical instance IDs `can_445` và `can_715` (display names `can__445`, `can__715`).
-- 24 raw `.mtx.rnd` files không nằm trong Git vì `benchmark/hb/raw/` được gitignore; chúng không có trong workspace của phiên này. Do đó CI chỉ chứng minh parser/runner với fixture, chưa chạy actual HB exact pilot.
+- 24 raw `.mtx.rnd` source files không nằm trong Git vì `benchmark/hb/raw/` được gitignore. Branch P1 hiện có đủ 40 raw JSON records trong `results/pilot_exact/raw/` và `summary.csv` (đã kiểm tra directory listing trên GitHub).
 
 ## 5. Quyết định hiện tại
 
-**Giữ phiên bản `1.0-rc`; chưa tạo tag `v1.0`.** P1 đã chọn candidate Windows host/cap 12 GiB, giữ CPLEX trong run plan với policy `ERR` khi Community Edition chặn, loại Kissat khỏi RQ2 Core và chấp nhận canonical SAT `order/pairwise/glucose4`. Vẫn còn: xác minh raw HB files trên candidate host, chạy exact pilot 40 runs, P3 kiểm tra resource/runner và vận hành official queue, re-review/freeze evidence theo §12. Không đánh dấu benchmark chính thức sẵn sàng chỉ dựa trên CI hoặc mô hình nhỏ.
+**Giữ phiên bản `1.0-rc`; chưa tạo tag `v1.0`.** P1 đã hoàn thành code/integration, UB audit, formulation docs, vòng review protocol đầu và Exact Pilot 40/40. P1 còn: independent verify các pilot solutions; chốt cách trình bày giới hạn Gurobi/CPLEX; đồng bộ nhánh sau khi PR #52 ổn định; chạy full suite trên freeze candidate; và thực hiện 10-run spot-check exact khi P3 có official outputs. P2 còn: sửa sáu blocker PR #52 và xác nhận SAT spec/canonical config. P3 còn: sign-off runner/schema, hard memory cap/kill-resume/checkpoint, dry-run/budget, validation pipeline và vận hành official queue. Pilot-large chưa chạy vì chờ memory gate; official RQ3 chưa chạy. Không tag `v1.0` trước khi mọi điều kiện §12 có evidence.
 
 PR theo dõi: https://github.com/bangphan1311/ABP/pull/50
+
+
+## 4.3. HB Exact Pilot thực tế (07/11/2026)
+
+| Backend | OPT | FEAS | ERR |
+|---|---:|---:|---:|
+| CP-SAT | 6 | 4 | 0 |
+| Gurobi MIP | 0 | 1 | 9 |
+| CPLEX MIP | 0 | 0 | 10 |
+| CPLEX CP | 5 | 5 | 0 |
+| **Total** | **11** | **10** | **19** |
+
+Toàn bộ 19 `ERR` là license/edition blocks: 9 Gurobi size-limited-license và 10 CPLEX Community Edition error 1016. Không có `TO` hoặc `MO`. Raw JSON lưu `memory_limit=12.0`; tuy nhiên trường `peak_memory` không có số đo (null), nên không dùng pilot này làm bằng chứng đo peak RAM hoặc thay cho hard-memory kill test/sign-off của P3. Report chi tiết theo instance/backend và PAR2: `docs/p1/exact_pilot_report_2026-11-07.md`.
+
+Đây là engineering pilot trên 10 HB validation instances, không phải official RQ3. Giữ nguyên toàn bộ raw attempts; không chuyển ERR thành TO.
