@@ -28,9 +28,9 @@ predeclared sample of exact runs; P1 does not take over P3's runner.
 |---|---|---|
 | Four exact backends through the common interface | `src/exact/{gurobi_mip,cplex_mip,cplex_cp,cp_sat_solver}.py`; shared `Result`; oracle comparison tests on `path4`, `cycle5`, `complete5` | Implemented; latest full-suite evidence must be rebound to final commit |
 | Formulation review | MIP uses pairwise orientation indicators for distinct labels and edge direction; CP uses `all_diff` and absolute-distance constraints; CP-SAT uses `all_different` and absolute-distance variables | Code-reviewed; retain small-oracle tests as correctness evidence |
-| Whole-run exact time accounting | Exact backends subtract model-build elapsed time before passing the remaining budget to the optimizer; `tests/exact/test_time_budget.py` covers remaining-budget arithmetic | Implemented in code; protocol/documentation alignment needed |
+| Whole-run exact time accounting | Exact backends subtract model-build elapsed time before passing the remaining budget to the optimizer; `tests/exact/test_time_budget.py` covers remaining-budget arithmetic; `docs/exact_models.md` and Protocol §6.2 document solver `t_total` versus runner `wall_time` | Implemented and documented; final freeze-candidate suite/review still required |
 | Upper bound audit | 24/24 manifest rows are `VALID`; each row records `delta_max` and `ub_n_minus_delta` | Values tabulated in §3 below |
-| Gurobi/CPLEX entitlement check | Gurobi Academic small probe PASS; CPLEX MIP and CP Community Edition size/search limits confirmed; no CPLEX Academic entitlement verified | Partial; benchmark-scale Gurobi capacity and CPLEX entitlement remain unverified |
+| Gurobi/CPLEX entitlement check | Gurobi tiny Academic probe passed but the HB pilot returned 9/10 size-limited-license errors; CPLEX MIP returned 10/10 Community Edition error 1016; no CPLEX Academic entitlement verified | **Environment limitation demonstrated at pilot scale; team must decide whether to obtain suitable entitlements or retain ERR with explicit RQ3 scope limitation.** |
 | Exact pilot on actual HB validation subset | `experiments/pilot_exact_p1.py`; local execution record and derived report `docs/p1/exact_pilot_report_2026-11-07.md`; 10 × 4 runs completed on the selected Windows host | **40/40 completed on 2026-11-07; GitHub branch contains all 40 raw JSON files and `summary.csv`. Independent solution verification and official-run spot-check remain pending.** |
 | Pilot on large HB instances | P1 exact-pilot runner supports 12 additional exact runs on `bcsstk06`, `nos6`, `can_715` at 1800 s/run; host/cap selected, target-host memory gate still requires recheck | **Not executed; requires real raw HB files and target-host memory test** |
 | Review SAT semantics/canonical candidate | P1 review agrees with `order / pairwise / glucose4` within the Core candidate set `{cadical195, glucose4}`; `minisat22` is outside that Core set | P1 proposal accepted within Core; synthetic-pilot transfer limitation must be reported |
@@ -83,9 +83,8 @@ mismatch, missing provenance files, continued JSON compatibility, and an
 end-to-end `run_one()` subprocess test using the brute-force oracle on a
 small fixture. The workflow `W3 checkpoint, runner and HB loader tests` was
 expanded to execute these checks plus the P1 exact-pilot plan tests on Ubuntu
-and Windows. GitHub Actions run `42156873444` completed successfully on the
-final documented branch head: Ubuntu **23 passed**, Windows **23 passed**.
-This is fixture/plan CI evidence, not an actual HB solver pilot.
+and Windows. GitHub Actions run `42346018670` completed successfully after the 2026-11-07 readiness updates: Ubuntu **23 passed in 4.89s**, Windows **23 passed in 6.48s**. This is the focused HB loader/pilot-plan/checkpoint/runner subset, not the full project suite.
+This is fixture/plan CI evidence, not an actual HB solver pilot. The actual HB Exact Pilot is separately complete (40/40) and documented in `docs/p1/exact_pilot_report_2026-11-07.md`.
 
 This closes the **code integration** gap. The actual 40-run Exact Pilot has since completed on the selected Windows host against the HB validation subset; the branch contains 40 raw JSON files plus `summary.csv`, with details in `docs/p1/exact_pilot_report_2026-11-07.md`. `benchmark/hb/raw/` remains gitignored, so source files must be available on whichever host P3 selects for the official queue. The pilot's `memory_limit=12.0` metadata records the configured cap but does not include `peak_memory`; this does not replace P3's required hard-memory enforcement/kill evidence and sign-off.
 
