@@ -1,0 +1,188 @@
+\section{SAT Method}
+\label{sec:sat-method}
+
+\subsection{Decision formulation}
+Let $G=(V,E)$ be a simple undirected graph, with $n=|V|$ and $m=|E|$. A
+labeling is a bijection $f:V\rightarrow\{1,\ldots,n\}$. Its antibandwidth is
+\begin{equation}
+  B(f)=\min_{\{u,v\}\in E}|f(u)-f(v)|,
+\end{equation}
+and the optimization problem is to maximize $B(f)$. For a fixed threshold
+$K\geq 1$, the SAT decision problem asks whether there exists a bijection
+satisfying
+\begin{equation}
+  |f(u)-f(v)|\geq K
+  \qquad \forall\,\{u,v\}\in E.
+  \label{eq:sat-decision}
+\end{equation}
+The implementation uses two alternative encodings of this same decision
+problem: a pairwise assignment encoding and an order encoding. Both include
+constraints for vertex assignment, label permutation, and edge distance.
+They differ in their representation of a vertex label.
+
+\subsection{Pairwise assignment encoding}
+For each vertex $v\in V$ and label $p\in\{1,\ldots,n\}$, introduce a Boolean
+variable $x_{v,p}$, where $x_{v,p}=1$ means that vertex $v$ receives label $p$.
+The encoding contains three groups of clauses.
+
+\paragraph{Assignment.}
+Each vertex receives at least one label (ALO), and no vertex receives two
+different labels (AMO):
+\begin{align}
+  &\bigvee_{p=1}^{n}x_{v,p}
+      &&\forall v\in V,\\
+  &\neg x_{v,p}\vee\neg x_{v,q}
+      &&\forall v\in V,\;1\leq p<q\leq n.
+\end{align}
+
+\paragraph{Permutation.}
+Each label is assigned to at least one vertex and to at most one vertex:
+\begin{align}
+  &\bigvee_{v\in V}x_{v,p}
+      &&\forall p\in\{1,\ldots,n\},\\
+  &\neg x_{u,p}\vee\neg x_{v,p}
+      &&\forall p\in\{1,\ldots,n\},\;u<v.
+\end{align}
+Together, assignment and permutation make the labeling a bijection.
+
+\paragraph{Edge distance.}
+For every edge $\{u,v\}\in E$, every label pair $(p,q)$ whose separation is
+strictly smaller than $K$ is forbidden:
+\begin{equation}
+  \neg x_{u,p}\vee\neg x_{v,q}
+  \qquad
+  \forall\{u,v\}\in E,\quad
+  1\leq |p-q|\leq K-1.
+  \label{eq:pairwise-distance}
+\end{equation}
+For $1\leq K<n$, the number of edge-distance clauses is
+\begin{equation}
+  2m\sum_{d=1}^{K-1}(n-d).
+\end{equation}
+With pairwise AMO, the assignment and permutation groups each contain
+$n+n\binom{n}{2}$ clauses. The pairwise encoding uses $n^2$ primary variables;
+an alternative AMO encoding may introduce auxiliary variables.
+
+\subsection{Order encoding}
+The order encoding uses Boolean variables $o_{v,p}$ for
+$v\in V$ and $p\in\{1,\ldots,n-1\}$, with the meaning
+\begin{equation}
+  o_{v,p}=1 \quad\Longleftrightarrow\quad f(v)\leq p.
+  \label{eq:order-variable}
+\end{equation}
+The boundary values are implicit: $o_{v,0}=0$ and $o_{v,n}=1$. For every
+vertex, monotonicity is enforced by
+\begin{equation}
+  \neg o_{v,p}\vee o_{v,p+1}
+  \qquad
+  \forall v\in V,\;p=1,\ldots,n-2.
+  \label{eq:order-chain}
+\end{equation}
+A monotone chain uniquely determines one label: the smallest index $p$ for
+which $o_{v,p}=1$, or $n$ if all variables are false.
+
+To express that a vertex does not receive label $q$, define the disjunction
+\begin{equation}
+  N(v,q)=
+  \begin{cases}
+    \neg o_{v,1}, & q=1,\\
+    \neg o_{v,q}\vee o_{v,q-1}, & 1<q<n,\\
+    o_{v,n-1}, & q=n.
+  \end{cases}
+  \label{eq:not-label}
+\end{equation}
+For every pair of distinct vertices $u<v$ and every label $q$, the
+permutation constraint is
+\begin{equation}
+  N(u,q)\vee N(v,q).
+  \label{eq:order-permutation}
+\end{equation}
+Thus, two vertices cannot receive the same label. Since there are $n$ vertices
+and $n$ available labels, injectivity also implies surjectivity.
+
+The edge-distance constraints use the same no-good construction:
+\begin{equation}
+  N(u,p)\vee N(v,q)
+  \qquad
+  \forall\{u,v\}\in E,\quad
+  1\leq |p-q|\leq K-1.
+  \label{eq:order-distance}
+\end{equation}
+The order encoding has $n(n-1)$ variables, $n(n-2)$ chain clauses, and
+$n\binom{n}{2}$ permutation clauses. Its edge-distance clause count is the
+same as in the pairwise encoding, although the clauses can contain up to four
+literals. The order encoding does not use a separate AMO constraint: the
+monotone chain replaces the ALO/AMO pair. Therefore, changing the AMO metadata
+for the order encoding does not change its CNF.
+
+\subsection{AMO variants}
+For the pairwise assignment encoding, the default AMO formulation adds
+$\binom{r}{2}$ binary clauses for a group of $r$ literals and introduces no
+auxiliary variables. The sequential-counter variant instead delegates the
+at-most-one constraint to \texttt{pysat.card} and adds auxiliary variables to
+reduce the number of clauses. Both variants preserve the same feasible
+labelings when the auxiliary variables are existentially eliminated. AMO is
+not an experimental factor for the order encoding, because the order chain
+already represents one label per vertex.
+
+\subsection{SAT backend and optimization search}
+The SAT implementation uses the PySAT interface and supports CaDiCaL
+(\texttt{cadical195}) and Glucose (\texttt{glucose4}) as the Protocol Core
+solver candidates. Kissat is excluded from the Core after the tested PySAT
+binding exhibited incorrect model/assumption behavior and process failures.
+A fresh backend is created for each threshold probe.
+
+The optimization procedure solves a sequence of decision problems. It keeps
+$\ell$, the best verified antibandwidth found so far, and $h$, a threshold
+already known to be infeasible. Initially $\ell=0$ and $h=n$, because no
+labeling can have a difference of $n$ or greater. While $\ell+1<h$, the next
+threshold is $K=\ell+1$:
+\begin{itemize}
+  \item If the SAT solver returns SAT, the model is decoded and independently
+    verified. If its actual antibandwidth is $B$, the algorithm sets
+    $\ell=B$ and starts the next probe at $B+1$.
+  \item If the solver returns UNSAT, it sets $h=K$. Since $K=\ell+1$, the
+    current verified labeling is optimal.
+  \item If the solver returns UNKNOWN or the run budget expires, the search
+    stops. A verified incumbent is reported as FEAS; without one, the result is
+    TO.
+\end{itemize}
+A SAT labeling with value $B\geq K$ also satisfies every threshold between
+$K$ and $B$. Jumping directly to $B+1$ therefore skips only thresholds already
+known to be feasible. The first infeasible threshold, when found, proves
+optimality. The initial counting bound also proves optimality if a labeling
+reaches $n-1$.
+
+The time budget covers CNF construction, clause loading, all solver probes,
+decoding, and verification for the entire K-search sequence. Each probe
+receives the remaining budget. The shared runner adds a hard process timeout
+and is responsible for enforcing the configured OS-level memory limit.
+\texttt{peak\_memory} is a sampled process-memory measurement, not a
+continuous high-water mark; the official protocol fixes one Windows host so
+that the reported memory measurements are taken under a consistent
+environment.
+
+\subsection{Decoding, verification, and result semantics}
+A SAT model is not accepted directly as a solution. The encoding-specific
+decoder must reconstruct a permutation of $\{1,\ldots,n\}$. The shared
+\texttt{verify} routine then independently checks the labeling and recomputes
+\[
+  B(f)=\min_{\{u,v\}\in E}|f(u)-f(v)|.
+\]
+The recomputed value must meet the probed threshold and agree with the
+reported lower bound. The project uses the following status semantics:
+\texttt{OPT} denotes a verified incumbent with an optimality proof;
+\texttt{FEAS} denotes a verified incumbent without a proof at termination;
+\texttt{TO} denotes termination without a verified incumbent; \texttt{MO}
+denotes a confirmed memory-limit event; and \texttt{ERR} denotes an execution,
+backend, license, malformed-output, or correctness error. In particular, a
+license failure is not reported as a timeout.
+
+\subsection{Correctness evidence}
+The W2 correctness matrix evaluated the two ABP encodings, two AMO variants,
+and two SAT solvers (eight configurations) against a brute-force oracle on
+small graphs. The test suite also checks SAT/UNSAT decisions over thresholds,
+model decoding, model counts, and the AMO contract. The empirical matrix is
+evidence for the tested finite instances, not a proof that the SAT backends
+always answer UNSAT correctly. The proof argument for the encodings and the
+K-search invariants is provided in Appendix~\ref{app:sat-correctness}.
