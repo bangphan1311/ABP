@@ -9,6 +9,7 @@ UNSAT thì ``K - 1 = B`` là tối ưu. Mọi nghiệm đều qua ``verify()`` t
 from __future__ import annotations
 
 import ctypes
+import math
 import warnings
 from ctypes import wintypes
 from time import perf_counter
@@ -47,7 +48,7 @@ CANONICAL_SAT_CONFIG = Config(
     warm_start=False,
     seed=0,
     time_limit=1800.0,
-    memory_limit=None,
+    memory_limit=12.0,
 )
 
 
@@ -57,7 +58,15 @@ def canonical_sat_config(
     memory_limit: float | None = None,
     sat_solver: str = "glucose4",
 ) -> Config:
-    """Trả bản sao ``Config`` chuẩn cho SAT (M2 freeze, ticket 21)."""
+    """Trả cấu hình SAT chuẩn; caller phải chọn rõ hard cap GiB của runner."""
+    if (
+        memory_limit is None
+        or isinstance(memory_limit, bool)
+        or not isinstance(memory_limit, (int, float))
+        or not math.isfinite(float(memory_limit))
+        or memory_limit <= 0
+    ):
+        raise ValueError("memory_limit phải được truyền rõ và là số hữu hạn > 0 GiB.")
     return Config(
         method=METHOD,
         abp_encoding=CANONICAL_SAT_CONFIG.abp_encoding,
@@ -74,7 +83,6 @@ def canonical_sat_config(
 
 # Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.
 IGNORED_CONFIG_FIELDS = (
-    "memory_limit",
     "search_mode",
     "symmetry",
     "warm_start",
@@ -100,10 +108,10 @@ def _warn_ignored_config(cfg: Config) -> None:
         return
 
     warnings.warn(
-        "W1 bỏ qua các field Config: "
+        "SAT solver chưa dùng trực tiếp các field Config: "
         + ", ".join(ignored)
-        + " (memory_limit chưa cài đặt nên status MO không bao giờ xuất hiện; "
-        "search_mode/symmetry/warm_start/seed thuộc P3).",
+        + " (memory cap được enforce bởi shared runner; search_mode/symmetry/"
+        "warm_start/seed cần tuân theo protocol).",
         stacklevel=2,
     )
 
