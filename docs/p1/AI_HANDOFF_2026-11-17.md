@@ -48,7 +48,7 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 
 ## Remaining open issues at review time
 - #25 canonical SAT config: provisional choice documented; pilot budget decision and P3 host/cap sign-off pending.
-- #26 correctness suite + appendix: appendix draft exists; latest correctness suite must pass and P2 must sign off the proof.
+- #26 correctness suite + appendix: GitHub currently shows this issue as **closed**, but its body still has unchecked items for rerunning the suite and P2 proof sign-off. Verify why it was closed; reopen it if those acceptance gates were not actually met.
 - #28 M2 freeze: not frozen; needs fresh tests, pilot-budget resolution, P3 hard-cap/runner sign-off and all PR review/integration gates.
 - #29 SAT incident response: triage tool/tests exist, but latest tests and real official raw incidents are still pending.
 - #30 RQ1/RQ2 draft + G3: pilot tables exist; corrected G3 is pending raw evidence; official results still absent.
