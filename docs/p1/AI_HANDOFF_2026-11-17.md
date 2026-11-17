@@ -135,7 +135,7 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - Reopen it and preserve those acceptance gates. Do not treat the modular appendix draft as proof of a completed correctness/freeze review.
 
 ### Current integration guardrails
-- PR #50 remains open, head `857cbfc7`, 100 ahead / 11 behind `main`. Do not sync until PR #52's blocker is fixed and the shared branch state settles; do not force-push.
+- PR #50 remains open, head at last verification `eb2dc062`, **111 ahead / 0 behind** `main`; branch already synchronized with main. No force-push was used.
 - Do not merge either PR or tag `v1.0` based on focused CI alone.
 - Official RQ3, 24 HB raw inputs, 12 GiB official-host kill/MO enforcement, queue and raw→validation→`runs.csv` remain P3 gates. P1's 10-run Exact spot-check plan applies when P3 generates the corresponding official run records; it is not a completed pilot verification.
 
@@ -168,11 +168,16 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - P1 posted a status comment on PR #50 (comment ID `6941464871`) recording the Exact fixes and focused CI. The current full-suite evidence is in runs above.
 - Latest P1 branch head is `cc8f3687` (documentation/handoff-only commits after tested code SHA `c03659be`); PR #50 remains open and mergeable. Do not merge/tag until P3 operational and protocol freeze gates have evidence.
 
-### P2 PR #52 remains blocked
-- Latest observed P2 head remains `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; no later P2 commit was visible at last check.
-- P1's latest review is still `CHANGES_REQUESTED` (review ID `5934391739`): global deduplication removes the 10 shared CaDiCaL `order/pairwise` rows from RQ2. Required split counts remain RQ1=30, RQ2=20, union=40 unique IDs; duplicate test definition also needs cleanup.
-- Workflow #44010144573 on P2 head `acd9dd00` remains `action_required`; it did not run test jobs. The GitHub connection available here cannot approve this run.
-- Re-review only after P2 pushes a correction and obtains fresh test results.
+### P2 PR #52 — code-review approval and current state
+- PR #52 current head: `02f225578b0b3cba0e325d856d3835934f826881`; compare vs main: **29 ahead / 0 behind**. PR is open and mergeable.
+- P1's earlier 17 Nov finding claiming global dedup removed shared CaDiCaL rows was a false positive. The shared CaDiCaL `order/pairwise` runs remain in both RQ outputs; verified actual split: RQ1=30, RQ2=20, shared IDs=10, union=40. The erroneous review was dismissed and corrected in a PR comment.
+- The six original P1 review findings have been addressed. P1 review **APPROVED** (review ID `5934659898`) for code review only.
+- G3 safeguards and regression tests are implemented: required frozen denominator; denominator cannot be smaller than observed unique Core IDs; completed count must match unique triage report count; conflicting duplicate CSV/triage payloads rejected; malformed-status Core rows remain in the denominator and are reported as CODE_BUG.
+- Workflow [#44040260149](https://github.com/bangphan1311/ABP/actions/runs/44040260149) on implementation/test SHA `a5d58821393448cc1f019e7860c6546a4bedd907` passed:
+  - Ubuntu: SAT/W4 **452 passed**, full suite **556 passed**.
+  - Windows: SAT/W4 **452 passed**, full suite **556 passed**.
+- Branch tip `02f22557` only adds the M2 freeze-doc evidence after that tested source/test SHA. P3 reviewer `ENEIT` remains requested.
+- PR #52 remains open; do not merge/tag until the team resolves the pilot budget mismatch and P3's operational review/evidence is available.
 
 ### Issue #26 and freeze
 - Issue #26 has been reopened because full-suite evidence, P2 proof sign-off and pilot-budget resolution are required for the shared/freeze candidate. The 539-pass P1 branch run does not by itself certify the unmerged P2 head.
