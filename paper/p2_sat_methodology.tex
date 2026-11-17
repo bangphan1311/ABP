@@ -157,6 +157,13 @@ The time budget covers CNF construction, clause loading, all solver probes,
 decoding, and verification for the entire K-search sequence. Each probe
 receives the remaining budget. The shared runner adds a hard process timeout
 and is responsible for enforcing the configured OS-level memory limit.
+
+For the SAT-versus-Exact comparison in RQ3, the primary end-to-end runtime
+must be the shared runner's 	exttt{wall\_time} for every method. The
+solver-level 	exttt{t\_total} fields do not have identical scopes across
+solver families (for example, process startup and model-construction
+boundaries differ), so they are diagnostic fields and must not be ranked
+against one another across SAT and Exact.
 \texttt{peak\_memory} is a sampled process-memory measurement, not a
 continuous high-water mark; the official protocol fixes one Windows host so
 that the reported memory measurements are taken under a consistent
