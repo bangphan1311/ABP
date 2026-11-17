@@ -12,6 +12,7 @@ from experiments.analyze_rq1_rq2 import (
     evaluate_g3_gate,
     find_smaller_cnf_slower_solve_cases,
     load_csv_rows,
+    split_combined_rq_rows,
     main as analyze_main,
     render_markdown_report,
     summarize_rq1,
@@ -99,6 +100,33 @@ def test_evaluate_g3_gate_enforces_80_percent_and_zero_code_bugs():
     assert gate_bug.passed_gate is False
 
 
+
+def test_split_combined_runs_csv_keeps_rq1_and_rq2_axes_separate():
+    def row(run_id, method, encoding, amo, solver, search_mode="multi"):
+        return {
+            "run_id": run_id, "method": method,
+            "abp_encoding": encoding, "amo_encoding": amo,
+            "solver": solver, "search_mode": search_mode,
+        }
+
+    rows = [
+        row("r1", "sat", "pairwise", "pairwise", "cadical195"),
+        row("r2", "sat", "pairwise", "seqcounter", "cadical195"),
+        row("r3", "sat", "order", "pairwise", "cadical195"),
+        row("r4", "sat", "order", "seqcounter", "cadical195"),  # CNF trùng, bỏ
+        row("r5", "sat", "order", "pairwise", "glucose4"),
+        row("r6", "sat", "order", "pairwise", "minisat22"),  # ngoài Core
+        row("r7", "exact", "", "", "cp_sat"),
+    ]
+    rq1, rq2 = split_combined_rq_rows(rows)
+    assert [r["run_id"] for r in rq1] == ["r1", "r2", "r3"]
+    assert [r["run_id"] for r in rq2] == ["r3", "r5"]
+
+
+def test_render_report_requires_frozen_expected_run_count():
+    with pytest.raises(ValueError, match="frozen run plan"):
+        render_markdown_report([], [], [])
+
 def test_analyze_cli_supports_single_runs_csv(tmp_path):
     runs_csv = tmp_path / "runs.csv"
     with runs_csv.open("w", newline="", encoding="utf-8") as handle:
@@ -146,6 +174,17 @@ def test_analyze_cli_supports_single_runs_csv(tmp_path):
                 "error": "",
             }
         )
+        writer.writerow(
+            {
+                "run_id": "i1__sat__pairwise__pairwise__cadical195",
+                "instance": "i1", "method": "sat",
+                "abp_encoding": "pairwise", "amo_encoding": "pairwise",
+                "solver": "cadical195", "status": "OPT", "lb": 2, "ub": 2,
+                "t_encode": 0.01, "t_solve": 0.02, "t_total": 0.03,
+                "variables": 16, "clauses": 74, "peak_memory": 20.0,
+                "time_limit": 60.0, "error": "",
+            }
+        )
 
     out_md = tmp_path / "report.md"
     rc = analyze_main(
@@ -154,6 +193,8 @@ def test_analyze_cli_supports_single_runs_csv(tmp_path):
             str(runs_csv),
             "--raw-dir",
             str(tmp_path / "empty_raw"),
+            "--expected-runs",
+            "2",
             "--out",
             str(out_md),
         ]
