@@ -203,3 +203,31 @@ Keep the protocol at `1.0-rc` until every gate in Experimental Protocol
 §12 has evidence tied to the exact candidate commit, selected host,
 configuration and raw results. Merging PRs is necessary but not sufficient.
 No official RQ3 result, `data-final`, or `v1.0` tag is claimed by this file.
+
+
+## 9. Exact adapter follow-up — 2026-11-17
+
+P1 has added a focused code/test follow-up for three implementation review
+findings:
+
+- **E1:** CPLEX CP reports `MO` when the termination cause is memory
+  exhaustion, even if a verified incumbent is retained. The result keeps its
+  incumbent and bounds; status records the stop cause.
+- **E2:** CPLEX CP distinguishes no incumbent (`get_solution() is None`)
+  from partial/invalid incumbent extraction. Partial values and verification
+  failures are `ERR`, not `TO`.
+- **E3:** CP-SAT warns when non-default shared Config fields are ignored,
+  consistent with the other Exact adapters.
+
+Regression tests cover these cases. The P1 cross-platform workflow now
+installs OR-Tools and includes `tests/exact/test_solver_status.py` and
+`tests/exact/test_time_budget.py`. These findings are **implementation-added,
+CI verification pending** until the workflow on this commit is green.
+
+E4 is clarified as two recorded environments (development Conda 3.11.17 and
+candidate preflight 3.11.16); the exact interpreter used by the official host
+must still be recorded at execution time.
+
+E5 (Gurobi/CPLEX license entitlement and benchmark-scale availability) remains
+with P1's local environment verification. The exact pilot raw records remain
+immutable and are not rewritten.

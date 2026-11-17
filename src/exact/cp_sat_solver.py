@@ -8,7 +8,7 @@ from ortools.sat.python import cp_model
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
-from src.exact.common import remaining_time_budget
+from src.exact.common import remaining_time_budget, warn_ignored_config
 
 def _safe_upper_bound(status_code: int, best_bound: float, n: int) -> int:
     """Return a safe integer upper bound for the ABP objective."""
@@ -23,6 +23,8 @@ def solve_cp_sat(instance: Instance, config: Config | None = None) -> Result:
 
     if config is None:
         config = Config(method="cp_sat")
+
+    warn_ignored_config(config, supported=("seed",))
 
     if instance.n < 1:
         raise ValueError("Đồ thị phải có ít nhất một đỉnh.")

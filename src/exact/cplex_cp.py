@@ -34,19 +34,39 @@ def _classify_status(
     solve_text = str(solve_status or "").strip().casefold()
     fail_text = str(fail_status or "").strip().casefold()
 
-    if has_solution:
-        if solve_text == "optimal" or solve_text.endswith(".optimal"):
-            return "OPT"
-        return "FEAS"
-
+    if solve_text == "optimal" or solve_text.endswith(".optimal"):
+        return "OPT"
     if _is_memory_failure(solve_status, fail_status, stop_cause):
         return "MO"
-
+    if has_solution:
+        return "FEAS"
     if fail_text == "searchstoppedbylimit":
         return "TO"
-
     return "ERR"
 
+
+def _extract_verified_solution(solved, variables, instance):
+    """Return (labeling, objective, error); None solution means no incumbent."""
+    try:
+        model_solution = solved.get_solution()
+    except Exception as exc:
+        return None, None, exc
+    if model_solution is None:
+        return None, None, None
+    try:
+        variable_solutions = [
+            model_solution.get_var_solution(variable) for variable in variables
+        ]
+        if any(solution is None for solution in variable_solutions):
+            raise ValueError("CP Optimizer returned a partial incumbent.")
+        values = [solution.get_value() for solution in variable_solutions]
+        if any(value is None for value in values):
+            raise ValueError("CP Optimizer incumbent contains an undefined variable value.")
+        labeling = {vertex: int(values[vertex]) for vertex in range(len(variables))}
+        objective = verify(instance, labeling)
+    except Exception as exc:
+        return None, None, exc
+    return labeling, objective, None
 
 def solve_cplex_cp(
     instance: Instance,
@@ -143,20 +163,28 @@ def solve_cplex_cp(
         except Exception:
             stop_cause = ""
 
-        # Extract and independently verify the incumbent.
-        try:
-            labeling = {
-                v: int(solved.get_var_solution(x[v]).get_value())
-                for v in range(n)
-            }
-
-            objective = verify(instance, labeling)
-            has_solution = True
-
-        except Exception:
-            labeling = None
-            objective = None
-            has_solution = False
+        # Distinguish an absent incumbent from broken/partial extraction.
+        labeling, objective, extraction_error = _extract_verified_solution(
+            solved, x, instance
+        )
+        if extraction_error is not None:
+            return Result(
+                status="ERR",
+                t_encode=t_encode,
+                t_solve=t_solve,
+                t_total=perf_counter() - start,
+                metadata={
+                    "solver": "CPLEX CP",
+                    "solve_status": status_text,
+                    "fail_status": fail_status,
+                    "stop_cause": stop_cause,
+                    "error": (
+                        "Không trích xuất/kiểm chứng được incumbent: "
+                        f"{type(extraction_error).__name__}: {extraction_error}"
+                    ),
+                },
+            )
+        has_solution = labeling is not None
 
         # Handle termination without a verified incumbent.
         if not has_solution:
@@ -169,7 +197,7 @@ def solve_cplex_cp(
 
             return Result(
                 status=st,
-                ub=n - 1 if st == "TO" else None,
+                ub=n - 1 if st in ("TO", "MO") else None,
                 t_encode=t_encode,
                 t_solve=t_solve,
                 t_total=perf_counter() - start,

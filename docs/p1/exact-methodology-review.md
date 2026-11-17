@@ -92,3 +92,52 @@ The preflight records a successful small Gurobi Academic/WLS probe, but that is 
 - `tests/exact/test_time_budget.py`
 
 No solver experiment, official benchmark run, status sign-off, or W5/W6 completion is claimed by this audit.
+
+
+## 6. Follow-up implementation review — 2026-11-17
+
+The following code-level findings have been addressed on the P1 branch; they
+remain subject to the cross-platform workflow result tied to this commit.
+
+### E1 — Memory-stop status with an incumbent
+
+**Resolved in code:** a proven optimum remains `OPT`. Otherwise, a detected
+memory stop is `MO` even when a verified incumbent exists. The verified
+labeling and bounds are retained in `Result.solution/lb/ub`; status records
+the termination cause. This matches the MIP adapters' status convention.
+Regression coverage: `test_cplex_cp_memory_stop_with_incumbent_is_mo`.
+
+### E2 — CPLEX CP incumbent extraction
+
+**Resolved in code:** `CpoSolveResult.get_solution()` returning `None`
+means there is no incumbent. A partial solution, missing variable value,
+extraction exception, or failed `verify()` is an `ERR`, not a timeout.
+Regression coverage covers no-incumbent, partial-incumbent and invalid-incumbent
+cases.
+
+### E3 — CP-SAT ignored configuration
+
+**Resolved in code:** CP-SAT now calls `warn_ignored_config(...,
+supported=("seed",))`, consistent with the other Exact adapters. Non-default
+fields that this adapter does not implement are surfaced as warnings; the
+memory cap remains enforced by the shared runner/OS, not by the solver adapter.
+Regression coverage: `test_cp_sat_warns_when_ignoring_shared_config_fields`.
+
+### E4 — Python environment version documentation
+
+The two recorded versions refer to different environments: `docs/ENV.md`
+describes P1's Conda development environment (3.11.17), while the W3 preflight
+records a candidate execution environment (3.11.16). This is not evidence
+that one value should overwrite the other. Before an official run, the selected
+host must record the actual interpreter version from that exact environment.
+
+### E5 — Solver entitlement and scale
+
+**Owner: P1 (local environment), pending user-side license verification.**
+The 40-run pilot's Gurobi/CPLEX errors remain `ERR` with their original raw
+reasons. This review does not claim that Academic entitlements are active or
+that the commercial solvers have passed a benchmark-scale run.
+
+**Verification status:** implementation and regression tests are committed by
+this follow-up; the linked GitHub Actions run must pass before E1–E3 are
+CI-verified. No commercial solver license is required by these unit tests.

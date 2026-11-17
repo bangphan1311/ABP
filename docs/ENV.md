@@ -63,3 +63,12 @@ Script `experiments/check_env.py` đã chạy thành công với:
 - Máy hiện tại có 15.2 GB RAM; không mặc định áp dụng giới hạn 16 GB cho riêng một tiến trình trên máy này.
 - Giới hạn bộ nhớ và cấu hình chạy chính thức sẽ được thống nhất cùng P3 trong `PROTOCOL.md`.
 - Cần ghi lại mọi thay đổi về phiên bản solver, Python và môi trường trước khi chạy thực nghiệm chính thức.
+
+
+## 6. Phân biệt môi trường phát triển và môi trường candidate
+
+Python 3.11.17 trong tài liệu này là môi trường Conda `abp` dùng để phát
+triển. Python 3.11.16 trong `docs/w3_preflight.md` là snapshot candidate
+được ghi nhận ở một lần preflight khác. Không được tự ý thay một phiên bản
+bằng phiên bản còn lại. Trước pilot/official run, chạy preflight ngay trong
+interpreter sẽ dùng và ghi phiên bản thực tế vào evidence của lần chạy đó.
