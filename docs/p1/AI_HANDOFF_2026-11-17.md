@@ -96,13 +96,31 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
   - These are focused tests, **not** the full project suite and not solver/license benchmark evidence.
 - E5 (commercial license/entitlement, Gurobi/CPLEX scale capability) remains owned by P1's local environment verification; the pilot's original raw errors were not edited.
 
-### Latest P1 re-review of P2 PR #52
-- P2 head at last inspection remains `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; branch compare: 25 ahead / 0 behind.
-- P1 submitted a new `REQUEST_CHANGES` review (review ID `5934391739`, 17 Nov 2026).
-- Blocking finding: `split_combined_rq_rows()` globally deduplicates run IDs before splitting RQ1 and RQ2. The two pilot CSVs each have 40 unique rows and share 10 CaDiCaL `order/pairwise` IDs. Because these IDs are intentionally reused by both research questions, global dedup removes those 10 from RQ2. The correct outputs are RQ1=30 rows, RQ2=20 rows, union=40 unique Core IDs. Deduplicate within each axis; compute G3's expected/completed unique-run accounting from the union of IDs.
-- The same test module defines `test_real_pilot_sources_produce_forty_unique_core_runs` twice; remove the duplicate definition.
-- Do not approve PR #52 until the cross-axis regression is fixed and fresh CI runs on the updated head are green.
-- P2 SAT workflow run #44010144573 on `acd9dd00` remains `action_required`; it has no test job result. This is not a code PASS or a test failure. It requires repository-side workflow approval/authorization, which the current GitHub integration cannot perform.
+### Latest P1 re-review of P2 PR #52 — corrected and approved
+
+- PR #52 branch `p2/w4-sat` latest tip: `02f225578b0b3cba0e325d856d3835934f826881`; compare vs main: **29 ahead / 0 behind**. PR remains open and GitHub reports it mergeable.
+- P1's 17 Nov review claiming global dedup removed shared CaDiCaL rows was a **false positive**. The combined source rows are deduplicated once, then the same retained row is filtered independently into RQ1 and RQ2. Re-check against the actual pilot CSVs confirmed RQ1=30, RQ2=20, shared CaDiCaL rows=10, union=40. That erroneous review was dismissed with an explicit correction comment.
+- The six P1 findings from 06/11 have been fixed/clarified. P1's latest review on PR #52 is **APPROVED** (review ID `5934659898`) for code review only.
+- Additional G3 safeguards on the P2 branch:
+  - expected denominator is mandatory, integer, and cannot be smaller than observed unique Core run IDs;
+  - `completed_runs` must not exceed expected and must equal the unique triage-report count;
+  - duplicate/conflicting CSV payloads or triage reports are rejected;
+  - Core rows with malformed status remain in G3's run-ID set so triage can classify them as `CODE_BUG`, rather than silently dropping them;
+  - duplicate test definition was removed; regression tests cover shared RQ axes, conflicting IDs, missing IDs, denominator errors, malformed statuses and unrecognized triage categories.
+- P2 workflow #44040260149 passed on implementation/test SHA `a5d58821393448cc1f019e7860c6546a4bedd907`:
+  - Ubuntu: SAT/W4 **452 passed**; full `pytest tests -q` **556 passed**.
+  - Windows: SAT/W4 **452 passed**; full `pytest tests -q` **556 passed**.
+  - The current P2 branch tip `02f22557` adds only freeze-document evidence after the tested code/test SHA.
+- P2 issue #28 records the full-suite evidence but remains **NOT FROZEN**. Issue #29 has its current triage/SAT test evidence checked, but remains open for P3's real runner/raw handoff. Issue #30 remains **G3 PENDING** because the 40 Core pilot raw JSON files are not present.
+- P3 reviewer `ENEIT` remains requested on PR #52. P1 approval does not substitute for P3 operational review.
+
+### Remaining P2/P3 and methodology gates
+
+1. **60-second versus 1800-second pilot budget:** the committed W3 pilot run IDs record 60 s; current Experimental Protocol §6.2 specifies 1800 s. The group must explicitly approve/amend the historical budget or rerun the pilot and revisit canonical selection. Do not silently reconcile it.
+2. **G3 raw evidence:** matching 40 Core pilot raw JSON records are not in the Git tree. Keep G3 pending; CSV rows alone are not triage evidence.
+3. **P3 official-run validation:** P3 must confirm official host, Windows Job Object 12 GiB hard-cap kill/MO, checkpoint/hard-kill/resume/attempt history, raw → validation → `runs.csv`, expected-run plan, dry-run/budget and official queue operation.
+4. **P2/P3 manuscript sign-off:** the modular SAT method and proof appendix exist, but P2 proof wording/sign-off and integrated master paper build/cross-read are still distinct acceptance tasks.
+5. Do not tag `v1.0`, close freeze issues or launch official RQ3 until Experimental Protocol §12 gates have evidence and all three owners sign off.
 
 ### Issue #26 re-opened
 - Issue #26 had been closed even though its body still leaves the final current-suite rerun, P2 proof sign-off, and 60s-vs-1800s pilot-budget decision unchecked.
@@ -120,7 +138,7 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - Main head at sync: `276c6c010102e4836eb8bc3af4c6705a3f1cb3d2`.
 - The 11 commits missing from P1 touched 22 paths. Path comparison found only one overlap, `AGENTS.md`; P1's file was byte-identical to the merge-base, so the upstream Core Rules addition was retained. The remaining 21 files were added from main without overlap.
 - Created a normal two-parent merge commit `47ffc1a564b63e4c8ba1577d278e2c4f73544a8d` with parents P1 `d53e5118...` and main `276c6c0...`. The branch update was fast-forward from the old P1 head; no force-push.
-- P1 is now **105 ahead / 0 behind** main. PR #50 remains open and GitHub reports it mergeable.
+- P1 is now **109 ahead / 0 behind** main. PR #50 remains open and GitHub reports it mergeable.
 
 ### CI workflow expanded
 - The P1 W3 workflow now includes the pilot script tests, Exact status/time-budget tests and a separate full-suite matrix on Ubuntu + Windows.
@@ -140,7 +158,7 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 
 ### PR #50 status update
 - P1 posted a status comment on PR #50 (comment ID `6941464871`) recording the Exact fixes and focused CI. The current full-suite evidence is in runs above.
-- Latest branch head is `c03659be`; PR #50 remains open. Do not merge/tag until PR #52 is fixed/re-reviewed and protocol/P3 freeze gates have evidence.
+- Latest P1 branch head is `cc8f3687` (documentation/handoff-only commits after tested code SHA `c03659be`); PR #50 remains open and mergeable. Do not merge/tag until P3 operational and protocol freeze gates have evidence.
 
 ### P2 PR #52 remains blocked
 - Latest observed P2 head remains `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; no later P2 commit was visible at last check.
@@ -157,4 +175,4 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 ### Documentation synchronization after full-suite CI
 - After full-suite verification, P1 updated `docs/p1/exact-methodology-review.md` and `docs/p1/w3-w4-exact-readiness.md` to replace the stale "CI verification pending" note for E1–E3 with the actual focused/full-suite evidence.
 - The code/test candidate used for the full-suite result remains `c03659be`; subsequent commits only update the audit, readiness and handoff documents. They do not modify solver source or tests.
-- Current P2 branch has still not advanced beyond `acd9dd00`; the cross-axis RQ1/RQ2 run-ID deduplication blocker and P2 workflow authorization remain unresolved.
+- Current P2 branch is `02f22557`; the false-positive global-dedup finding was dismissed, the six original P1 review items are addressed, P1 code review is approved, and P2 CI passes 452 focused + 556 full tests on both OS. The historical pilot-budget decision, missing raw JSON G3 evidence and P3 operational sign-off remain unresolved.
