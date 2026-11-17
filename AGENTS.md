@@ -12,6 +12,12 @@ Default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-huma
 
 Single-context: `GLOSSARY.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
 
+## Core Rules
+
+- If a task matches a skill, invoke it with the `skill` tool before acting.
+- Follow the skill workflow strictly; do not partially apply it.
+- Never skip required steps such as spec, plan, or test when a skill demands them.
+
 ## Rule
 
 - Tự Build → Validate → Run → Explain phần của mình.
