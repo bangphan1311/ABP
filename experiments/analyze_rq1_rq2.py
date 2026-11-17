@@ -1,7 +1,6 @@
 """Sinh bảng/báo cáo nháp phân tích RQ1, RQ2 và kiểm tra cổng G3 (W4, ticket 23 / #30).
 
-Đọc dữ liệu từ ``runs.csv`` (hoặc kết hợp ``results/pilot_rq1.csv``,
-``results/pilot_rq2.csv``, hoặc ``results/raw/*.json``), không sửa tay số liệu.
+Đọc hai CSV pilot riêng (hoặc một CSV gộp pilot chỉ khi được chỉ định tường minh); không tự đọc official ``results/runs.csv`` cho RQ1/RQ2.
 
 Nội dung sinh tự động:
   - RQ1: kích thước CNF (``variables``, ``clauses``), ảnh hưởng của AMO,
@@ -14,7 +13,7 @@ Nội dung sinh tự động:
   - G3 Gate: kiểm tra tỷ lệ hoàn thành các run Core (≥ 80%) và phân loại toàn bộ
     các run bất thường qua ``src.sat.triage``.
 
-    python -m experiments.analyze_rq1_rq2 --expected-runs 40 --out docs/handoff/w4-sat/23-rq1-rq2-draft-analysis.md
+    python -m experiments.analyze_rq1_rq2 --expected-runs 40 --out docs/w4-sat/23-rq1-rq2-draft-analysis.md
 """
 
 from __future__ import annotations
@@ -34,7 +33,6 @@ if __package__ in (None, ""):
 from experiments.pilot_common import REPO_ROOT, use_utf8_output
 from src.sat.triage import DEFAULT_RAW_DIR, TriageReport, triage_directory
 
-DEFAULT_RUNS_CSV = REPO_ROOT / "results" / "runs.csv"
 DEFAULT_RQ1_CSV = REPO_ROOT / "results" / "pilot_rq1.csv"
 DEFAULT_RQ2_CSV = REPO_ROOT / "results" / "pilot_rq2.csv"
 DEFAULT_REPORT_PATH = (
@@ -568,7 +566,7 @@ def main(argv: list[str] | None = None) -> int:
         "--runs-csv",
         type=Path,
         default=None,
-        help="File runs.csv tổng hợp của P3 (nếu đã có).",
+        help="CSV gộp CHỈ các pilot RQ1/RQ2; không truyền official results/runs.csv.",
     )
     parser.add_argument("--rq1-csv", type=Path, default=DEFAULT_RQ1_CSV)
     parser.add_argument("--rq2-csv", type=Path, default=DEFAULT_RQ2_CSV)
@@ -584,18 +582,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.runs_csv is not None:
         if not args.runs_csv.is_file():
-            raise FileNotFoundError(f"Không thấy runs.csv được chỉ định: {args.runs_csv}")
+            raise FileNotFoundError(f"Không thấy combined pilot CSV được chỉ định: {args.runs_csv}")
         all_rows = load_csv_rows(args.runs_csv)
         rq1_rows, rq2_rows = split_combined_rq_rows(all_rows)
-        source_note = f"`{args.runs_csv.relative_to(REPO_ROOT) if args.runs_csv.is_relative_to(REPO_ROOT) else args.runs_csv}` (lọc Core RQ1/RQ2; G3 kiểm tra raw evidence theo 40 Core run)"
-    elif DEFAULT_RUNS_CSV.is_file():
-        all_rows = load_csv_rows(DEFAULT_RUNS_CSV)
-        rq1_rows, rq2_rows = split_combined_rq_rows(all_rows)
-        source_note = "`results/runs.csv` (lọc Core RQ1/RQ2; G3 kiểm tra raw evidence theo 40 Core run)"
+        source_note = f"`{args.runs_csv.relative_to(REPO_ROOT) if args.runs_csv.is_relative_to(REPO_ROOT) else args.runs_csv}` (caller xác nhận đây chỉ là dữ liệu pilot RQ1/RQ2; G3 expected=40 Core run)"
     else:
         pilot_rows = load_csv_rows(args.rq1_csv) + load_csv_rows(args.rq2_csv)
         rq1_rows, rq2_rows = split_combined_rq_rows(pilot_rows)
-        source_note = "`results/pilot_rq1.csv` + `results/pilot_rq2.csv` (lọc 3 CNF RQ1 + Core RQ2; G3 expected=40 Core run từ frozen pilot plan)"
+        source_note = "`results/pilot_rq1.csv` + `results/pilot_rq2.csv` (nguồn pilot tách riêng; không đọc official results/runs.csv; G3 expected=40 Core run)"
 
     triage_reports = (
         triage_directory(args.raw_dir) if args.raw_dir.is_dir() else []
