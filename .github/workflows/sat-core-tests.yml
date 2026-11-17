@@ -1,0 +1,37 @@
+name: SAT core and W4 analysis tests
+
+on:
+  push:
+    branches:
+      - p2/w4-sat
+    paths:
+      - "src/sat/**"
+      - "experiments/analyze_rq1_rq2.py"
+      - "tests/sat/**"
+      - "tests/experiments/test_analyze_rq1_rq2.py"
+      - ".github/workflows/sat-core-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sat-core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    name: SAT core and W4 analysis (${{ matrix.os }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install pytest python-sat==1.9.dev15
+      - name: Run SAT, triage and pilot-analysis tests
+        run: python -m pytest tests/sat tests/experiments/test_analyze_rq1_rq2.py tests/experiments/test_pilot_scripts.py -q
