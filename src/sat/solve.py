@@ -55,7 +55,7 @@ CANONICAL_SAT_CONFIG = Config(
 def canonical_sat_config(
     *,
     time_limit: float | None = 1800.0,
-    memory_limit: float | None = None,
+    memory_limit: float | None = 12.0,
     sat_solver: str = "glucose4",
 ) -> Config:
     """Trả cấu hình SAT chuẩn; caller phải chọn rõ hard cap GiB của runner."""
