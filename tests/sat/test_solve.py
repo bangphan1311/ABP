@@ -9,7 +9,13 @@ from src.common.models import Config, Instance
 from src.common.verify import verify
 from src.exact.oracle import solve_oracle
 from src.sat import generator
-from src.sat.solve import summarise_result, solve_decision, solve_sat
+from src.sat.solve import (
+    CANONICAL_SAT_CONFIG,
+    canonical_sat_config,
+    summarise_result,
+    solve_decision,
+    solve_sat,
+)
 
 TOY_INSTANCES = (
     generator.path(4),
@@ -336,13 +342,14 @@ def test_ignored_config_fields_emit_one_warning():
         seed=7,
     )
 
-    with pytest.warns(UserWarning, match="memory_limit") as record:
+    with pytest.warns(UserWarning, match="search_mode") as record:
         solve_sat(generator.path(4), config)
 
     assert len(record) == 1
     message = str(record[0].message)
-    for name in ("memory_limit", "search_mode", "symmetry", "warm_start", "seed"):
+    for name in ("search_mode", "symmetry", "warm_start", "seed"):
         assert name in message
+    assert "memory_limit" not in message  # runner enforce hard cap, not solve_sat()
 
 
 def test_default_config_fields_emit_no_warning(recwarn):
@@ -350,6 +357,40 @@ def test_default_config_fields_emit_no_warning(recwarn):
 
     assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]
 
+
+def test_canonical_sat_config_emits_no_warning_and_matches_oracle(recwarn):
+    cfg = canonical_sat_config(time_limit=10.0, memory_limit=12.0)
+    assert cfg.method == "sat"
+    assert cfg.abp_encoding == "order"
+    assert cfg.amo_encoding == "pairwise"
+    assert cfg.sat_solver == "glucose4"
+    assert cfg.search_mode == "multi"
+    assert cfg.symmetry is False
+    assert cfg.warm_start is False
+    assert cfg.seed == 0
+    assert cfg.memory_limit == 12.0
+    assert CANONICAL_SAT_CONFIG.abp_encoding == "order"
+    assert CANONICAL_SAT_CONFIG.memory_limit == 12.0
+
+    instance = generator.path(4)
+    result = solve_sat(instance, cfg)
+    assert result.status == "OPT"
+    assert result.lb == 2
+    assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]
+
+
+
+def test_canonical_sat_config_defaults_to_protocol_memory_cap():
+    cfg = canonical_sat_config()
+    assert cfg.memory_limit == 12.0
+    assert CANONICAL_SAT_CONFIG.memory_limit == 12.0
+
+
+def test_canonical_sat_config_rejects_missing_or_invalid_memory_cap():
+    with pytest.raises(ValueError, match="memory_limit phải được truyền rõ"):
+        canonical_sat_config(memory_limit=None)
+    with pytest.raises(ValueError, match="memory_limit phải được truyền rõ"):
+        canonical_sat_config(memory_limit=0)
 
 def test_self_loop_instance_raises_value_error():
     instance = Instance(

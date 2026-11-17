@@ -21,6 +21,7 @@ from typing import Any
 
 from src.common.models import Config, Result
 from src.common.verify import verify
+from src.runner.registry import METHODS
 from src.runner.schema import build_record, make_run_id
 from src.sat.loader import read_instance
 
@@ -36,9 +37,44 @@ def run_one(
     out_dir: str | Path = DEFAULT_OUT_DIR,
     *,
     resume: bool = False,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Chạy một run, ghi raw JSON, trả về record."""
+    """Chạy một run, ghi raw JSON, trả về record.
+
+    Với ``dry_run=True``: chỉ đọc instance, kiểm tra method tĩnh, tính run_id
+    và trạng thái resume — không mkdir, không spawn worker, không ghi file.
+    Record dry-run không được persist.
+    """
     instance = read_instance(instance_path)
+
+    if dry_run:
+        start = perf_counter()
+        if config.method not in METHODS and ":" not in config.method:
+            raise ValueError(
+                f"Method '{config.method}' không có trong registry. "
+                f"Hợp lệ: {sorted(METHODS)}."
+            )
+        run_id = make_run_id(instance, config)
+        out_file = Path(out_dir) / f"{run_id}.json"
+        exists = out_file.exists()
+        hard_limit = (
+            None if config.time_limit is None
+            else config.time_limit + KILL_GRACE_SECONDS
+        )
+        record = build_record(
+            instance, config, None, wall_time=perf_counter() - start,
+            status_override="DRY_RUN",
+        )
+        record["dry_run"] = {
+            "out_file": str(out_file),
+            "exists": exists,
+            "resume_would_skip": bool(resume and exists),
+            "hard_limit": hard_limit,
+            "n": instance.n,
+            "m": len(instance.edges),
+        }
+        return record
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     run_id = make_run_id(instance, config)
