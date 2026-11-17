@@ -1,6 +1,6 @@
 # Canonical SAT configuration — proposal (W3, issue #18 / #25)
 
-Status: proposed by P2, to be confirmed by P1/P3 before M2 freeze.
+Status: **P1 accepts the Core choice**; P3 must still confirm that the preflighted official host matches the 12.0 GiB hard-cap setup before M2 freeze.
 Decision is taken **before any official run**: only the two W3 pilots
 (`results/pilot_rq1.csv`, `results/pilot_rq2.csv`) were read. No RQ3 / official
 result exists yet, and none was inspected.
@@ -12,12 +12,12 @@ result exists yet, and none was inspected.
 | `method` | `sat` |
 | `abp_encoding` | `order` |
 | `amo_encoding` | `pairwise` |
-| `sat_solver` | `glucose4` (Protocol Core winner among `{cadical195, glucose4}`) / `minisat22` (overall PySAT 4-solver winner) |
+| `sat_solver` | `glucose4` (canonical Protocol Core choice; `minisat22` remains an extra PySAT baseline only) |
 | `search_mode` | `multi` |
 | `symmetry` | `false` |
 | `warm_start` | `false` |
 | `seed` | `0` |
-| `memory_limit` | `null` (not implemented in solver; enforced by runner in Protocol §6.3) |
+| `memory_limit` | `12.0 GiB` (hard cap enforced by the shared runner / OS Job Object; host sign-off remains a freeze gate) |
 
 Concretely, the canonical run under the Experimental Protocol Core solver set (`{CaDiCaL, Glucose}` when Kissat is excluded) is
 
@@ -26,12 +26,13 @@ Config(
     method="sat",
     abp_encoding="order",
     amo_encoding="pairwise",
-    sat_solver="glucose4",  # or "minisat22" if PySAT MiniSat22 is permitted
+    sat_solver="glucose4",  # frozen Protocol Core choice
     search_mode="multi",
     symmetry=False,
     warm_start=False,
     seed=0,
-    time_limit=<protocol value>,
+    time_limit=1800.0,
+    memory_limit=12.0,
 )
 ```
 
@@ -189,10 +190,7 @@ with no warning and no error, so there is nothing to classify.
 * `search_mode = multi`: the K-search loop `K ← B + 1` from a verified lower
   bound, stopping at the first UNSAT, is the only implemented mode
   (`src/sat/solve.py:168-218`). Completeness argument:
-  `docs/technical_appendix_draft.md` A.5. Note `Config.search_mode` is currently
-  in `IGNORED_CONFIG_FIELDS` and warns when set to `"multi"`
-  (`src/sat/solve.py:39-67`); the warning text is stale, the setting is
-  nonetheless what the loop does (review notes §2).
+  `docs/technical_appendix_draft.md` A.5. The `multi` K-search loop is implemented in the solver; it no longer emits an ignored-field warning for the canonical value.
 * `symmetry = false`, `warm_start = false`: not implemented
   (`src/sat/solve.py:39-45`); they must be reported as "off by design", not as
   "tested and found not to help".
@@ -209,7 +207,7 @@ with no warning and no error, so there is nothing to classify.
 3. FEAS rows carry a loose `ub`: when the run times out before any UNSAT,
    `ub = hi - 1` is still the counting bound `n - 1` (e.g. `randconn40`:
    `lb = 14, ub = 39`). Report FEAS bounds as bounds, not as near-optimal gaps.
-4. `time_limit` is a budget for the whole K chain, and the CaDiCaL budget loop can
+4. The canonical config passes `memory_limit=12.0` GiB to the shared runner; the runner must enforce it at OS process/job level. This value is valid only for the preflighted candidate host and must be reconfirmed by P3 before official execution.\n5. `time_limit` is a budget for the whole K chain, and the CaDiCaL budget loop can
    overshoot it (72.67 s observed at a 60 s limit for
    `pairwise/pairwise` on `n = 40`). If the protocol needs a hard wall-clock
    ceiling per run, that must be enforced by the runner, not by the solver.
