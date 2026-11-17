@@ -203,6 +203,47 @@ Kiểm tra thực tế (2026-10-20, branch `p2/w2-sat`):
 - Phạm vi: ticket này chỉ được thêm file docs (ràng buộc dispatch), không sửa
   `src/runner` — việc bổ sung cờ thuộc P3.
 
+### 4.1 Cập nhật 2026-11-03: --dry-run đã có trên runner
+
+Branch `p2/w4-sat`; `git describe --tags --always --dirty` tại thời điểm chạy:
+`v0.1-contract-126-g6b6b8b5-dirty` (hậu tố `-dirty` do working tree còn thay
+đổi chưa commit của chính task này).
+
+Lệnh chạy thật (verbatim):
+
+```powershell
+.venv\Scripts\python.exe -m src.runner --instance benchmark/toy/path4.json --method sat --abp-encoding pairwise --amo-encoding seqcounter --sat-solver cadical195 --search-mode multi --time-limit 1800 --out results/raw --dry-run
+```
+
+Stdout chạy thật (verbatim, 5 dòng `DRY_RUN`, exit code `0`, stderr rỗng):
+
+```
+DRY_RUN run_id=path4__sat__pairwise__seqcounter__cadical195__multi__sym0__ws0__s0__tl1800.0__mlNone
+DRY_RUN instance=path4 n=4 m=3
+DRY_RUN config method=sat abp_encoding=pairwise amo_encoding=seqcounter sat_solver=cadical195 search_mode=multi symmetry=false warm_start=false seed=0
+DRY_RUN budget time_limit=1800.0 hard_limit=1830.0 memory_limit=none memory_limit_enforced=false
+DRY_RUN output out_file=results\raw\path4__sat__pairwise__seqcounter__cadical195__multi__sym0__ws0__s0__tl1800.0__mlNone.json exists=false resume_would_skip=false
+```
+
+Đọc kết quả:
+
+- `run_id` = `path4__sat__pairwise__seqcounter__cadical195__multi__sym0__ws0__s0__tl1800.0__mlNone`,
+  đúng `make_run_id(instance, config)` — suffix `tl1800.0` vì `--time-limit`
+  qua argparse là float; `mlNone` vì không đặt `--memory-limit`.
+- `hard_limit = time_limit + KILL_GRACE_SECONDS = 1800.0 + 30.0 = 1830.0`;
+  constant đọc tại call time trong `src/runner/runner.py`, không hardcode.
+- `memory_limit=none` và literal `memory_limit_enforced=false`: runner hiện
+  không enforce memory limit; dry-run chỉ báo sự thật hiện tại, không ngụ ý
+  hard cap.
+- `n=4`, `m=3` đúng `benchmark/toy/path4.json` sau dedup loader.
+- `exists=false`, `resume_would_skip=false`: `results/raw` chưa có file tương
+  ứng; dry-run không tạo thư mục/file nào — `git status --porcelain results/raw`
+  rỗng sau lệnh.
+
+Phạm vi: mục này chỉ đóng blocker `--dry-run` (mục 2 của ticket 15). Quyết
+định M1 vẫn **NO-GO**; lý do và danh sách Bonus bị cắt ở mục 6 giữ nguyên
+byte-identical.
+
 ## 5. Hai phương án đặt ra cho gate M1
 
 Doc không chốt. Hai phương án, lý do mỗi bên:
@@ -271,6 +312,7 @@ Customer quyết định tại gate M1: **NO-GO** — chọn phương án B.
 - **Việc còn mở của gate** (không chặn quyết định): P3 bổ sung cờ `--dry-run`
   cho runner (`src/runner`) — mục 2 của ticket 15 vẫn chưa tick, theo dõi
   bên phía P3.
+  Đã hoàn tất 2026-11-03 — xem mục 4.1.
 
 ## Nguồn
 

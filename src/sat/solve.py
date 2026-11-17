@@ -9,6 +9,7 @@ UNSAT thì ``K - 1 = B`` là tối ưu. Mọi nghiệm đều qua ``verify()`` t
 from __future__ import annotations
 
 import ctypes
+import math
 import os
 import warnings
 from ctypes import wintypes
@@ -36,10 +37,54 @@ from src.sat.pairwise import (
 
 METHOD = "sat"
 ABP_ENCODINGS = (DEFAULT_ABP_ENCODING, "order")
+DEFAULT_SEARCH_MODE = "multi"
+
+# Canonical SAT configuration khóa ở M2 (ticket 18 / 21, docs/canonical_sat_config.md).
+CANONICAL_SAT_CONFIG = Config(
+    method=METHOD,
+    abp_encoding="order",
+    amo_encoding="pairwise",
+    sat_solver="glucose4",
+    search_mode=DEFAULT_SEARCH_MODE,
+    symmetry=False,
+    warm_start=False,
+    seed=0,
+    time_limit=1800.0,
+    memory_limit=12.0,
+)
+
+
+def canonical_sat_config(
+    *,
+    time_limit: float | None = 1800.0,
+    memory_limit: float | None = 12.0,
+    sat_solver: str = "glucose4",
+) -> Config:
+    """Trả cấu hình SAT chuẩn; caller phải chọn rõ hard cap GiB của runner."""
+    if (
+        memory_limit is None
+        or isinstance(memory_limit, bool)
+        or not isinstance(memory_limit, (int, float))
+        or not math.isfinite(float(memory_limit))
+        or memory_limit <= 0
+    ):
+        raise ValueError("memory_limit phải được truyền rõ và là số hữu hạn > 0 GiB.")
+    return Config(
+        method=METHOD,
+        abp_encoding=CANONICAL_SAT_CONFIG.abp_encoding,
+        amo_encoding=CANONICAL_SAT_CONFIG.amo_encoding,
+        sat_solver=sat_solver,
+        search_mode=CANONICAL_SAT_CONFIG.search_mode,
+        symmetry=CANONICAL_SAT_CONFIG.symmetry,
+        warm_start=CANONICAL_SAT_CONFIG.warm_start,
+        seed=CANONICAL_SAT_CONFIG.seed,
+        time_limit=time_limit,
+        memory_limit=memory_limit,
+    )
+
 
 # Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.
 IGNORED_CONFIG_FIELDS = (
-    "memory_limit",
     "search_mode",
     "symmetry",
     "warm_start",
@@ -48,6 +93,7 @@ IGNORED_CONFIG_FIELDS = (
 _CONFIG_DEFAULTS = {
     name: getattr(Config(method=METHOD), name) for name in IGNORED_CONFIG_FIELDS
 }
+_IMPLEMENTED_SEARCH_MODES = (None, DEFAULT_SEARCH_MODE)
 
 
 def _warn_ignored_config(cfg: Config) -> None:
@@ -55,16 +101,19 @@ def _warn_ignored_config(cfg: Config) -> None:
     ignored = [
         name
         for name in IGNORED_CONFIG_FIELDS
-        if getattr(cfg, name) != _CONFIG_DEFAULTS[name]
+        if (
+            name == "search_mode" and cfg.search_mode not in _IMPLEMENTED_SEARCH_MODES
+        )
+        or (name != "search_mode" and getattr(cfg, name) != _CONFIG_DEFAULTS[name])
     ]
     if not ignored:
         return
 
     warnings.warn(
-        "W1 bỏ qua các field Config: "
+        "SAT solver chưa dùng trực tiếp các field Config: "
         + ", ".join(ignored)
-        + " (memory_limit chưa cài đặt nên status MO không bao giờ xuất hiện; "
-        "search_mode/symmetry/warm_start/seed thuộc P3).",
+        + " (memory cap được enforce bởi shared runner; search_mode/symmetry/"
+        "warm_start/seed cần tuân theo protocol).",
         stacklevel=2,
     )
 
@@ -86,8 +135,8 @@ class _PROCESS_MEMORY_COUNTERS(ctypes.Structure):
     ]
 
 
-# Windows dùng psapi; Linux dùng /proc/self/statm để tránh phụ thuộc API Windows
-# ngay lúc import (đặc biệt khi chạy unit test/CI trên Linux).
+# Windows dùng psapi; Linux đọc RSS từ /proc/self/statm. Không được gọi
+# ctypes.WinDLL ở module import trên Linux vì API này không tồn tại ở đó.
 if hasattr(ctypes, "WinDLL"):
     _psapi = ctypes.WinDLL("psapi")
     _kernel32 = ctypes.WinDLL("kernel32")
@@ -106,10 +155,10 @@ else:
 
 
 def working_set_mb() -> float:
-    """Working set hiện tại của process này, đơn vị MB, qua GetProcessMemoryInfo.
+    """Working set (Windows) hoặc RSS (Linux), đơn vị MB.
 
-    Trên Windows dùng GetProcessMemoryInfo; Linux đọc RSS từ /proc/self/statm.
-    Thất bại hệ thống trả ``0.0``: số liệu bộ nhớ không được làm gãy pipeline.
+    Linux sampling chỉ phục vụ test/phát triển; hard memory cap official vẫn do
+    runner/OS enforce và Protocol khóa cùng một Windows host cho mọi official run.
     """
     if _psapi is not None and _kernel32 is not None:
         counters = _PROCESS_MEMORY_COUNTERS()
@@ -120,8 +169,6 @@ def working_set_mb() -> float:
         if measured:
             return counters.WorkingSetSize / (1024.0 * 1024.0)
 
-    # Linux: trường resident pages ở cột 2 của /proc/self/statm; chỉ đọc số liệu,
-    # không tạo cơ chế enforce giới hạn bộ nhớ.
     try:
         with open("/proc/self/statm", "r", encoding="ascii") as stream:
             fields = stream.read().split()
