@@ -14,7 +14,7 @@ Nội dung sinh tự động:
   - G3 Gate: kiểm tra tỷ lệ hoàn thành các run Core (≥ 80%) và phân loại toàn bộ
     các run bất thường qua ``src.sat.triage``.
 
-    python -m experiments.analyze_rq1_rq2 --out docs/handoff/w4-sat/23-rq1-rq2-draft-analysis.md
+    python -m experiments.analyze_rq1_rq2 --expected-runs N_FROM_FROZEN_PLAN --out docs/handoff/w4-sat/23-rq1-rq2-draft-analysis.md
 """
 
 from __future__ import annotations
@@ -80,6 +80,7 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
         "clauses": _to_int(raw.get("clauses")),
         "peak_memory": _to_float(raw.get("peak_memory")),
         "time_limit": _to_float(raw.get("time_limit")) or 60.0,
+        "search_mode": str(raw.get("search_mode") or "multi"),
         "error": str(raw.get("error") or ""),
     }
 
@@ -325,6 +326,47 @@ def evaluate_g3_gate(
     )
 
 
+CORE_RQ2_SOLVERS = frozenset({"cadical195", "glucose4"})
+
+
+def split_combined_rq_rows(
+    rows: Sequence[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Tách runs.csv theo đúng trục thí nghiệm, không gộp cấu hình khác điều kiện.
+
+    RQ1: CaDiCaL, search_mode=multi và ba CNF khác nhau theo Protocol §4/§9.1.
+    RQ2: canonical order/pairwise và solver Core đã xác minh (CaDiCaL, Glucose).
+    Exact rows, baseline ngoài Core và order/seqcounter (CNF trùng) bị loại.
+    """
+    sat_rows = [
+        row for row in rows
+        if row.get("method", "sat") == "sat"
+        and row.get("search_mode", "multi") == "multi"
+    ]
+    rq1_rows = [
+        row for row in sat_rows
+        if row.get("solver") == "cadical195"
+        and (row.get("abp_encoding"), row.get("amo_encoding")) in {
+            ("pairwise", "pairwise"),
+            ("pairwise", "seqcounter"),
+            ("order", "pairwise"),
+        }
+    ]
+    rq2_rows = [
+        row for row in sat_rows
+        if row.get("abp_encoding") == "order"
+        and row.get("amo_encoding") == "pairwise"
+        and row.get("solver") in CORE_RQ2_SOLVERS
+    ]
+    if not rq1_rows or not rq2_rows:
+        raise ValueError(
+            "runs.csv phải chứa cả RQ1 (CaDiCaL, 3 CNF) và RQ2 "
+            "(canonical order/pairwise, Core solver CaDiCaL/Glucose); "
+            "kiểm tra schema và frozen run plan."
+        )
+    return rq1_rows, rq2_rows
+
+
 def render_markdown_report(
     rq1_rows: Sequence[dict[str, Any]],
     rq2_rows: Sequence[dict[str, Any]],
@@ -340,7 +382,12 @@ def render_markdown_report(
 
     unique_run_ids = {r["run_id"] for r in rq1_rows} | {r["run_id"] for r in rq2_rows}
     completed_count = len(unique_run_ids)
-    expected_count = expected_core_runs or max(completed_count, 1)
+    if expected_core_runs is None or expected_core_runs <= 0:
+        raise ValueError(
+            "G3 cần --expected-runs > 0 lấy từ frozen run plan; "
+            "không được suy mẫu số từ số run đã quan sát."
+        )
+    expected_count = expected_core_runs
     g3 = evaluate_g3_gate(completed_count, expected_count, triage_reports)
 
     lines: list[str] = [
@@ -505,7 +552,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rq1-csv", type=Path, default=DEFAULT_RQ1_CSV)
     parser.add_argument("--rq2-csv", type=Path, default=DEFAULT_RQ2_CSV)
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
-    parser.add_argument("--expected-runs", type=int, default=None)
+    parser.add_argument(
+        "--expected-runs", type=int, required=True,
+        help="Số run Core duy nhất từ frozen run plan; bắt buộc cho G3.",
+    )
     parser.add_argument("--out", type=Path, default=DEFAULT_REPORT_PATH)
     args = parser.parse_args(argv)
 
@@ -513,14 +563,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.runs_csv is not None and args.runs_csv.is_file():
         all_rows = load_csv_rows(args.runs_csv)
-        rq1_rows = all_rows
-        rq2_rows = all_rows
-        source_note = f"`{args.runs_csv.relative_to(REPO_ROOT) if args.runs_csv.is_relative_to(REPO_ROOT) else args.runs_csv}`"
+        rq1_rows, rq2_rows = split_combined_rq_rows(all_rows)
+        source_note = f"`{args.runs_csv.relative_to(REPO_ROOT) if args.runs_csv.is_relative_to(REPO_ROOT) else args.runs_csv}` (đã lọc riêng trục RQ1/RQ2 theo protocol)"
     elif DEFAULT_RUNS_CSV.is_file():
         all_rows = load_csv_rows(DEFAULT_RUNS_CSV)
-        rq1_rows = all_rows
-        rq2_rows = all_rows
-        source_note = "`results/runs.csv`"
+        rq1_rows, rq2_rows = split_combined_rq_rows(all_rows)
+        source_note = "`results/runs.csv` (đã lọc riêng trục RQ1/RQ2 theo protocol)"
     else:
         rq1_rows = load_csv_rows(args.rq1_csv) if args.rq1_csv.is_file() else []
         rq2_rows = load_csv_rows(args.rq2_csv) if args.rq2_csv.is_file() else []
