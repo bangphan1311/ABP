@@ -48,8 +48,12 @@ def plan(args):
             for abp,amo in RQ1_CONFIGS: add(stage,inst,"sat",abp,amo,"cadical",args.time_limit if args.time_limit is not None else 1800,"Only run after hard memory limit is tested on target OS")
             for method in EXACT_METHODS: add(stage,inst,method,None,None,None,args.time_limit if args.time_limit is not None else 1800,"Only run after hard memory limit and license checks")
     elif stage=="official":
+        if args.abp_encoding not in (None, "order"):
+            raise ValueError("official SAT abp_encoding is frozen to order")
+        if args.amo_encoding not in (None, "pairwise"):
+            raise ValueError("official SAT amo_encoding is frozen to pairwise")
         for r in rows:
-            add(stage,r["id"],"sat",args.abp_encoding,args.amo_encoding,"cadical",args.time_limit if args.time_limit is not None else 1800,"Canonical SAT config must be selected before official run")
+            add(stage,r["id"],"sat","order","pairwise","glucose4",args.time_limit if args.time_limit is not None else 1800,"Canonical Core SAT: order/pairwise/glucose4; memory cap is metadata here and must be enforced by runner")
             for method in EXACT_METHODS: add(stage,r["id"],method,None,None,None,args.time_limit if args.time_limit is not None else 1800,"License/size limit must be verified before official run")
     ids=[r["run_id_plan"] for r in out]
     if len(ids)!=len(set(ids)): raise ValueError("duplicate planned run IDs")
@@ -59,7 +63,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--stage",choices=["pilot-rq1","pilot-rq2","pilot-exact","pilot-large","official"],required=True)
     p.add_argument("--instances",type=Path,default=INV);p.add_argument("--data-dir",type=Path,default=RAW)
-    p.add_argument("--time-limit",type=int);p.add_argument("--memory-limit-gib",type=float,help="metadata only; no memory enforcement")
+    p.add_argument("--time-limit",type=int);p.add_argument("--memory-limit-gib",type=float,default=12.0,help="planned GiB cap metadata; the runner, not this dry-run script, enforces it")
     p.add_argument("--abp-encoding",choices=["pairwise","order"]);p.add_argument("--amo-encoding",choices=["pairwise","seqcounter"])
     p.add_argument("--output",type=Path);a=p.parse_args()
     try: rows=plan(a)
