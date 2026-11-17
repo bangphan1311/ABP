@@ -342,8 +342,18 @@ def split_combined_rq_rows(
     RQ2: canonical order/pairwise và solver Core đã xác minh (CaDiCaL, Glucose).
     Exact rows, baseline ngoài Core và order/seqcounter (CNF trùng) bị loại.
     """
+    unique_rows: list[dict[str, Any]] = []
+    seen_run_ids: set[str] = set()
+    for row in rows:
+        run_id = str(row.get("run_id") or "")
+        if run_id and run_id in seen_run_ids:
+            continue
+        if run_id:
+            seen_run_ids.add(run_id)
+        unique_rows.append(row)
+
     sat_rows = [
-        row for row in rows
+        row for row in unique_rows
         if row.get("method", "sat") == "sat"
         and row.get("search_mode", "multi") == "multi"
     ]
