@@ -76,26 +76,37 @@ def test_evaluate_g3_gate_enforces_80_percent_and_zero_code_bugs():
             reasons=["timeout after incumbent"],
         ),
     ]
+    ok_triage.extend(
+        TriageReport(
+            run_id=f"r{i}",
+            instance_id=f"p{i}",
+            status="OPT",
+            category="OK",
+            is_anomaly=False,
+            reasons=["ok"],
+        )
+        for i in range(3, 81)
+    )
 
     gate_pass = evaluate_g3_gate(80, 100, ok_triage)
     assert gate_pass.passed_completion is True
     assert gate_pass.passed_gate is True
 
-    gate_low = evaluate_g3_gate(79, 100, ok_triage)
+    gate_low = evaluate_g3_gate(79, 100, ok_triage[:79])
     assert gate_low.passed_completion is False
     assert gate_low.passed_gate is False
 
-    bug_triage = ok_triage + [
+    bug_triage = ok_triage[:79] + [
         TriageReport(
-            run_id="r3",
-            instance_id="p6",
+            run_id="r81",
+            instance_id="p81",
             status="OPT",
             category="CODE_BUG",
             is_anomaly=True,
             reasons=["lb != verified"],
         )
     ]
-    gate_bug = evaluate_g3_gate(95, 100, bug_triage)
+    gate_bug = evaluate_g3_gate(80, 100, bug_triage)
     assert gate_bug.code_bugs_count == 1
     assert gate_bug.passed_gate is False
 
@@ -103,6 +114,78 @@ def test_evaluate_g3_gate_enforces_80_percent_and_zero_code_bugs():
     assert missing_raw.missing_raw_records_count == 1
     assert missing_raw.passed_gate is False
 
+    with pytest.raises(ValueError, match="không khớp số triage report"):
+        evaluate_g3_gate(80, 100, ok_triage[:2])
+
+
+def test_evaluate_g3_gate_rejects_unrecognized_non_anomaly_category():
+    bad_category = TriageReport(
+        run_id="unexpected",
+        instance_id="p1",
+        status="OPT",
+        category="UNRECOGNIZED",
+        is_anomaly=False,
+        reasons=[],
+    )
+    result = evaluate_g3_gate(1, 2, [bad_category])
+    assert result.unclassified_anomalies == 1
+    assert result.passed_gate is False
+
+
+def test_render_g3_does_not_drop_invalid_status_rows_from_core_denominator():
+    def row(run_id, instance, encoding, amo, solver, status):
+        return {
+            "run_id": run_id,
+            "instance": instance,
+            "method": "sat",
+            "abp_encoding": encoding,
+            "amo_encoding": amo,
+            "solver": solver,
+            "search_mode": "multi",
+            "status": status,
+            "lb": 2 if status == "OPT" else None,
+            "ub": 2 if status == "OPT" else None,
+            "t_encode": 0.01,
+            "t_solve": 0.02,
+            "t_total": 0.03,
+            "variables": 12,
+            "clauses": 62,
+            "peak_memory": 20.0,
+            "time_limit": 60.0,
+        }
+
+    invalid = row("r-invalid", "i1", "pairwise", "pairwise", "cadical195", "BROKEN")
+    rq1_rows = [
+        invalid,
+        row("r2", "i2", "pairwise", "seqcounter", "cadical195", "OPT"),
+        row("r3", "i3", "order", "pairwise", "cadical195", "OPT"),
+    ]
+    rq2_rows = [
+        row("r4", "i4", "order", "pairwise", "glucose4", "OPT"),
+        row("r5", "i5", "order", "pairwise", "glucose4", "OPT"),
+    ]
+    reports = [
+        TriageReport(
+            run_id="r-invalid", instance_id="i1", status="BROKEN",
+            category="CODE_BUG", is_anomaly=True, reasons=["invalid status"],
+        ),
+        *[
+            TriageReport(
+                run_id=run_id, instance_id=instance, status="OPT",
+                category="OK", is_anomaly=False, reasons=["ok"],
+            )
+            for run_id, instance in [
+                ("r2", "i2"), ("r3", "i3"), ("r4", "i4"), ("r5", "i5")
+            ]
+        ],
+    ]
+
+    report = render_markdown_report(
+        rq1_rows, rq2_rows, reports, expected_core_runs=5
+    )
+    assert "5 / 5" in report
+    assert "lỗi correctness `CODE_BUG`: `1`" in report
+    assert "**FAIL**" in report
 
 
 def test_split_combined_runs_csv_keeps_rq1_and_rq2_axes_separate():

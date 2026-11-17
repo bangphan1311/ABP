@@ -319,15 +319,30 @@ def evaluate_g3_gate(
         raise ValueError("threshold phải là số trong khoảng (0, 1].")
     if not 0 < threshold <= 1:
         raise ValueError("threshold phải nằm trong khoảng (0, 1].")
+    triage_ids = [report.run_id for report in triage_reports]
+    if any(not run_id for run_id in triage_ids):
+        raise ValueError("triage report thiếu run_id.")
+    if len(set(triage_ids)) != len(triage_ids):
+        raise ValueError("triage_reports có run_id trùng; phải xử lý attempt/raw evidence trước G3.")
+    if len(triage_ids) != completed_runs:
+        raise ValueError(
+            f"completed_runs={completed_runs} không khớp số triage report duy nhất={len(triage_ids)}."
+        )
     ratio = completed_runs / expected_runs
     passed_completion = ratio >= threshold
 
     anomalies = [r for r in triage_reports if r.is_anomaly]
     unclassified = [
-        r
-        for r in anomalies
-        if r.category not in ("SOLVER_BEHAVIOR", "ENV_ERROR", "CODE_BUG")
-        or not r.reasons
+        report
+        for report in triage_reports
+        if report.category not in ("OK", "SOLVER_BEHAVIOR", "ENV_ERROR", "CODE_BUG")
+        or (
+            report.is_anomaly
+            and (
+                report.category not in ("SOLVER_BEHAVIOR", "ENV_ERROR", "CODE_BUG")
+                or not report.reasons
+            )
+        )
     ]
     code_bugs = [r for r in triage_reports if r.category == "CODE_BUG"]
     passed_gate = (
@@ -439,11 +454,14 @@ def render_markdown_report(
     counterexamples = find_smaller_cnf_slower_solve_cases(rq1_rows)
 
     core_rows = list(rq1_rows) + list(rq2_rows)
-    core_run_ids = {
-        str(row["run_id"])
-        for row in core_rows
-        if row.get("run_id") and row.get("status") in {"OPT", "FEAS", "TO", "MO", "ERR"}
-    }
+    missing_run_id_rows = [row for row in core_rows if not row.get("run_id")]
+    if missing_run_id_rows:
+        raise ValueError(
+            f"{len(missing_run_id_rows)} Core row thiếu run_id; không thể tính G3 an toàn."
+        )
+    # Giữ cả row có status hỏng trong mẫu số để triage có thể chặn CODE_BUG;
+    # không được lặng lẽ bỏ chúng khỏi G3 chỉ vì status ngoài CONTRACT.
+    core_run_ids = {str(row["run_id"]) for row in core_rows}
     triage_by_id: dict[str, TriageReport] = {}
     for report in triage_reports:
         if report.run_id not in core_run_ids:
