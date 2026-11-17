@@ -76,6 +76,16 @@ class _FakeSolveResult:
         return self.solution
 
 
+def test_cplex_cp_complete_incumbent_is_independently_verified():
+    solution = _FakeModelSolution({"x0": 2, "x1": 4, "x2": 1, "x3": 3})
+    labeling, objective, error = _extract_verified_solution(
+        _FakeSolveResult(solution), ["x0", "x1", "x2", "x3"], _path4()
+    )
+    assert labeling == {0: 2, 1: 4, 2: 1, 3: 3}
+    assert objective == 2
+    assert error is None
+
+
 def test_cplex_cp_no_incumbent_is_not_an_extraction_error():
     labeling, objective, error = _extract_verified_solution(
         _FakeSolveResult(None), ["x0", "x1", "x2", "x3"], _path4()
