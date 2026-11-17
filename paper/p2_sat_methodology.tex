@@ -186,3 +186,86 @@ model decoding, model counts, and the AMO contract. The empirical matrix is
 evidence for the tested finite instances, not a proof that the SAT backends
 always answer UNSAT correctly. The proof argument for the encodings and the
 K-search invariants is provided in Appendix~\ref{app:sat-correctness}.
+
+
+\subsection{W3 pilot observations}
+\label{subsec:sat-pilot-observations}
+
+The committed W3 pilot evaluated ten deterministic synthetic instances
+($n=8$--$50$), not the official 24-instance Harwell--Boeing benchmark. Each
+pilot run used a 60-second limit. The values below are therefore preliminary
+engineering evidence used to choose the Core SAT configuration; they are not
+the final RQ1/RQ2 results and must not be pooled with the official RQ3 queue.
+The source records are \texttt{results/pilot\_rq1.csv} and
+\texttt{results/pilot\_rq2.csv}; the selection rationale is recorded in
+\texttt{docs/canonical\_sat\_config.md}.
+
+Table~\ref{tab:sat-rq1-pilot} summarizes the RQ1 pilot. The two order rows
+produce the same CNF because the order encoding has no separate AMO group;
+they are shown as a consistency check, not as two distinct encodings.
+
+\begin{table}[t]
+\centering
+\caption{W3 synthetic pilot: ABP encoding and AMO (10 instances).}
+\label{tab:sat-rq1-pilot}
+\begin{tabular}{llrrrrrr}
+\hline
+ABP encoding & AMO & OPT & FEAS & $\sum t_{\mathrm{total}}$ (s) &
+Median clauses & Max clauses & Max memory (MB)\\
+\hline
+order & pairwise & 10/10 & 0 & 23.24 & 8,840 & 196,450 & 111.4\\
+order & seqcounter$^\ast$ & 10/10 & 0 & 23.12 & 8,840 & 196,450 & 113.0\\
+pairwise & seqcounter & 9/10 & 1 & 88.50 & 7,548 & 147,500 & 87.6\\
+pairwise & pairwise & 9/10 & 1 & 86.43 & 11,444 & 255,400 & 126.5\\
+\hline
+\end{tabular}
+\par\smallskip
+\footnotesize $^\ast$The order encoding does not use AMO; the clause and
+variable counts are identical to order/pairwise. The row is retained only as
+a metadata/identity consistency check.
+\end{table}
+
+Both pairwise-ABP variants returned FEAS on \texttt{randconn40}, whereas the
+order variant proved OPT on that instance. Over this pilot set, the order
+configuration also had a lower aggregate runtime than either pairwise-ABP
+variant. However, the sequential-counter AMO produced fewer clauses and a
+lower maximum sampled memory value than order on this particular set. These
+observations do not establish that one encoding is universally superior:
+CNF size, solver runtime, and memory are separate measurements, and the
+sample is small and synthetic.
+
+Table~\ref{tab:sat-rq2-pilot} summarizes the solver comparison on the selected
+order/pairwise encoding.
+
+\begin{table}[t]
+\centering
+\caption{W3 synthetic pilot: SAT solver comparison on order/pairwise
+(10 instances).}
+\label{tab:sat-rq2-pilot}
+\begin{tabular}{lrrrr}
+\hline
+Solver & Role & OPT & $\sum t_{\mathrm{total}}$ (s) &
+Max memory (MB)\\
+\hline
+glucose4 & Protocol Core & 10/10 & 17.13 & 100.3\\
+cadical195 & Protocol Core & 10/10 & 23.24 & 111.4\\
+minisat22 & Extra PySAT baseline & 10/10 & 16.61 & 99.3\\
+glucose42 & Extra PySAT baseline & 10/10 & 17.49 & 99.9\\
+\hline
+\end{tabular}
+\end{table}
+
+Within the Protocol Core candidate set
+$\{\texttt{cadical195},\texttt{glucose4}\}$, both solvers proved OPT on all ten
+instances, while Glucose had lower aggregate runtime and lower maximum
+sampled memory. MiniSat22 was faster in the broader four-solver pilot, but it
+was an additional PySAT baseline rather than a member of the predeclared Core
+set. The canonical Core choice is therefore
+\texttt{order/pairwise/glucose4}. Kissat was excluded because the tested
+PySAT binding did not pass the project's model/assumption and process-safety
+checks.
+
+The results above are not official benchmark evidence. The 24 raw
+Harwell--Boeing \texttt{.mtx.rnd} files and the official run records are not
+present in the repository snapshot used to prepare this draft. Accordingly,
+no conclusion about SAT versus Exact on the official instances is stated here.
