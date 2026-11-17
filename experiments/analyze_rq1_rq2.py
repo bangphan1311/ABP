@@ -35,9 +35,7 @@ from src.sat.triage import DEFAULT_RAW_DIR, TriageReport, triage_directory
 
 DEFAULT_RQ1_CSV = REPO_ROOT / "results" / "pilot_rq1.csv"
 DEFAULT_RQ2_CSV = REPO_ROOT / "results" / "pilot_rq2.csv"
-DEFAULT_REPORT_PATH = (
-    REPO_ROOT / "docs" / "handoff" / "w4-sat" / "23-rq1-rq2-draft-analysis.md"
-)
+DEFAULT_REPORT_PATH = REPO_ROOT / "docs" / "w4-sat" / "23-rq1-rq2-draft-analysis.md"
 G3_THRESHOLD = 0.80
 
 
