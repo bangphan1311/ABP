@@ -4,8 +4,8 @@ Purpose: continue the project from the current GitHub state without redoing the 
 
 ## Repository and branch snapshot
 - Repository: https://github.com/bangphan1311/ABP
-- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest tested source/workflow candidate: `c03659beedbb5f69c9f2af3930f40baba614df88`; later commits only update audit/readiness/handoff documentation. Branch is synchronized with main (0 commits behind).
-- PR #52: https://github.com/bangphan1311/ABP/pull/52 — P2 SAT W4 implementation/analysis, open; branch `p2/w4-sat`; latest observed head `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; compare vs main at review time: 25 ahead / 0 behind.
+- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest tested source/workflow candidate: `c03659beedbb5f69c9f2af3930f40baba614df88`; later commits update audit/readiness/handoff documentation only. Current head at last verification: `7f6a9f295c3d3617e93ba9e0dbd1fa7782f72a3f`; compare vs main: 110 ahead / 0 behind.
+- PR #52: https://github.com/bangphan1311/ABP/pull/52 — P2 SAT W4 implementation/analysis, open; branch `p2/w4-sat`; current head at last verification `02f225578b0b3cba0e325d856d3835934f826881`; compare vs main: 29 ahead / 0 behind; P1 review APPROVED for code review only, P3 reviewer ENEIT still requested.
 - Do not force-push or reset either branch. Reconcile P1 with main only after reviewing/merging P2, then rerun affected tests.
 
 ## Work added in this review round
@@ -32,11 +32,19 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - Updated PR #50 and issue #49 descriptions to show protocol status, host/dataset/budget blockers and review requests.
 
 ## CI evidence — do not overstate
-- P1 workflow run #73: https://github.com/bangphan1311/ABP/actions/runs/44009085711 — PASS on Windows and Ubuntu, 23 tests per platform. This covers HB loader/checkpoint/shared runner, not the full suite and not P2's SAT-analysis tests.
-- New P2 SAT CI workflow: `.github/workflows/sat-core-tests.yml`, matrix Ubuntu + Windows, command `python -m pytest tests/sat tests/experiments/test_analyze_rq1_rq2.py tests/experiments/test_pilot_scripts.py -q`.
-- First P2 run #1: https://github.com/bangphan1311/ABP/actions/runs/44009690444 — FAILED on both OS during collection because `ortools` was missing (`tests/sat/test_g1_oracle.py` imports `src.exact.cp_sat_solver`).
-- P2 then added commit `acd9dd0` to install `ortools==9.15.6755` alongside pytest and python-sat. Workflow run #2: https://github.com/bangphan1311/ABP/actions/runs/44010144573 — `action_required`; no test pass/fail result on that new SHA is available yet. Approve/enable/re-run it, then diagnose subsequent failures.
-- Historical PR #52 test counts (513/514 passed) predate the current review fixes; they are not evidence for latest head.
+
+### P1
+- P1 full-suite workflow #44037909768 on source/test SHA `c03659beedbb5f69c9f2af3930f40baba614df88`: **539 passed on Ubuntu and 539 passed on Windows**; focused runner/HB/Exact jobs also passed.
+- The current P1 branch tip is later documentation/handoff-only commits; source/tests are unchanged from the tested SHA above.
+
+### P2
+- Older P2 workflow #44010144573 on `acd9dd00` was `action_required`; it is obsolete and must not be cited as current validation.
+- The P2 workflow was corrected and now runs both focused SAT/W4 tests and full `python -m pytest tests -q` on Ubuntu + Windows.
+- Latest P2 code/test SHA: `a5d58821393448cc1f019e7860c6546a4bedd907`; workflow [#44040260149](https://github.com/bangphan1311/ABP/actions/runs/44040260149) completed successfully:
+  - Ubuntu: SAT/W4 **452 passed**; full suite **556 passed**.
+  - Windows: SAT/W4 **452 passed**; full suite **556 passed**.
+- P2 branch tip `02f225578b0b3cba0e325d856d3835934f826881` adds only the W4 freeze-doc evidence after the tested code/test SHA; no source/test changes followed `a5d58821`.
+- These tests do not provide the missing raw pilot JSON, resolve the historical pilot budget, establish solver license entitlement or replace P3's official-host/queue sign-off.
 
 ## Unresolved methodology and data blockers
 
@@ -138,7 +146,7 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - Main head at sync: `276c6c010102e4836eb8bc3af4c6705a3f1cb3d2`.
 - The 11 commits missing from P1 touched 22 paths. Path comparison found only one overlap, `AGENTS.md`; P1's file was byte-identical to the merge-base, so the upstream Core Rules addition was retained. The remaining 21 files were added from main without overlap.
 - Created a normal two-parent merge commit `47ffc1a564b63e4c8ba1577d278e2c4f73544a8d` with parents P1 `d53e5118...` and main `276c6c0...`. The branch update was fast-forward from the old P1 head; no force-push.
-- P1 is now **109 ahead / 0 behind** main. PR #50 remains open and GitHub reports it mergeable.
+- P1 is now **110 ahead / 0 behind** main at the current branch tip. PR #50 remains open and GitHub reports it mergeable.
 
 ### CI workflow expanded
 - The P1 W3 workflow now includes the pilot script tests, Exact status/time-budget tests and a separate full-suite matrix on Ubuntu + Windows.
