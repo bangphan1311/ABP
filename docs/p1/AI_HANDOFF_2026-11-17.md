@@ -4,7 +4,7 @@ Purpose: continue the project from the current GitHub state without redoing the 
 
 ## Repository and branch snapshot
 - Repository: https://github.com/bangphan1311/ABP
-- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest head after Exact fixes, main sync and CI expansion: `c03659beedbb5f69c9f2af3930f40baba614df88`; compare vs main: 105 ahead / 0 behind.
+- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest tested source/workflow candidate: `c03659beedbb5f69c9f2af3930f40baba614df88`; later commits only update audit/readiness/handoff documentation. Branch is synchronized with main (0 commits behind).
 - PR #52: https://github.com/bangphan1311/ABP/pull/52 — P2 SAT W4 implementation/analysis, open; branch `p2/w4-sat`; latest observed head `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; compare vs main at review time: 25 ahead / 0 behind.
 - Do not force-push or reset either branch. Reconcile P1 with main only after reviewing/merging P2, then rerun affected tests.
 
@@ -152,3 +152,9 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - Issue #26 has been reopened because full-suite evidence, P2 proof sign-off and pilot-budget resolution are required for the shared/freeze candidate. The 539-pass P1 branch run does not by itself certify the unmerged P2 head.
 - Keep #26, #28, #29, #30, #31–38 and #49 open while their respective acceptance gates remain.
 - License entitlement verification remains with P1 (user). Official queue, official host, 12 GiB Job Object enforcement/kill/MO, checkpoint/resume/attempt history, real HB raw inputs and raw→validation→`runs.csv` remain P3 responsibilities.
+
+
+### Documentation synchronization after full-suite CI
+- After full-suite verification, P1 updated `docs/p1/exact-methodology-review.md` and `docs/p1/w3-w4-exact-readiness.md` to replace the stale "CI verification pending" note for E1–E3 with the actual focused/full-suite evidence.
+- The code/test candidate used for the full-suite result remains `c03659be`; subsequent commits only update the audit, readiness and handoff documents. They do not modify solver source or tests.
+- Current P2 branch has still not advanced beyond `acd9dd00`; the cross-axis RQ1/RQ2 run-ID deduplication blocker and P2 workflow authorization remain unresolved.
