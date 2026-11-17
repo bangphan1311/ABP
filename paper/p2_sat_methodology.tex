@@ -200,6 +200,13 @@ The source records are \texttt{results/pilot\_rq1.csv} and
 \texttt{results/pilot\_rq2.csv}; the selection rationale is recorded in
 \texttt{docs/canonical\_sat\_config.md}.
 
+The run identifiers in both CSVs record a 60-second limit. The current
+Experimental Protocol v1.0-rc §6.2 specifies 1,800 seconds for RQ1/RQ2 pilot
+runs. This budget mismatch is unresolved: these tables describe the historical
+60-second run only and cannot be presented as evidence from an 1,800-second
+pilot. The group must approve the historical budget or repeat the pilot before
+M2 freeze.
+
 Table~\ref{tab:sat-rq1-pilot} summarizes the RQ1 pilot. The two order rows
 produce the same CNF because the order encoding has no separate AMO group;
 they are shown as a consistency check, not as two distinct encodings.
