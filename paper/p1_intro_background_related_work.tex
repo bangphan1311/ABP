@@ -1,0 +1,53 @@
+% P1 contribution blocks for the master manuscript.
+% The repository had no existing manuscript source when reviewed on 2026-11-06.
+% These are modular passages for integration, not a complete paper Introduction.
+
+\section{Introduction}
+\label{sec:introduction}
+
+The Antibandwidth Problem (ABP) is a graph-labeling optimization problem in which each vertex receives a distinct integer label and the minimum label difference across adjacent vertices is maximized. Although the objective is simple to state, finding a labeling with a large minimum edge separation is computationally difficult on general graphs. The problem has been studied using integer programming, constraint programming, and metaheuristic approaches. In particular, previous computational work has shown that the commonly used Harwell--Boeing instances remain challenging for exact optimization, motivating continued comparison of formulations and solver technologies \citep{Duarte2011,Sinnl2021}.
+
+This project studies the ABP through a controlled computational comparison between SAT-based solving and exact optimization. The Exact component provides four backends---Gurobi MIP, CPLEX MIP, CPLEX CP Optimizer, and OR-Tools CP-SAT---that implement a common labeling objective and are evaluated under a shared input, verification, time-accounting, and result-status contract. The purpose is to establish comparable exact baselines and examine how solver technology and graph structure relate to proof of optimality, feasible solution quality, runtime, and resource use. The project does not claim a new general-purpose ABP formulation; its contribution is the implementation and protocol-driven comparison of these backends alongside the selected SAT configuration.
+
+The benchmark study uses the 24 Harwell--Boeing graph instances identified by the OPTSICOM ABP benchmark collection, comprising 12 smaller and 12 larger graphs \citep{OptsicomABP}. The experimental design distinguishes preliminary validation pilots from the official comparison. Pilot runs are used to expose implementation, input, licensing, and resource risks; only validated runs under the frozen official protocol are used to answer the research questions.
+
+% Integrate the project-wide objectives and RQ wording here after the master
+% manuscript and P2/P3 sections are available. Do not insert pilot findings.
+
+\section{Problem Background}
+\label{sec:background}
+
+Let $G=(V,E)$ be a simple undirected graph with $n=|V|$ vertices. A labeling is a bijection $f:V\rightarrow\{1,\ldots,n\}$. The antibandwidth of a labeling is the smallest absolute difference between the labels assigned to the endpoints of any edge. The optimal antibandwidth is therefore
+\begin{equation}
+  \operatorname{AB}(G)
+  = \max_{f:V\rightarrow\{1,\ldots,n\}\ \mathrm{bijective}}
+       \min_{\{u,v\}\in E}|f(u)-f(v)|.
+  \label{eq:background-abp}
+\end{equation}
+Equivalently, for a fixed integer threshold $K$, the associated decision problem asks whether there exists a bijective labeling satisfying
+\begin{equation}
+  |f(u)-f(v)|\ge K
+  \qquad \text{for every }\{u,v\}\in E.
+  \label{eq:background-abp-decision}
+\end{equation}
+This threshold view is useful for SAT encodings, while the optimization view in \eqref{eq:background-abp} is used directly by the Exact MIP and CP backends. The ABP is NP-hard on general graphs \citep{Sinnl2021}.
+
+The objective is the dual counterpart of the bandwidth objective: bandwidth seeks to minimize the largest label difference over edges, whereas antibandwidth seeks to maximize the smallest such difference. The permutation requirement couples all vertices, so the difficulty is not simply to assign large differences independently to edges; all labels must be distinct and drawn from the same finite range.
+
+For any instance with at least one edge, let $\Delta$ be the maximum vertex degree. A useful elementary upper bound is
+\begin{equation}
+  \operatorname{AB}(G)\le n-\Delta.
+  \label{eq:background-degree-bound}
+\end{equation}
+Indeed, fix a vertex of degree $\Delta$ and consider its label. At most $n-K$ labels in $\{1,\ldots,n\}$ can be at distance at least $K$ from that label. If all $\Delta$ neighbours must be at such a distance, then $\Delta\le n-K$, yielding \eqref{eq:background-degree-bound}. This bound is used as a consistency bound in the project; it is not an optimality certificate.
+
+\section{Related Work}
+\label{sec:related-work}
+
+Duarte, Martí, Resende, and Silva developed an early integer-programming formulation for the ABP and proposed GRASP-based construction and local-search procedures combined with path relinking \citep{Duarte2011}. Their work established a computational baseline in which exact integer programming was effective on smaller instances, while the proposed metaheuristics produced high-quality solutions more quickly on larger cases.
+
+Sinnl subsequently studied computational approaches based on mixed-integer programming and constraint programming \citep{Sinnl2021}. The work introduced two MIP formulations, valid inequalities, a branch-and-cut algorithm, and an iterative solution approach; it also developed a CP formulation and derived additional bounds using graph-theoretic subproblems. Its computational study improved known bounds and proved optimality for several benchmark instances whose optimum had previously been unknown. These results show that ABP computational performance depends not only on the solver engine but also on formulation strength, valid inequalities, heuristics, and the availability of useful bounds.
+
+The OPTSICOM benchmark page describes the Harwell--Boeing ABP set as 24 graph instances derived from sparse matrices, divided into 12 smaller and 12 larger instances \citep{OptsicomABP}. This collection provides a shared basis for comparing computational approaches, but comparisons across papers must account for differences in hardware, solver versions, formulations, presolve and symmetry settings, stopping criteria, and resource limits.
+
+Against this background, the present project implements four exact backends under a common project-level result contract and compares them with a selected SAT configuration on the same benchmark inputs. Unlike the stronger branch-and-cut and iterative MIP framework of Sinnl, the current Exact backends are direct MIP/CP models using integer vertex labels, indicator-based pairwise ordering for the MIP implementations, and global all-different plus absolute-distance constraints for the CP implementations. This distinction is important: the experiment compares the implemented solver backends and does not claim to reproduce Sinnl's algorithms or to isolate the effect of solver brand independently of formulation.

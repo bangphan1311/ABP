@@ -6,11 +6,11 @@ import platform
 import subprocess
 from dataclasses import asdict
 from datetime import datetime, timezone
+import re
 from pathlib import Path
 from typing import Any
 
 from src.common.models import Config, Instance, Result
-
 # Thứ tự cột của runs.csv. 
 RUN_FIELDS = (
     "run_id", "instance", "method", "abp_encoding", "amo_encoding", "solver",
@@ -22,14 +22,23 @@ RUN_FIELDS = (
 )
 
 
+
 def make_run_id(instance: Instance, config: Config) -> str:
     parts = [
         instance.id, config.method, config.abp_encoding, config.amo_encoding,
         config.sat_solver, config.search_mode,
         f"sym{int(config.symmetry)}", f"ws{int(config.warm_start)}",
         f"s{config.seed}", f"tl{config.time_limit}", f"ml{config.memory_limit}",
-    ]   
-    return "__".join("na" if p is None else str(p) for p in parts)
+    ]
+
+    def safe_part(value: Any) -> str:
+        if value is None:
+            return "na"
+        # Loại ký tự không hợp lệ trong tên file Windows.
+        return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", str(value))
+
+    return "__".join(safe_part(part) for part in parts)
+
 
 
 def git_tag() -> str:

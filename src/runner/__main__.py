@@ -74,7 +74,7 @@ def main() -> int:
     p.add_argument("--search-mode")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--time-limit", type=float, default=1800.0)
-    p.add_argument("--memory-limit", type=float, default=None)
+    p.add_argument("--memory-limit", type=float, default=None, help="GiB; áp dụng hard limit cấp OS cho worker")
     p.add_argument("--out", default=str(DEFAULT_OUT_DIR))
     p.add_argument("--resume", action="store_true")
     p.add_argument("--dry-run", action="store_true",
