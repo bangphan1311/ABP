@@ -4,7 +4,7 @@ Purpose: continue the project from the current GitHub state without redoing the 
 
 ## Repository and branch snapshot
 - Repository: https://github.com/bangphan1311/ABP
-- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest head after P1 Exact follow-up: `857cbfc7ce238d92bb37933e2ae4e6e72b56ee60`; compare vs main: 100 ahead / 11 behind.
+- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest head after Exact fixes, main sync and CI expansion: `c03659beedbb5f69c9f2af3930f40baba614df88`; compare vs main: 105 ahead / 0 behind.
 - PR #52: https://github.com/bangphan1311/ABP/pull/52 — P2 SAT W4 implementation/analysis, open; branch `p2/w4-sat`; latest observed head `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; compare vs main at review time: 25 ahead / 0 behind.
 - Do not force-push or reset either branch. Reconcile P1 with main only after reviewing/merging P2, then rerun affected tests.
 
@@ -112,3 +112,43 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - PR #50 remains open, head `857cbfc7`, 100 ahead / 11 behind `main`. Do not sync until PR #52's blocker is fixed and the shared branch state settles; do not force-push.
 - Do not merge either PR or tag `v1.0` based on focused CI alone.
 - Official RQ3, 24 HB raw inputs, 12 GiB official-host kill/MO enforcement, queue and raw→validation→`runs.csv` remain P3 gates. P1's 10-run Exact spot-check plan applies when P3 generates the corresponding official run records; it is not a completed pilot verification.
+
+
+## Latest final integration and full-suite evidence — 2026-11-17
+
+### P1 branch synchronized with main
+- Main head at sync: `276c6c010102e4836eb8bc3af4c6705a3f1cb3d2`.
+- The 11 commits missing from P1 touched 22 paths. Path comparison found only one overlap, `AGENTS.md`; P1's file was byte-identical to the merge-base, so the upstream Core Rules addition was retained. The remaining 21 files were added from main without overlap.
+- Created a normal two-parent merge commit `47ffc1a564b63e4c8ba1577d278e2c4f73544a8d` with parents P1 `d53e5118...` and main `276c6c0...`. The branch update was fast-forward from the old P1 head; no force-push.
+- P1 is now **105 ahead / 0 behind** main. PR #50 remains open and GitHub reports it mergeable.
+
+### CI workflow expanded
+- The P1 W3 workflow now includes the pilot script tests, Exact status/time-budget tests and a separate full-suite matrix on Ubuntu + Windows.
+- Full-suite job installs pinned dependencies from `requirements.txt` and runs `python -m pytest tests -q`.
+- Path filters cover `src/**`, `tests/**`, `experiments/**`, `scripts/**`, benchmark inputs, pilot CSVs and requirements changes.
+
+### Full test evidence
+- Workflow run #44037863787 on commit `b2e2d4efe2330a2a9eabea032174f30403dd6a64` completed successfully:
+  - Ubuntu full suite: **539 passed in 11.73s**.
+  - Windows full suite: **539 passed in 22.01s**.
+  - Focused runner/HB/Exact jobs on both platforms also passed.
+- Workflow run #44037909768 on latest P1 head `c03659beedbb5f69c9f2af3930f40baba614df88`:
+  - Ubuntu full suite: **539 passed in 11.73s**.
+  - Windows full suite: **539 passed in 22.75s**.
+  - Focused jobs on Ubuntu and Windows passed.
+- These results are full repository tests (`pytest tests -q`) on the P1 branch. They do not demonstrate commercial license entitlement or benchmark-scale solver availability, and do not replace P3's official-host/kill/resume validation.
+
+### PR #50 status update
+- P1 posted a status comment on PR #50 (comment ID `6941464871`) recording the Exact fixes and focused CI. The current full-suite evidence is in runs above.
+- Latest branch head is `c03659be`; PR #50 remains open. Do not merge/tag until PR #52 is fixed/re-reviewed and protocol/P3 freeze gates have evidence.
+
+### P2 PR #52 remains blocked
+- Latest observed P2 head remains `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; no later P2 commit was visible at last check.
+- P1's latest review is still `CHANGES_REQUESTED` (review ID `5934391739`): global deduplication removes the 10 shared CaDiCaL `order/pairwise` rows from RQ2. Required split counts remain RQ1=30, RQ2=20, union=40 unique IDs; duplicate test definition also needs cleanup.
+- Workflow #44010144573 on P2 head `acd9dd00` remains `action_required`; it did not run test jobs. The GitHub connection available here cannot approve this run.
+- Re-review only after P2 pushes a correction and obtains fresh test results.
+
+### Issue #26 and freeze
+- Issue #26 has been reopened because full-suite evidence, P2 proof sign-off and pilot-budget resolution are required for the shared/freeze candidate. The 539-pass P1 branch run does not by itself certify the unmerged P2 head.
+- Keep #26, #28, #29, #30, #31–38 and #49 open while their respective acceptance gates remain.
+- License entitlement verification remains with P1 (user). Official queue, official host, 12 GiB Job Object enforcement/kill/MO, checkpoint/resume/attempt history, real HB raw inputs and raw→validation→`runs.csv` remain P3 responsibilities.
