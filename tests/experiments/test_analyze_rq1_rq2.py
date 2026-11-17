@@ -135,6 +135,14 @@ def test_real_pilot_sources_produce_forty_unique_core_runs():
     assert len({r["run_id"] for r in rq1 + rq2}) == 40  # CaDiCaL reused
 
 
+def test_real_pilot_sources_produce_forty_unique_core_runs():
+    pilot_rows = load_csv_rows(DEFAULT_RQ1_CSV) + load_csv_rows(DEFAULT_RQ2_CSV)
+    rq1, rq2 = split_combined_rq_rows(pilot_rows)
+    assert len(rq1) == 30
+    assert len(rq2) == 20
+    assert len({r["run_id"] for r in rq1 + rq2}) == 40
+
+
 def test_render_report_requires_frozen_expected_run_count():
     with pytest.raises(ValueError, match="frozen run plan"):
         render_markdown_report([], [], [])
