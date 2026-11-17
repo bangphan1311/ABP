@@ -4,7 +4,7 @@ Purpose: continue the project from the current GitHub state without redoing the 
 
 ## Repository and branch snapshot
 - Repository: https://github.com/bangphan1311/ABP
-- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; head `f7f1b661a43f181952fd0678a5ef3b8dcbe26578`; compare vs main at review time: 97 ahead / 11 behind.
+- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest head after P1 Exact follow-up: `857cbfc7ce238d92bb37933e2ae4e6e72b56ee60`; compare vs main: 100 ahead / 11 behind.
 - PR #52: https://github.com/bangphan1311/ABP/pull/52 — P2 SAT W4 implementation/analysis, open; branch `p2/w4-sat`; latest observed head `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; compare vs main at review time: 25 ahead / 0 behind.
 - Do not force-push or reset either branch. Reconcile P1 with main only after reviewing/merging P2, then rerun affected tests.
 
@@ -78,3 +78,37 @@ Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb
 - Do not call a 12 GiB config value proof that the OS-level cap is enforced.
 - Do not tag `v1.0` or close freeze/sign-off issues until Protocol §12 evidence exists.
 - Keep P1/P2/P3 ownership boundaries explicit. P1 can prepare code/docs/reviews but cannot invent P3's actual benchmark execution or host confirmation.
+
+## Latest P1 GitHub update — 2026-11-17 (after initial handoff)
+
+### P1 Exact implementation follow-up
+- New branch head: `857cbfc7ce238d92bb37933e2ae4e6e72b56ee60`.
+- Commit: `fix(exact): resolve CP Optimizer status and extraction review findings`.
+- Changed:
+  - `src/exact/cplex_cp.py`: memory-stop with a retained verified incumbent is classified as `MO`; the incumbent/bounds remain in the result. A genuine no-incumbent result (`get_solution() is None`) is distinguished from partial/invalid extraction or verification failures, which become `ERR`.
+  - `src/exact/cp_sat_solver.py`: non-default shared Config fields ignored by CP-SAT now trigger the same warning mechanism used by the other Exact adapters.
+  - `tests/exact/test_solver_status.py`: regression coverage for memory stop with incumbent, absent/partial/invalid incumbent, and CP-SAT ignored-field warning.
+  - `.github/workflows/w3-checkpoint-tests.yml`: focused workflow triggers on exact source/tests, installs OR-Tools, and runs Exact status/time-budget tests together with the existing HB-loader/checkpoint/runner tests.
+  - Updated `docs/p1/exact-methodology-review.md`, `docs/p1/w3-w4-exact-readiness.md`, and `docs/ENV.md` to record the fixes and distinguish the development Conda Python 3.11.17 from the candidate preflight Python 3.11.16. The latter must still be recorded from the actual execution interpreter before official runs.
+- Focused cross-platform CI on the new SHA:
+  - Run #44036964092: Ubuntu **39 passed**; Windows **39 passed**.
+  - Run #44036956857: workflow rerun also completed successfully on Ubuntu/Windows.
+  - These are focused tests, **not** the full project suite and not solver/license benchmark evidence.
+- E5 (commercial license/entitlement, Gurobi/CPLEX scale capability) remains owned by P1's local environment verification; the pilot's original raw errors were not edited.
+
+### Latest P1 re-review of P2 PR #52
+- P2 head at last inspection remains `acd9dd0068c7a168b9cca1b9c4e057a0c9266ca6`; branch compare: 25 ahead / 0 behind.
+- P1 submitted a new `REQUEST_CHANGES` review (review ID `5934391739`, 17 Nov 2026).
+- Blocking finding: `split_combined_rq_rows()` globally deduplicates run IDs before splitting RQ1 and RQ2. The two pilot CSVs each have 40 unique rows and share 10 CaDiCaL `order/pairwise` IDs. Because these IDs are intentionally reused by both research questions, global dedup removes those 10 from RQ2. The correct outputs are RQ1=30 rows, RQ2=20 rows, union=40 unique Core IDs. Deduplicate within each axis; compute G3's expected/completed unique-run accounting from the union of IDs.
+- The same test module defines `test_real_pilot_sources_produce_forty_unique_core_runs` twice; remove the duplicate definition.
+- Do not approve PR #52 until the cross-axis regression is fixed and fresh CI runs on the updated head are green.
+- P2 SAT workflow run #44010144573 on `acd9dd00` remains `action_required`; it has no test job result. This is not a code PASS or a test failure. It requires repository-side workflow approval/authorization, which the current GitHub integration cannot perform.
+
+### Issue #26 re-opened
+- Issue #26 had been closed even though its body still leaves the final current-suite rerun, P2 proof sign-off, and 60s-vs-1800s pilot-budget decision unchecked.
+- Reopen it and preserve those acceptance gates. Do not treat the modular appendix draft as proof of a completed correctness/freeze review.
+
+### Current integration guardrails
+- PR #50 remains open, head `857cbfc7`, 100 ahead / 11 behind `main`. Do not sync until PR #52's blocker is fixed and the shared branch state settles; do not force-push.
+- Do not merge either PR or tag `v1.0` based on focused CI alone.
+- Official RQ3, 24 HB raw inputs, 12 GiB official-host kill/MO enforcement, queue and raw→validation→`runs.csv` remain P3 gates. P1's 10-run Exact spot-check plan applies when P3 generates the corresponding official run records; it is not a completed pilot verification.
