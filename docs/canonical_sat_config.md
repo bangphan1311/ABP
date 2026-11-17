@@ -1,9 +1,11 @@
 # Canonical SAT configuration — proposal (W3, issue #18 / #25)
 
-Status: **P1 accepts the Core choice**; P3 must still confirm that the preflighted official host matches the 12.0 GiB hard-cap setup before M2 freeze.
+Status: **provisional P1 acceptance** of the Core choice; pilot/protocol budget mismatch and P3 host sign-off remain before M2 freeze.
 Decision is taken **before any official run**: only the two W3 pilots
 (`results/pilot_rq1.csv`, `results/pilot_rq2.csv`) were read. No RQ3 / official
 result exists yet, and none was inspected.
+
+**Unresolved pilot-budget mismatch — do not call this frozen yet.** The committed W3 pilot CSV run IDs record `time_limit=60.0` seconds, while the current Experimental Protocol v1.0-rc §6.2 specifies **1800 seconds per RQ1/RQ2 pilot run**. The tables below faithfully report the historical 60-second pilot; they do not satisfy the later 1800-second plan. Before M2 freeze, the group must either (a) explicitly approve the historical pilot as the selection evidence and revise the protocol budget, or (b) rerun the pilot under the 1800-second budget and revisit the selection. Do not silently treat these budgets as equivalent.
 
 ## Proposal
 
