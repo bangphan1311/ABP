@@ -221,8 +221,12 @@ findings:
 
 Regression tests cover these cases. The P1 cross-platform workflow now
 installs OR-Tools and includes `tests/exact/test_solver_status.py` and
-`tests/exact/test_time_budget.py`. These findings are **implementation-added,
-CI verification pending** until the workflow on this commit is green.
+`tests/exact/test_time_budget.py`. These findings are **implementation-added and CI-verified**: the focused
+cross-platform suite passed (including 40 tests per platform on the initial
+full-Exact candidate, then pilot-script coverage), and the latest full
+repository suite passed 539 tests on both Ubuntu and Windows on code SHA
+`c03659be` (workflow #44037909768). The subsequent branch commit updates only
+documentation.
 
 E4 is clarified as two recorded environments (development Conda 3.11.17 and
 candidate preflight 3.11.16); the exact interpreter used by the official host
