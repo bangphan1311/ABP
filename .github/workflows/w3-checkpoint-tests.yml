@@ -5,24 +5,15 @@ on:
     branches:
       - p1/w3-experimental-protocol-rc
     paths:
-      - "src/common/checkpoint.py"
-      - "src/sat/**"
-      - "src/exact/**"
-      - "src/runner/**"
-      - "tests/sat/**"
-      - "tests/exact/**"
-      - "tests/runner/**"
-      - "experiments/pilot_exact_p1.py"
-      - "experiments/pilot_common.py"
-      - "experiments/pilot_rq1.py"
-      - "experiments/pilot_rq2.py"
-      - "experiments/make_validation_subset.py"
-      - "tests/experiments/test_pilot_exact_p1.py"
-      - "tests/experiments/test_pilot_scripts.py"
+      - "src/**"
+      - "tests/**"
+      - "experiments/**"
+      - "scripts/**"
       - "benchmark/validation/**"
       - "benchmark/large/**"
       - "results/pilot_rq1.csv"
       - "results/pilot_rq2.csv"
+      - "requirements.txt"
       - ".github/workflows/w3-checkpoint-tests.yml"
   pull_request:
     paths:
@@ -70,3 +61,24 @@ jobs:
         run: python -m pip install pytest python-sat ortools==9.15.6755
       - name: Test HB loader, checkpoint và runner
         run: python -m pytest tests/sat/test_hb_loader.py tests/experiments/test_pilot_exact_p1.py tests/experiments/test_pilot_scripts.py tests/runner/test_checkpoint.py tests/runner/test_sat_checkpoint.py tests/runner/test_runner.py tests/exact/test_solver_status.py tests/exact/test_time_budget.py -q
+
+  full-test-suite:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    name: Full correctness suite (${{ matrix.os }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run full test suite
+        run: python -m pytest tests -q
+
