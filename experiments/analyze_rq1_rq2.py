@@ -294,10 +294,31 @@ def evaluate_g3_gate(
     missing_raw_records: int = 0,
 ) -> G3GateSummary:
     """Đánh giá G3: ≥80% Core run có raw evidence và không còn CODE_BUG."""
-    if expected_runs <= 0:
-        raise ValueError("expected_runs phải > 0.")
-    if missing_raw_records < 0:
-        raise ValueError("missing_raw_records không được âm.")
+    if (
+        isinstance(expected_runs, bool)
+        or not isinstance(expected_runs, int)
+        or expected_runs <= 0
+    ):
+        raise ValueError("expected_runs phải là số nguyên > 0 lấy từ frozen run plan.")
+    if isinstance(completed_runs, bool) or not isinstance(completed_runs, int):
+        raise ValueError("completed_runs phải là số nguyên không âm.")
+    if completed_runs < 0:
+        raise ValueError("completed_runs không được âm.")
+    if completed_runs > expected_runs:
+        raise ValueError(
+            "completed_runs không thể lớn hơn expected_runs; "
+            "kiểm tra frozen run plan và duplicate run IDs."
+        )
+    if (
+        isinstance(missing_raw_records, bool)
+        or not isinstance(missing_raw_records, int)
+        or missing_raw_records < 0
+    ):
+        raise ValueError("missing_raw_records phải là số nguyên không âm.")
+    if not isinstance(threshold, (int, float)) or isinstance(threshold, bool):
+        raise ValueError("threshold phải là số trong khoảng (0, 1].")
+    if not 0 < threshold <= 1:
+        raise ValueError("threshold phải nằm trong khoảng (0, 1].")
     ratio = completed_runs / expected_runs
     passed_completion = ratio >= threshold
 
@@ -336,45 +357,68 @@ CORE_RQ2_SOLVERS = frozenset({"cadical195", "glucose4"})
 def split_combined_rq_rows(
     rows: Sequence[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Tách runs.csv theo đúng trục thí nghiệm, không gộp cấu hình khác điều kiện.
+    """Tách dữ liệu theo hai trục RQ, khử trùng lặp nhưng vẫn tái sử dụng run chung.
 
     RQ1: CaDiCaL, search_mode=multi và ba CNF khác nhau theo Protocol §4/§9.1.
-    RQ2: canonical order/pairwise và solver Core đã xác minh (CaDiCaL, Glucose).
-    Exact rows, baseline ngoài Core và order/seqcounter (CNF trùng) bị loại.
-    """
-    unique_rows: list[dict[str, Any]] = []
-    seen_run_ids: set[str] = set()
-    for row in rows:
-        run_id = str(row.get("run_id") or "")
-        if run_id and run_id in seen_run_ids:
-            continue
-        if run_id:
-            seen_run_ids.add(run_id)
-        unique_rows.append(row)
+    RQ2: canonical order/pairwise và Core solver CaDiCaL/Glucose.
+    CaDiCaL order/pairwise là run chung hợp lệ của cả hai RQ; vì vậy nó xuất hiện
+    trong cả hai output nhưng chỉ được tính một lần trong union dùng cho G3.
 
-    sat_rows = [
-        row for row in unique_rows
-        if row.get("method", "sat") == "sat"
-        and row.get("search_mode", "multi") == "multi"
+    Các bản ghi lặp có cùng run_id phải giống hệt nhau. Nếu cùng ID nhưng payload
+    khác nhau, dừng phân tích thay vì âm thầm giữ bản ghi xuất hiện đầu tiên.
+    """
+    def is_sat_multi(row: dict[str, Any]) -> bool:
+        return (
+            row.get("method", "sat") == "sat"
+            and row.get("search_mode", "multi") == "multi"
+        )
+
+    def is_rq1_candidate(row: dict[str, Any]) -> bool:
+        return (
+            is_sat_multi(row)
+            and row.get("solver") == "cadical195"
+            and (row.get("abp_encoding"), row.get("amo_encoding")) in {
+                ("pairwise", "pairwise"),
+                ("pairwise", "seqcounter"),
+                ("order", "pairwise"),
+            }
+        )
+
+    def is_rq2_candidate(row: dict[str, Any]) -> bool:
+        return (
+            is_sat_multi(row)
+            and row.get("abp_encoding") == "order"
+            and row.get("amo_encoding") == "pairwise"
+            and row.get("solver") in CORE_RQ2_SOLVERS
+        )
+
+    # Một row CaDiCaL order/pairwise thuộc cả RQ1 và RQ2.
+    candidates = [
+        row for row in rows
+        if is_rq1_candidate(row) or is_rq2_candidate(row)
     ]
-    rq1_rows = [
-        row for row in sat_rows
-        if row.get("solver") == "cadical195"
-        and (row.get("abp_encoding"), row.get("amo_encoding")) in {
-            ("pairwise", "pairwise"),
-            ("pairwise", "seqcounter"),
-            ("order", "pairwise"),
-        }
-    ]
-    rq2_rows = [
-        row for row in sat_rows
-        if row.get("abp_encoding") == "order"
-        and row.get("amo_encoding") == "pairwise"
-        and row.get("solver") in CORE_RQ2_SOLVERS
-    ]
+    by_run_id: dict[str, dict[str, Any]] = {}
+    for row in candidates:
+        run_id = str(row.get("run_id") or "")
+        if not run_id:
+            raise ValueError(
+                "Core RQ1/RQ2 row thiếu run_id; không thể deduplicate hoặc tính G3 an toàn."
+            )
+        previous = by_run_id.get(run_id)
+        if previous is not None:
+            if previous != row:
+                raise ValueError(
+                    f"run_id {run_id!r} xuất hiện với payload mâu thuẫn giữa các nguồn CSV."
+                )
+            continue
+        by_run_id[run_id] = row
+
+    unique_rows = list(by_run_id.values())
+    rq1_rows = [row for row in unique_rows if is_rq1_candidate(row)]
+    rq2_rows = [row for row in unique_rows if is_rq2_candidate(row)]
     if not rq1_rows or not rq2_rows:
         raise ValueError(
-            "runs.csv phải chứa cả RQ1 (CaDiCaL, 3 CNF) và RQ2 "
+            "Nguồn dữ liệu phải chứa cả RQ1 (CaDiCaL, 3 CNF) và RQ2 "
             "(canonical order/pairwise, Core solver CaDiCaL/Glucose); "
             "kiểm tra schema và frozen run plan."
         )
@@ -400,13 +444,35 @@ def render_markdown_report(
         for row in core_rows
         if row.get("run_id") and row.get("status") in {"OPT", "FEAS", "TO", "MO", "ERR"}
     }
-    triaged_run_ids = {report.run_id for report in triage_reports}
+    triage_by_id: dict[str, TriageReport] = {}
+    for report in triage_reports:
+        if report.run_id not in core_run_ids:
+            continue
+        previous = triage_by_id.get(report.run_id)
+        if previous is not None and previous != report:
+            raise ValueError(
+                f"run_id {report.run_id!r} có nhiều triage report mâu thuẫn; "
+                "cần xử lý attempt/raw evidence trước khi tính G3."
+            )
+        triage_by_id[report.run_id] = report
+    triage_reports = list(triage_by_id.values())
+    triaged_run_ids = set(triage_by_id)
     completed_count = len(core_run_ids & triaged_run_ids)
     missing_raw_records = len(core_run_ids - triaged_run_ids)
-    if expected_core_runs is None or expected_core_runs <= 0:
+    if (
+        expected_core_runs is None
+        or isinstance(expected_core_runs, bool)
+        or not isinstance(expected_core_runs, int)
+        or expected_core_runs <= 0
+    ):
         raise ValueError(
-            "G3 cần --expected-runs > 0 lấy từ frozen run plan; "
+            "G3 cần --expected-runs là số nguyên > 0 lấy từ frozen run plan; "
             "không được suy mẫu số từ số run đã quan sát."
+        )
+    if expected_core_runs < len(core_run_ids):
+        raise ValueError(
+            f"--expected-runs={expected_core_runs} nhỏ hơn {len(core_run_ids)} "
+            "unique Core run IDs trong dữ liệu đầu vào; mẫu số frozen không hợp lệ."
         )
     expected_count = expected_core_runs
     g3 = evaluate_g3_gate(

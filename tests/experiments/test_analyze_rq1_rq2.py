@@ -134,13 +134,57 @@ def test_real_pilot_sources_produce_forty_unique_core_runs():
     assert len(rq2) == 20  # 10 instances × 2 Protocol Core solvers
     assert len({r["run_id"] for r in rq1 + rq2}) == 40  # CaDiCaL reused
 
-
-def test_real_pilot_sources_produce_forty_unique_core_runs():
+def test_shared_cadical_run_is_retained_in_both_rq_axes_once():
     pilot_rows = load_csv_rows(DEFAULT_RQ1_CSV) + load_csv_rows(DEFAULT_RQ2_CSV)
     rq1, rq2 = split_combined_rq_rows(pilot_rows)
+    rq1_ids = {row["run_id"] for row in rq1}
+    rq2_ids = {row["run_id"] for row in rq2}
+    shared_ids = rq1_ids & rq2_ids
+
     assert len(rq1) == 30
     assert len(rq2) == 20
-    assert len({r["run_id"] for r in rq1 + rq2}) == 40
+    assert len(shared_ids) == 10
+    assert all("__cadical195__" in run_id for run_id in shared_ids)
+    assert len(rq1_ids | rq2_ids) == 40
+
+
+def test_split_rejects_conflicting_duplicate_run_id():
+    row_a = {
+        "run_id": "shared-1", "method": "sat", "search_mode": "multi",
+        "solver": "cadical195", "abp_encoding": "order", "amo_encoding": "pairwise",
+        "status": "OPT",
+    }
+    row_b = {**row_a, "status": "FEAS"}
+    with pytest.raises(ValueError, match="payload mâu thuẫn"):
+        split_combined_rq_rows([row_a, row_b])
+
+
+def test_split_rejects_core_rows_without_run_id():
+    row = {
+        "method": "sat", "search_mode": "multi", "solver": "cadical195",
+        "abp_encoding": "order", "amo_encoding": "pairwise", "status": "OPT",
+    }
+    with pytest.raises(ValueError, match="thiếu run_id"):
+        split_combined_rq_rows([row])
+
+
+def test_g3_rejects_completed_runs_above_expected_denominator():
+    with pytest.raises(ValueError, match="lớn hơn expected_runs"):
+        evaluate_g3_gate(41, 40, [])
+
+
+def test_g3_rejects_invalid_denominator_and_threshold():
+    with pytest.raises(ValueError, match="số nguyên > 0"):
+        evaluate_g3_gate(1, True, [])
+    with pytest.raises(ValueError, match="threshold"):
+        evaluate_g3_gate(1, 10, [], threshold=1.1)
+
+
+def test_render_report_rejects_expected_count_below_observed_core_ids():
+    pilot_rows = load_csv_rows(DEFAULT_RQ1_CSV) + load_csv_rows(DEFAULT_RQ2_CSV)
+    rq1, rq2 = split_combined_rq_rows(pilot_rows)
+    with pytest.raises(ValueError, match="nhỏ hơn 40 unique Core run IDs"):
+        render_markdown_report(rq1, rq2, [], expected_core_runs=39)
 
 
 def test_render_report_requires_frozen_expected_run_count():

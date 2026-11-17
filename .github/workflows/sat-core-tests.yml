@@ -5,10 +5,19 @@ on:
     branches:
       - p2/w4-sat
     paths:
-      - "src/sat/**"
-      - "experiments/analyze_rq1_rq2.py"
-      - "tests/sat/**"
-      - "tests/experiments/test_analyze_rq1_rq2.py"
+      - "src/**"
+      - "tests/**"
+      - "experiments/**"
+      - "scripts/**"
+      - "requirements.txt"
+      - ".github/workflows/sat-core-tests.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "experiments/**"
+      - "scripts/**"
+      - "requirements.txt"
       - ".github/workflows/sat-core-tests.yml"
   workflow_dispatch:
 
@@ -17,6 +26,26 @@ permissions:
 
 jobs:
   sat-core:
+  full-test-suite:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    name: Full correctness suite (${{ matrix.os }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run full test suite
+        run: python -m pytest tests -q
+
     strategy:
       fail-fast: false
       matrix:
