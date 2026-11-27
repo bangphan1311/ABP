@@ -1,0 +1,1 @@
+{"status": "SAT", "solve_s": 6.783914399999958, "restarts": 6272, "conflicts": 253261, "decisions": 567283, "propagations": 28707073, "instance": "will57", "optimum": 13, "k": 13, "encoding": "pairwise", "solver": "cadical195", "limit_s": 120}

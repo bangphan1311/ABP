@@ -1,0 +1,1 @@
+{"status": "SAT", "solve_s": 0.3859418000001824, "restarts": 335, "conflicts": 6393, "decisions": 19092, "propagations": 726601, "instance": "bcspwr02", "optimum": 21, "k": 19, "encoding": "order", "solver": "cadical195", "limit_s": 120}

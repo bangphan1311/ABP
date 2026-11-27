@@ -1,0 +1,1 @@
+{"status": "SAT", "solve_s": 0.38938580000012735, "restarts": 148, "conflicts": 8593, "decisions": 13274, "propagations": 434074, "instance": "curtis54", "optimum": 13, "k": 13, "encoding": "order", "solver": "cadical195", "limit_s": 120}
