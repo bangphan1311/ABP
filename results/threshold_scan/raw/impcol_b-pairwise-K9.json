@@ -1,0 +1,1 @@
+{"status": "TO", "instance": "impcol_b", "optimum": 8, "k": 9, "encoding": "pairwise", "solver": "cadical195", "limit_s": 120}

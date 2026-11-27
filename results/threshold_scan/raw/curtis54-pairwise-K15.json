@@ -1,0 +1,1 @@
+{"status": "UNSAT", "solve_s": 0.9565146999998433, "restarts": 2080, "conflicts": 31638, "decisions": 108295, "propagations": 5636919, "instance": "curtis54", "optimum": 13, "k": 15, "encoding": "pairwise", "solver": "cadical195", "limit_s": 120}
