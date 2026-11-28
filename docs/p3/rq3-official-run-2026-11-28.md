@@ -71,10 +71,18 @@ pairwise encoding does not fit the 12 GiB cap on the denser instances.
 3. **`peak_memory` is only populated for `sat` records.** Exact-solver records
    store `null`; report as unavailable, not as zero.
 
-## 5. Not produced yet
+## 5. Export and remaining gaps
 
-- `results/runs.csv` export validated from raw JSON. No exporter exists in the
-  repository at `09e8e3b`; `src/runner/schema.py` only defines `RUN_FIELDS`.
+- `results/runs.csv` is exported from the raw records by `scripts/export_runs_csv.py`
+  (120 rows, one per `run_id`, columns in `RUN_FIELDS` order). The exporter rejects
+  records missing schema fields, unknown statuses, duplicate `run_id` and a wrong
+  `--expected-runs` count.
+
+  ```powershell
+  .venv\Scripts\python.exe scripts\export_runs_csv.py --expected-runs 120
+  ```
+
+  `runs.csv` is the selected view only; `attempt_history/` keeps the raw attempts.
 - The 10-run Exact spot-check in `docs/p1/exact_spot_check_plan.md` has not been run
   against these records.
 
