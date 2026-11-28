@@ -25,6 +25,12 @@ Trường hợp biên:
 - Mã số: `id(x[v][p]) = v * n + p` → `n²` biến chính với id từ `1` đến `n²`.
 - Biến phụ (aux): chỉ xuất hiện khi `amo_encoding ≠ pairwise`; cấp phát từ `n² + 1` qua một `IDPool` dùng chung cho mọi AMO trong một CNF, không đè vùng biến chính.
 
+### 2.2. Encoding `order`
+
+- `o[v][p] = 1` khi nhãn của đỉnh `v` **≤ p** với `p ∈ 1..n−1`; biên `p = 0` luôn sai và `p = n` luôn đúng nên không cần biến (`src/sat/order.py`).
+- Mã số: `id(o[v][p]) = v * (n - 1) + p` → `n(n−1)` biến chính, id từ `1` đến `n(n−1)`.
+- Nhãn `f(v) = min{p : o[v][p] = 1}`, hoặc `n` khi cả chuỗi bằng 0 — mỗi cách gán chuỗi đơn điệu cho đúng một nhãn.
+
 ## 3. Ràng buộc
 
 Đặt `m = |E|`. Bảng số clause cho AMO `pairwise` (mặc định):
@@ -56,6 +62,19 @@ Tính tay: `assignment = 4 + 4·C(4,2) = 28`; `K = 2`: `distance = 3·2·(4−1)
 
 Ghi chú AMO: mặc định `amo_encoding = "pairwise"`, tức `C(m,2)` clause cho `m` literal, không thêm biến. Các encoding từ `pysat.card` (`seqcounter`, `cardnetwrk`, `totalizer`, `mtotalizer`, `kmtotalizer`, `bitwise`, `ladder`, `sortnetwrk`) cho số clause khác và có thể thêm biến phụ; bảng trên chỉ đúng cho `pairwise`, phần ALO không đổi. `native` (ràng buộc native cần CNFPlus) và tên lạ đều `ValueError`.
 
+### 3.2. Encoding `order`
+
+`order` không có nhóm AMO: chuỗi đơn điệu thay ALO + AMO nên `amo_encoding` chỉ là metadata, không đổi clause (`src/sat/order.py`). Đặt `m = |E|`:
+
+| Nhóm | Điều kiện | Số clause |
+|---|---|---|
+| `assignment` | chuỗi đơn điệu `o[v][p] → o[v][p+1]`, `p ∈ 1..n−2`, mỗi đỉnh | `n(n−2)` |
+| `permutation` | mỗi cặp đỉnh `u < w`, mỗi nhãn `q`: `f(u) ≠ q ∨ f(w) ≠ q` | `n · C(n,2)` |
+| `distance` | như `pairwise` trên mỗi cạnh, no-good trên nhãn | `m · 2 · Σ_{d=1..K−1} max(0, n − d)` |
+| `threshold` | `K ≥ n` chốt UNSAT trước khi dựng CNF | 0 |
+
+Ví dụ `path4` (`n = 4`, `m = 3`, `order`): K = 1: `8 + 24 + 0 = 32` clause; K = 2: `8 + 24 + 18 = 50`; K = 3: `8 + 24 + 30 = 62`.
+
 ## 4. SAT / UNSAT và decode
 
 - SAT: solver trả model. `decode_model` (`src/sat/pairwise.py`) quét các `x[v][p]` dương: mỗi đỉnh phải có đúng một nhãn và tập nhãn phải là hoán vị của `1..n`; vi phạm → `ValueError` (lỗi encoding, không được bỏ qua). Model chưa phải nghiệm: nghiệm bắt buộc đi qua `verify(instance, labeling)` (CONTRACT §6). Verify tính lại giá trị mục tiêu từ labeling và đồ thị gốc. `solve_sat` luôn `verify` trước khi đưa nghiệm vào `Result`; `solve_decision` trả labeling từ `_probe` **không** qua `verify`. Caller phải tự gọi `verify`.
@@ -84,3 +103,9 @@ lặp khi lo + 1 < hi:
 - Không mượn hướng tìm kiếm của 2DBMP: không duyệt `K` từ trên xuống, không tìm kiếm nhị phân. Lý do: duyệt tăng dần đảm bảo lần dò UNSAT đầu tiên đồng thời chứng minh tối ưu, và mọi lần dò SAT trước đó đều cho nghiệm đã verify (giả thuyết chưa đo: các ngưỡng cao là UNSAT khó nhất).
 - `solve_sat` nhận tham số `ub` ngoài tùy chọn do P2 tính. Không truyền `ub`: solver tự tính mặc định `ub = hi − 1` từ lần UNSAT đầu tiên (`summarise_result`, `src/sat/solve.py`); cận trên tầm thường của bài toán là `n − 1`, sau lần UNSAT đầu tiên `ub = B` tối ưu. `ub` ngoài không hợp lệ (vd: `ub` nhỏ hơn `B` đã verify SAT) → `ValueError`.
 - Mỗi ngưỡng dựng CNF mới và dùng backend mới; không dùng incremental/assumption ở W1.
+
+### 5.1. Canonical config và memory contract
+
+`CANONICAL_SAT_CONFIG` (`src/sat/solve.py`) khóa `method="sat"`, `abp_encoding="order"`, `amo_encoding="pairwise"`, `sat_solver="glucose4"`, `search_mode="multi"`, `symmetry=False`, `warm_start=False`, `seed=0` (M2 freeze v1.0, `docs/w4-sat/21-m2-freeze-v1.md`).
+
+`canonical_sat_config(memory_limit=...)` bắt buộc `memory_limit` là số hữu hạn > 0 cho run official: `memory_limit=None` raise `ValueError` nhắc `memory_limit`; escape hatch `allow_unbounded_memory=True` chỉ dành cho dev/unit test và trả `memory_limit=None`. Solver không enforce cap trong process; `MO` chỉ đến từ ánh xạ `MemoryError` ngoài process (`src/runner/worker.py`), cap official do runner áp (Protocol §6.3). `search_mode="multi"` là mode duy nhất đã cài đặt nên không phát warning giả; `symmetry`/`warm_start` khác mặc định vẫn warning.
