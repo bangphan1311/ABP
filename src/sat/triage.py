@@ -152,6 +152,20 @@ def inspect_record(
                 recorded_ub=ub,
                 reasons=[f"Không đọc được file instance '{instance_id}': {exc}"],
             )
+    if instance is None:
+        return TriageReport(
+            run_id=run_id,
+            instance_id=instance_id,
+            status=status,
+            category="ENV_ERROR",
+            is_anomaly=True,
+            recorded_lb=lb,
+            recorded_ub=ub,
+            reasons=[
+                f"Không tìm thấy/resolution được benchmark instance {instance_id!r}; "
+                "không thể xác minh raw result hoặc phân loại hành vi solver."
+            ],
+        )
 
     # Thiếu file instance thì không đối chiếu được nghiệm: ENV_ERROR thắng mọi
     # phân loại TO/ERR/MO/OPT/FEAS phía dưới. Chạy trước khi đọc/decode solution.

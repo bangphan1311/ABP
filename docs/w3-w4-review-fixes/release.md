@@ -1,5 +1,9 @@
 # Release — w3-w4-review-fixes
 
+> **Superseded (2026-11-28):** blocker B3's `allow_unbounded_memory` escape hatch was replaced
+> by the canonical `memory_limit=12.0` GiB default merged on `main`. Current contract:
+> `docs/canonical_sat_config.md`. Keep this file as the historical release record.
+
 **Branch:** `p2/w4-sat` · **Base commit:** `6137bf3` · **PR:** #52 (OPEN)
 **Environment touched:** `dev` only — no deploy, no remote push, no tag.
 

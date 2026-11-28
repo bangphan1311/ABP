@@ -1,0 +1,88 @@
+\section{SAT Encoding Correctness}
+\label{app:sat-correctness}
+
+This appendix records proof sketches for the two SAT encodings implemented in
+the project. Let $G=(V,E)$ be a simple undirected graph with $n\geq 1$ vertices
+and at least one edge. A labeling is a bijection
+$f:V\rightarrow\{1,\ldots,n\}$, and its antibandwidth is
+$B(f)=\min_{\{u,v\}\in E}|f(u)-f(v)|$.
+
+\subsection{Pairwise encoding}
+The assignment clauses give each vertex at least one label (ALO) and at most
+one label (AMO). Therefore, every vertex receives exactly one label. The
+permutation clauses apply the same ALO/AMO pattern to each label, so every
+label is used by exactly one vertex. Consequently, the assignment variables
+define a bijection.
+
+Suppose a model satisfies the pairwise distance clauses at threshold $K$.
+If an edge $\{u,v\}$ had endpoint labels $p$ and $q$ with
+$|p-q|<K$, the clause $\neg x_{u,p}\vee\neg x_{v,q}$ would be present and
+false. This is a contradiction. Conversely, a labeling whose edge distances
+are all at least $K$ falsifies none of the distance clauses. Hence the
+pairwise CNF is satisfiable exactly when a feasible labeling exists.
+
+\subsection{Order encoding}
+For each vertex, the chain clauses enforce
+$o_{v,p}\Rightarrow o_{v,p+1}$. Therefore the true variables form a suffix.
+The smallest true index is a unique label in $\{1,\ldots,n-1\}$; the all-false
+chain represents label $n$. This establishes a one-to-one correspondence
+between monotone chains and labels.
+
+For a label $q$, the disjunction $N(v,q)$ in
+Equation~\ref{eq:not-label} is true exactly when vertex $v$ does not receive
+$q$. The permutation clause $N(u,q)\vee N(v,q)$ therefore excludes every
+assignment in which two vertices receive the same label. With $n$ vertices
+and $n$ labels, injectivity implies a bijection. The distance clauses use the
+same disjunction to forbid every pair of endpoint labels whose difference is
+less than $K$. Thus the order CNF is satisfiable exactly when a feasible
+labeling exists.
+
+\subsection{Faithfulness of AMO encodings}
+For the pairwise AMO encoding, each clause
+$\neg a_i\vee\neg a_j$ excludes exactly the assignments in which both
+$a_i$ and $a_j$ are true. Thus the conjunction is satisfied if and only if
+at most one input literal is true.
+
+The sequential-counter AMO implementation is supplied by
+\texttt{pysat.card.CardEnc.atmost} with bound one. Its auxiliary variables
+represent whether a true input has appeared in a prefix. Monotonic propagation
+of this prefix state prevents a second true input. Conversely, when at most
+one input is true, setting each prefix state to the disjunction of the inputs
+seen so far satisfies the counter clauses. The auxiliary variables therefore
+do not change the feasible set projected onto the label variables.
+
+\subsection{Equivalence theorem}
+For both encodings and every $1\leq K<n$, the CNF is satisfiable if and only
+if there is a bijective labeling $f$ satisfying $B(f)\geq K$. For $K\geq n$,
+the problem is infeasible because the largest possible label difference is
+$n-1$. The implementation handles this trivial case before building a CNF.
+
+\subsection{Completeness of the multi-run search}
+Let $B^*$ be the optimal antibandwidth. During the search, $\ell$ is the
+largest verified objective found so far and $h$ is a threshold known to be
+infeasible. The invariants are
+\[
+  \ell\leq B^*, \qquad h>B^*.
+\]
+They hold initially because $\ell=0$ and $h=n$. If $\ell<B^*$, the threshold
+$K=\ell+1$ is feasible. A correct SAT/UNSAT response therefore cannot return
+UNSAT at this threshold. A SAT response is decoded and verified, yielding a
+value $B\geq K$; updating $\ell=B$ preserves the lower-bound invariant. An
+UNSAT response at $K=\ell+1$ proves that no labeling reaches $K$, so
+$B^*<K=\ell+1$. Combined with $\ell\leq B^*$, this gives
+$B^*=\ell$ and the result is optimal.
+
+After SAT at threshold $K$ with verified value $B$, all thresholds
+$K<K'\leq B$ are feasible using the same labeling. Thus the next probe at
+$B+1$ skips no unresolved threshold. Each iteration shrinks the interval
+between $\ell$ and $h$ by at least one, so at most $n-1$ probes are required.
+A timeout before any verified labeling produces TO; a timeout after an
+incumbent produces FEAS with a verified lower bound and the best valid upper
+bound known to the implementation.
+
+\subsection{Trust boundary}
+The verifier independently checks every reported labeling and recomputes its
+objective. It does not independently certify UNSAT. Consequently, the
+optimality claim depends on the SAT backend's UNSAT answer being correct;
+the implementation's verification step protects the feasibility side of the
+claim but is not an UNSAT proof checker.

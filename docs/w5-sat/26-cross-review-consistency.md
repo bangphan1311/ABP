@@ -13,7 +13,7 @@
 | `C4` | **OK** | `src/sat/solve.py` | `solve_sat K-search (k = lo + 1, first UNSAT)` | K <- B + 1, dừng ở lần UNSAT đầu tiên (S §5, A §A.5) | k = lo + 1; hi = k khi UNSAT | — |
 | `C5` | **OK** | `src/sat/pairwise.py` | `trivial_unsat (k >= n) checked before build_cnf` | K >= n -> UNSAT trước khi dựng CNF (S §1, M §3.1, A.3.1) | live=True, probe_order=True | — |
 | `C6` | **OK** | `src/sat/solve.py` | `CANONICAL_SAT_CONFIG` | order/pairwise/glucose4/multi/false/false/0 | {'method': 'sat', 'abp_encoding': 'order', 'amo_encoding': 'pairwise', 'sat_solver': 'glucose4', 'search_mode': 'multi', 'symmetry': False, 'warm_start': False, 'seed': 0} | — |
-| `C7` | **OK** | `src/sat/solve.py` | `canonical_sat_config(memory_limit=...)` | None -> ValueError; allow_unbounded_memory=True -> None; nêu ở C/W4/S/M | raised=True, unbounded=True | — |
+| `C7` | **OK** | `src/sat/solve.py` | `canonical_sat_config(memory_limit=...)` | default 12.0 GiB; None -> ValueError; nêu ở C/W4/S/M | default=12.0, rejects_none=True | — |
 | `C8-R1` | **OK** | `tests/exact/test_exact_solvers.py` | `R1 skip-guards` | skip thay vì fail khi thiếu backend/engine/license | đủ | — |
 | `C8-R2` | **OK** | `docs/exact_models.md` | `R2 timing scope` | runner wall_time + kill cứng time_limit + 30 s | đủ | — |
 | `C8-R3` | **OK** | `src/exact/common.py` | `R3 validate_exact_input` | ValueError cho input xấu, hiện diện ở cả 4 solver | 4/4 file có ValueError/validate; 3/4 dùng validate_exact_input | — |
@@ -28,7 +28,7 @@
 | Mục | Trạng thái | Bằng chứng trong repo |
 |---|---|---|
 | R1 — skip-guard khi thiếu backend/engine/license | closed | `tests/exact/test_exact_solvers.py`: `_skip_if_backend_unavailable`, `pytest.skip`, guard `cpoptimizer.exe` |
-| R2 — timing scope, dùng runner `wall_time` | closed | `docs/exact_models.md` §Timing and memory-limit scope: `wall_time`, kill cứng `time_limit + 30 seconds` |
+| R2 — timing scope, dùng runner `wall_time` | closed | `docs/exact_models.md` §Time accounting: `wall_time`, kill cứng `time_limit + 30 seconds` |
 | R3 — input validation raise `ValueError` | closed | `src/exact/common.py::validate_exact_input`; 3 solver mới gọi hàm này, CP-SAT giữ validation nội bộ |
 | R4 — warning field Config bị bỏ qua | closed | `src/exact/common.py::warn_ignored_config`; gọi ở `gurobi_mip.py`, `cplex_mip.py`, `cplex_cp.py` |
 | R5 — `ub` khi TO ở CP-SAT | closed | `src/exact/cp_sat_solver.py::_safe_upper_bound` trả `n - 1` khi `UNKNOWN`/non-finite |

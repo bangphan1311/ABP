@@ -5,7 +5,7 @@ from time import perf_counter
 
 from src.common.models import Config, Instance, Result
 from src.common.verify import verify
-from src.exact.common import validate_exact_input, warn_ignored_config
+from src.exact.common import remaining_time_budget, validate_exact_input, warn_ignored_config
 
 
 def solve_gurobi_mip(instance: Instance, config: Config | None = None) -> Result:
@@ -54,6 +54,16 @@ def solve_gurobi_mip(instance: Instance, config: Config | None = None) -> Result
 
         model.setObjective(k, GRB.MAXIMIZE)
         t_encode = perf_counter() - encode_start
+        remaining = remaining_time_budget(config.time_limit, perf_counter() - start)
+        if remaining is not None:
+            if remaining <= 0:
+                model.dispose()
+                return Result(
+                    status="TO", ub=n - 1, t_encode=t_encode, t_solve=0.0,
+                    t_total=perf_counter() - start,
+                    metadata={"solver": "Gurobi MIP", "time_budget_exhausted_during_build": True},
+                )
+            model.Params.TimeLimit = remaining
         solve_start = perf_counter()
         model.optimize()
         t_solve = perf_counter() - solve_start

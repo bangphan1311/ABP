@@ -1,7 +1,6 @@
 """Sinh bảng/báo cáo nháp phân tích RQ1, RQ2 và kiểm tra cổng G3 (W4, ticket 23 / #30).
 
-Đọc dữ liệu từ ``runs.csv`` (hoặc kết hợp ``results/pilot_rq1.csv``,
-``results/pilot_rq2.csv``, hoặc ``results/raw/*.json``), không sửa tay số liệu.
+Đọc hai CSV pilot riêng (hoặc một CSV gộp pilot chỉ khi được chỉ định tường minh); không tự đọc official ``results/runs.csv`` cho RQ1/RQ2.
 
 Nội dung sinh tự động:
   - RQ1: kích thước CNF (``variables``, ``clauses``), ảnh hưởng của AMO,
@@ -14,7 +13,7 @@ Nội dung sinh tự động:
   - G3 Gate: kiểm tra tỷ lệ hoàn thành các run Core (≥ 80%) và phân loại toàn bộ
     các run bất thường qua ``src.sat.triage``.
 
-    python -m experiments.analyze_rq1_rq2 --out docs/w4-sat/23-rq1-rq2-draft-analysis.md
+    python -m experiments.analyze_rq1_rq2 --expected-runs 40 --out docs/w4-sat/23-rq1-rq2-draft-analysis.md
 """
 
 from __future__ import annotations
@@ -34,12 +33,10 @@ if __package__ in (None, ""):
 from experiments.pilot_common import REPO_ROOT, use_utf8_output
 from src.sat.triage import DEFAULT_RAW_DIR, TriageReport, triage_directory
 
-DEFAULT_RUNS_CSV = REPO_ROOT / "results" / "runs.csv"
 DEFAULT_RQ1_CSV = REPO_ROOT / "results" / "pilot_rq1.csv"
 DEFAULT_RQ2_CSV = REPO_ROOT / "results" / "pilot_rq2.csv"
-DEFAULT_REPORT_PATH = (
-    REPO_ROOT / "docs" / "w4-sat" / "23-rq1-rq2-draft-analysis.md"
-)
+DEFAULT_RUNS_CSV = REPO_ROOT / "results" / "runs.csv"
+DEFAULT_REPORT_PATH = REPO_ROOT / "docs" / "w4-sat" / "23-rq1-rq2-draft-analysis.md"
 G3_THRESHOLD = 0.80
 
 
@@ -112,6 +109,7 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
         "clauses": _to_int(raw.get("clauses")),
         "peak_memory": _to_float(raw.get("peak_memory")),
         "time_limit": _to_float(raw.get("time_limit")) or 60.0,
+        "search_mode": str(raw.get("search_mode") or "multi"),
         "error": str(raw.get("error") or ""),
     }
 
@@ -174,6 +172,7 @@ class G3GateSummary:
     anomalies_count: int
     unclassified_anomalies: int
     code_bugs_count: int
+    missing_raw_records_count: int
     passed_gate: bool
     gate_status: str
 
@@ -378,18 +377,59 @@ def evaluate_g3_gate(
     triage_reports: Sequence[TriageReport],
     *,
     threshold: float = G3_THRESHOLD,
+    missing_raw_records: int = 0,
 ) -> G3GateSummary:
     """Đánh giá điều kiện G3 (ticket 23): ≥ 80% run Core xong & mọi run bất thường đã phân loại.
 
     ``expected_runs is None`` nghĩa là chưa có kế hoạch run đã khóa: cổng trả ``PENDING``,
     không fallback về số run quan sát được (fallback sẽ tự "đạt" cổng).
     """
+    if expected_runs is not None and (
+        isinstance(expected_runs, bool)
+        or not isinstance(expected_runs, int)
+        or expected_runs <= 0
+    ):
+        raise ValueError("expected_runs phải là số nguyên > 0 lấy từ frozen run plan.")
+    if isinstance(completed_runs, bool) or not isinstance(completed_runs, int):
+        raise ValueError("completed_runs phải là số nguyên không âm.")
+    if completed_runs < 0:
+        raise ValueError("completed_runs không được âm.")
+    if expected_runs is not None and completed_runs > expected_runs:
+        raise ValueError(
+            "completed_runs không thể lớn hơn expected_runs; "
+            "kiểm tra frozen run plan và duplicate run IDs."
+        )
+    if (
+        isinstance(missing_raw_records, bool)
+        or not isinstance(missing_raw_records, int)
+        or missing_raw_records < 0
+    ):
+        raise ValueError("missing_raw_records phải là số nguyên không âm.")
+    if not isinstance(threshold, (int, float)) or isinstance(threshold, bool):
+        raise ValueError("threshold phải là số trong khoảng (0, 1].")
+    if not 0 < threshold <= 1:
+        raise ValueError("threshold phải nằm trong khoảng (0, 1].")
+    triage_ids = [report.run_id for report in triage_reports]
+    if any(not run_id for run_id in triage_ids):
+        raise ValueError("triage report thiếu run_id.")
+    if len(set(triage_ids)) != len(triage_ids):
+        raise ValueError("triage_reports có run_id trùng; phải xử lý attempt/raw evidence trước G3.")
+    if expected_runs is not None and len(triage_ids) != completed_runs:
+        raise ValueError(
+            f"completed_runs={completed_runs} không khớp số triage report duy nhất={len(triage_ids)}."
+        )
     anomalies = [r for r in triage_reports if r.is_anomaly]
     unclassified = [
-        r
-        for r in anomalies
-        if r.category not in ("SOLVER_BEHAVIOR", "ENV_ERROR", "CODE_BUG")
-        or not r.reasons
+        report
+        for report in triage_reports
+        if report.category not in ("OK", "SOLVER_BEHAVIOR", "ENV_ERROR", "CODE_BUG")
+        or (
+            report.is_anomaly
+            and (
+                report.category not in ("SOLVER_BEHAVIOR", "ENV_ERROR", "CODE_BUG")
+                or not report.reasons
+            )
+        )
     ]
     code_bugs = [r for r in triage_reports if r.category == "CODE_BUG"]
 
@@ -403,17 +443,19 @@ def evaluate_g3_gate(
             anomalies_count=len(anomalies),
             unclassified_anomalies=len(unclassified),
             code_bugs_count=len(code_bugs),
+            missing_raw_records_count=missing_raw_records,
             passed_gate=False,
             gate_status="PENDING",
         )
 
-    if isinstance(expected_runs, bool) or expected_runs <= 0:
-        raise ValueError("expected_runs phải > 0.")
     ratio = completed_runs / expected_runs
     passed_completion = ratio >= threshold
 
     passed_gate = (
-        passed_completion and len(unclassified) == 0 and len(code_bugs) == 0
+        passed_completion
+        and len(unclassified) == 0
+        and len(code_bugs) == 0
+        and missing_raw_records == 0
     )
 
     return G3GateSummary(
@@ -425,9 +467,84 @@ def evaluate_g3_gate(
         anomalies_count=len(anomalies),
         unclassified_anomalies=len(unclassified),
         code_bugs_count=len(code_bugs),
+        missing_raw_records_count=missing_raw_records,
         passed_gate=passed_gate,
         gate_status="PASS" if passed_gate else "FAIL",
     )
+
+
+CORE_RQ2_SOLVERS = frozenset({"cadical195", "glucose4"})
+
+
+def split_combined_rq_rows(
+    rows: Sequence[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Tách dữ liệu theo hai trục RQ, khử trùng lặp nhưng vẫn tái sử dụng run chung.
+
+    RQ1: CaDiCaL, search_mode=multi và ba CNF khác nhau theo Protocol §4/§9.1.
+    RQ2: canonical order/pairwise và Core solver CaDiCaL/Glucose.
+    CaDiCaL order/pairwise là run chung hợp lệ của cả hai RQ; vì vậy nó xuất hiện
+    trong cả hai output nhưng chỉ được tính một lần trong union dùng cho G3.
+
+    Các bản ghi lặp có cùng run_id phải giống hệt nhau. Nếu cùng ID nhưng payload
+    khác nhau, dừng phân tích thay vì âm thầm giữ bản ghi xuất hiện đầu tiên.
+    """
+    def is_sat_multi(row: dict[str, Any]) -> bool:
+        return (
+            row.get("method", "sat") == "sat"
+            and row.get("search_mode", "multi") == "multi"
+        )
+
+    def is_rq1_candidate(row: dict[str, Any]) -> bool:
+        return (
+            is_sat_multi(row)
+            and row.get("solver") == "cadical195"
+            and (row.get("abp_encoding"), row.get("amo_encoding")) in {
+                ("pairwise", "pairwise"),
+                ("pairwise", "seqcounter"),
+                ("order", "pairwise"),
+            }
+        )
+
+    def is_rq2_candidate(row: dict[str, Any]) -> bool:
+        return (
+            is_sat_multi(row)
+            and row.get("abp_encoding") == "order"
+            and row.get("amo_encoding") == "pairwise"
+            and row.get("solver") in CORE_RQ2_SOLVERS
+        )
+
+    # Một row CaDiCaL order/pairwise thuộc cả RQ1 và RQ2.
+    candidates = [
+        row for row in rows
+        if is_rq1_candidate(row) or is_rq2_candidate(row)
+    ]
+    by_run_id: dict[str, dict[str, Any]] = {}
+    for row in candidates:
+        run_id = str(row.get("run_id") or "")
+        if not run_id:
+            raise ValueError(
+                "Core RQ1/RQ2 row thiếu run_id; không thể deduplicate hoặc tính G3 an toàn."
+            )
+        previous = by_run_id.get(run_id)
+        if previous is not None:
+            if previous != row:
+                raise ValueError(
+                    f"run_id {run_id!r} xuất hiện với payload mâu thuẫn giữa các nguồn CSV."
+                )
+            continue
+        by_run_id[run_id] = row
+
+    unique_rows = list(by_run_id.values())
+    rq1_rows = [row for row in unique_rows if is_rq1_candidate(row)]
+    rq2_rows = [row for row in unique_rows if is_rq2_candidate(row)]
+    if not rq1_rows or not rq2_rows:
+        raise ValueError(
+            "Nguồn dữ liệu phải chứa cả RQ1 (CaDiCaL, 3 CNF) và RQ2 "
+            "(canonical order/pairwise, Core solver CaDiCaL/Glucose); "
+            "kiểm tra schema và frozen run plan."
+        )
+    return rq1_rows, rq2_rows
 
 
 def render_markdown_report(
@@ -450,9 +567,50 @@ def render_markdown_report(
         rq1_rows, solver=rq1_solver
     )
 
-    unique_run_ids = {r["run_id"] for r in rq1_rows} | {r["run_id"] for r in rq2_rows}
-    completed_count = len(unique_run_ids)
-    g3 = evaluate_g3_gate(completed_count, expected_core_runs, triage_reports)
+    core_rows = list(rq1_rows) + list(rq2_rows)
+    missing_run_id_rows = [row for row in core_rows if not row.get("run_id")]
+    if missing_run_id_rows:
+        raise ValueError(
+            f"{len(missing_run_id_rows)} Core row thiếu run_id; không thể tính G3 an toàn."
+        )
+    # Giữ cả row có status hỏng trong mẫu số để triage có thể chặn CODE_BUG;
+    # không được lặng lẽ bỏ chúng khỏi G3 chỉ vì status ngoài CONTRACT.
+    core_run_ids = {str(row["run_id"]) for row in core_rows}
+    triage_by_id: dict[str, TriageReport] = {}
+    for report in triage_reports:
+        if report.run_id not in core_run_ids:
+            continue
+        previous = triage_by_id.get(report.run_id)
+        if previous is not None and previous != report:
+            raise ValueError(
+                f"run_id {report.run_id!r} có nhiều triage report mâu thuẫn; "
+                "cần xử lý attempt/raw evidence trước khi tính G3."
+            )
+        triage_by_id[report.run_id] = report
+    triage_reports = list(triage_by_id.values())
+    triaged_run_ids = set(triage_by_id)
+    completed_count = len(core_run_ids & triaged_run_ids)
+    missing_raw_records = len(core_run_ids - triaged_run_ids)
+    if expected_core_runs is not None and (
+        isinstance(expected_core_runs, bool)
+        or not isinstance(expected_core_runs, int)
+        or expected_core_runs <= 0
+    ):
+        raise ValueError(
+            "G3 cần --expected-runs là số nguyên > 0 lấy từ frozen run plan; "
+            "không được suy mẫu số từ số run đã quan sát."
+        )
+    if expected_core_runs is not None and expected_core_runs < len(core_run_ids):
+        raise ValueError(
+            f"--expected-runs={expected_core_runs} nhỏ hơn {len(core_run_ids)} "
+            "unique Core run IDs trong dữ liệu đầu vào; mẫu số frozen không hợp lệ."
+        )
+    g3 = evaluate_g3_gate(
+        completed_count,
+        expected_core_runs,
+        triage_reports,
+        missing_raw_records=missing_raw_records,
+    )
 
     lines: list[str] = [
         "# Nháp phân tích RQ1 / RQ2 và kiểm tra cổng G3 (W4, issue #23 / #30)",
@@ -595,6 +753,7 @@ def render_markdown_report(
             "",
             completion_line,
             f"- **Tổng số file raw JSON đã kiểm tra qua `src.sat.triage`:** `{g3.total_triaged}`.",
+            f"- **Core runs thiếu raw evidence:** `{g3.missing_raw_records_count}`.",
             f"- **Số run bất thường (`status != OPT` hoặc lỗi):** `{g3.anomalies_count}` (chưa phân loại: `{g3.unclassified_anomalies}`, lỗi correctness `CODE_BUG`: `{g3.code_bugs_count}`).",
             f"- **Kết luận cổng G3 (trên tập dữ liệu hiện có):** **{g3.gate_status}**.",
             "",
@@ -627,7 +786,7 @@ def main(argv: list[str] | None = None) -> int:
         "--runs-csv",
         type=Path,
         default=None,
-        help="File runs.csv tổng hợp của P3 (nếu đã có).",
+        help="CSV gộp CHỈ các pilot RQ1/RQ2; không truyền official results/runs.csv.",
     )
     parser.add_argument("--rq1-csv", type=Path, default=DEFAULT_RQ1_CSV)
     parser.add_argument("--rq2-csv", type=Path, default=DEFAULT_RQ2_CSV)
@@ -653,24 +812,26 @@ def main(argv: list[str] | None = None) -> int:
 
     use_utf8_output()
 
-    if args.runs_csv is not None and args.runs_csv.is_file():
+    if args.runs_csv is not None:
+        if not args.runs_csv.is_file():
+            raise FileNotFoundError(f"Không thấy combined pilot CSV được chỉ định: {args.runs_csv}")
         all_rows = load_csv_rows(args.runs_csv)
-        rq1_rows = all_rows
-        rq2_rows = all_rows
-        source_note = f"`{args.runs_csv.relative_to(REPO_ROOT) if args.runs_csv.is_relative_to(REPO_ROOT) else args.runs_csv}`"
-    elif DEFAULT_RUNS_CSV.is_file():
-        all_rows = load_csv_rows(DEFAULT_RUNS_CSV)
-        rq1_rows = all_rows
-        rq2_rows = all_rows
-        source_note = "`results/runs.csv`"
+        rq1_rows, rq2_rows = split_combined_rq_rows(all_rows)
+        source_note = f"`{args.runs_csv.relative_to(REPO_ROOT) if args.runs_csv.is_relative_to(REPO_ROOT) else args.runs_csv}` (caller xác nhận đây chỉ là dữ liệu pilot RQ1/RQ2; G3 expected=40 Core run)"
     else:
-        rq1_rows = load_csv_rows(args.rq1_csv) if args.rq1_csv.is_file() else []
-        rq2_rows = load_csv_rows(args.rq2_csv) if args.rq2_csv.is_file() else []
-        source_note = "`results/pilot_rq1.csv` + `results/pilot_rq2.csv` + `results/raw/*.json` (bản nháp W4 trước khi P3 khóa `results/runs.csv` official)"
+        pilot_rows = load_csv_rows(args.rq1_csv) + load_csv_rows(args.rq2_csv)
+        rq1_rows, rq2_rows = split_combined_rq_rows(pilot_rows)
+        source_note = "`results/pilot_rq1.csv` + `results/pilot_rq2.csv` (nguồn pilot tách riêng; không đọc official results/runs.csv; G3 expected=40 Core run)"
 
     triage_reports = (
         triage_directory(args.raw_dir) if args.raw_dir.is_dir() else []
     )
+    core_run_ids = {
+        str(row["run_id"])
+        for row in list(rq1_rows) + list(rq2_rows)
+        if row.get("run_id") and row.get("status") in {"OPT", "FEAS", "TO", "MO", "ERR"}
+    }
+    triage_reports = [report for report in triage_reports if report.run_id in core_run_ids]
     markdown = render_markdown_report(
         rq1_rows,
         rq2_rows,

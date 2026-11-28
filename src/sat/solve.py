@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import ctypes
 import math
+import os
 import warnings
 from ctypes import wintypes
 from time import perf_counter
 
 from src.common.models import Config, Instance, Result
+from src.common.checkpoint import write_incumbent_checkpoint
 from src.common.verify import verify
 from src.sat import order
 from src.sat.backend import (
@@ -48,25 +50,25 @@ CANONICAL_SAT_CONFIG = Config(
     warm_start=False,
     seed=0,
     time_limit=1800.0,
-    memory_limit=None,
+    memory_limit=12.0,
 )
 
 
 def canonical_sat_config(
     *,
     time_limit: float | None = 1800.0,
-    memory_limit: float | None = None,
+    memory_limit: float | None = 12.0,
     sat_solver: str = "glucose4",
-    allow_unbounded_memory: bool = False,
 ) -> Config:
-    """Trả bản sao ``Config`` chuẩn cho SAT (M2 freeze, ticket 21).
-
-    Run official phải mang ``memory_limit`` tường minh (số hữu hạn > 0): solver không
-    tự enforce cap trong process (runner làm ở Protocol §6.3), nhưng cấu hình official
-    không được phép bỏ trống cap. ``allow_unbounded_memory=True`` là escape hatch chỉ
-    dành cho dev/unit test khi cần ``memory_limit=None``.
-    """
-    _validate_memory_limit(memory_limit, allow_unbounded_memory=allow_unbounded_memory)
+    """Trả cấu hình SAT chuẩn; caller phải chọn rõ hard cap GiB của runner."""
+    if (
+        memory_limit is None
+        or isinstance(memory_limit, bool)
+        or not isinstance(memory_limit, (int, float))
+        or not math.isfinite(float(memory_limit))
+        or memory_limit <= 0
+    ):
+        raise ValueError("memory_limit phải được truyền rõ và là số hữu hạn > 0 GiB.")
     return Config(
         method=METHOD,
         abp_encoding=CANONICAL_SAT_CONFIG.abp_encoding,
@@ -81,38 +83,8 @@ def canonical_sat_config(
     )
 
 
-def _validate_memory_limit(
-    memory_limit: float | None, *, allow_unbounded_memory: bool
-) -> None:
-    """Chặn ``memory_limit`` thiếu/không hợp lệ ở biên cấu hình official.
-
-    Raises:
-        ValueError: Nếu ``memory_limit is None`` mà không bật escape hatch, hoặc giá trị
-            không phải số hữu hạn > 0 (``bool`` bị loại dù là subclass của ``int``).
-    """
-    if memory_limit is None:
-        if allow_unbounded_memory:
-            return
-        raise ValueError(
-            "memory_limit phải là số hữu hạn > 0 (int|float, không phải bool): "
-            "None. Run official cần cap tường minh; dev/unit test dùng "
-            "allow_unbounded_memory=True."
-        )
-    if (
-        isinstance(memory_limit, bool)
-        or not isinstance(memory_limit, (int, float))
-        or not math.isfinite(memory_limit)
-        or memory_limit <= 0
-    ):
-        raise ValueError(
-            "memory_limit phải là số hữu hạn > 0 (int|float, không phải bool): "
-            f"{memory_limit!r}."
-        )
-
-
 # Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.
 IGNORED_CONFIG_FIELDS = (
-    "memory_limit",
     "search_mode",
     "symmetry",
     "warm_start",
@@ -138,10 +110,10 @@ def _warn_ignored_config(cfg: Config) -> None:
         return
 
     warnings.warn(
-        "W1 bỏ qua các field Config: "
+        "SAT solver chưa dùng trực tiếp các field Config: "
         + ", ".join(ignored)
-        + " (memory_limit chưa cài đặt nên status MO không bao giờ xuất hiện; "
-        "search_mode/symmetry/warm_start/seed thuộc P3).",
+        + " (memory cap được enforce bởi shared runner; search_mode/symmetry/"
+        "warm_start/seed cần tuân theo protocol).",
         stacklevel=2,
     )
 
@@ -163,30 +135,50 @@ class _PROCESS_MEMORY_COUNTERS(ctypes.Structure):
     ]
 
 
-_psapi = ctypes.WinDLL("psapi")
-_kernel32 = ctypes.WinDLL("kernel32")
-# Thiếu prototype thì HANDLE pseudo -1 của GetCurrentProcess bị cắt 32 bit
-# và GetProcessMemoryInfo luôn thất bại.
-_kernel32.GetCurrentProcess.restype = wintypes.HANDLE
-_psapi.GetProcessMemoryInfo.argtypes = [
-    wintypes.HANDLE,
-    ctypes.POINTER(_PROCESS_MEMORY_COUNTERS),
-    wintypes.DWORD,
-]
-_psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+# Windows dùng psapi; Linux đọc RSS từ /proc/self/statm. Không được gọi
+# ctypes.WinDLL ở module import trên Linux vì API này không tồn tại ở đó.
+if hasattr(ctypes, "WinDLL"):
+    _psapi = ctypes.WinDLL("psapi")
+    _kernel32 = ctypes.WinDLL("kernel32")
+    # Thiếu prototype thì HANDLE pseudo -1 của GetCurrentProcess bị cắt 32 bit
+    # và GetProcessMemoryInfo luôn thất bại.
+    _kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    _psapi.GetProcessMemoryInfo.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(_PROCESS_MEMORY_COUNTERS),
+        wintypes.DWORD,
+    ]
+    _psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+else:
+    _psapi = None
+    _kernel32 = None
 
 
 def working_set_mb() -> float:
-    """Working set hiện tại của process này, đơn vị MB, qua GetProcessMemoryInfo.
+    """Working set (Windows) hoặc RSS (Linux), đơn vị MB.
 
-    Thất bại hệ thống trả ``0.0``: số liệu bộ nhớ không được làm gãy pipeline.
+    Linux sampling chỉ phục vụ test/phát triển; hard memory cap official vẫn do
+    runner/OS enforce và Protocol khóa cùng một Windows host cho mọi official run.
     """
-    counters = _PROCESS_MEMORY_COUNTERS()
-    counters.cb = ctypes.sizeof(_PROCESS_MEMORY_COUNTERS)
-    measured = _psapi.GetProcessMemoryInfo(
-        _kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
-    )
-    return counters.WorkingSetSize / (1024.0 * 1024.0) if measured else 0.0
+    if _psapi is not None and _kernel32 is not None:
+        counters = _PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(_PROCESS_MEMORY_COUNTERS)
+        measured = _psapi.GetProcessMemoryInfo(
+            _kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+        )
+        if measured:
+            return counters.WorkingSetSize / (1024.0 * 1024.0)
+
+    try:
+        with open("/proc/self/statm", "r", encoding="ascii") as stream:
+            fields = stream.read().split()
+        resident_pages = int(fields[1])
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        if resident_pages >= 0 and page_size > 0:
+            return resident_pages * page_size / (1024.0 * 1024.0)
+    except (OSError, ValueError, IndexError, AttributeError):
+        pass
+    return 0.0
 
 
 def solve_sat(
@@ -275,6 +267,20 @@ def solve_sat(
                     f"ub={ub} nhỏ hơn B={value} đã verify: ub không hợp lệ."
                 )
             lo, best_solution, best_cnf = value, solution, cnf
+            write_incumbent_checkpoint(
+                instance,
+                cfg,
+                objective=value,
+                solution=solution,
+                metrics={
+                    "t_encode": t_encode,
+                    "t_solve": t_solve,
+                    "t_total": perf_counter() - start,
+                    "variables": cnf.n_vars if cnf is not None else None,
+                    "clauses": len(cnf.clauses) if cnf is not None else None,
+                    "peak_memory": peak_ws,
+                },
+            )
         elif status == "UNSAT":
             # Ngưỡng K = lo + 1 đã bị bác -> B = lo là tối ưu.
             hi, unsat_source = k, "solver"

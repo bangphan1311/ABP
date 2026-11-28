@@ -674,20 +674,15 @@ def verify_code_spec_paper_consistency() -> list[ConsistencyFinding]:
         )
     )
 
-    # C7 — memory contract + escape hatch.
-    raised = False
+    # C7 — memory contract: default 12.0 GiB cap, None/invalid rejected.
+    default_cap = canonical_sat_config().memory_limit
+    rejects_none = False
     try:
         canonical_sat_config(memory_limit=None)
     except ValueError as exc:
-        raised = "memory_limit" in str(exc)
-    unbounded = (
-        canonical_sat_config(
-            memory_limit=None, allow_unbounded_memory=True
-        ).memory_limit
-        is None
-    )
+        rejects_none = "memory_limit" in str(exc)
     missing = []
-    if not (raised and unbounded):
+    if not (default_cap == 12.0 and rejects_none):
         missing.append("canonical_sat_config memory contract")
     for label, text in (
         ("C", c_text),
@@ -695,15 +690,15 @@ def verify_code_spec_paper_consistency() -> list[ConsistencyFinding]:
         ("S", s_text),
         ("M", m_text),
     ):
-        if "allow_unbounded_memory" not in _compact(text):
-            missing.append(f"{label}:allow_unbounded_memory")
+        if "12.0" not in _compact(text):
+            missing.append(f"{label}:12.0 GiB cap")
     findings.append(
         _finding(
             "C7",
             REPO_ROOT / "src" / "sat" / "solve.py",
             "canonical_sat_config(memory_limit=...)",
-            "None -> ValueError; allow_unbounded_memory=True -> None; nêu ở C/W4/S/M",
-            f"raised={raised}, unbounded={unbounded}",
+            "default 12.0 GiB; None -> ValueError; nêu ở C/W4/S/M",
+            f"default={default_cap}, rejects_none={rejects_none}",
             missing,
         )
     )
@@ -730,7 +725,7 @@ def verify_code_spec_paper_consistency() -> list[ConsistencyFinding]:
         "C8",
         EXACT_MODELS_PATH,
         "R2 timing scope",
-        ("Timing and memory-limit scope", "wall_time", "time_limit + 30 seconds"),
+        ("wall_time", "time_limit + 30 seconds"),
         "runner wall_time + kill cứng time_limit + 30 s",
     )
     r2.check_id = "C8-R2"
@@ -1452,7 +1447,7 @@ def _consistency_sections(
             "| Mục | Trạng thái | Bằng chứng trong repo |",
             "|---|---|---|",
             "| R1 — skip-guard khi thiếu backend/engine/license | closed | `tests/exact/test_exact_solvers.py`: `_skip_if_backend_unavailable`, `pytest.skip`, guard `cpoptimizer.exe` |",
-            "| R2 — timing scope, dùng runner `wall_time` | closed | `docs/exact_models.md` §Timing and memory-limit scope: `wall_time`, kill cứng `time_limit + 30 seconds` |",
+            "| R2 — timing scope, dùng runner `wall_time` | closed | `docs/exact_models.md` §Time accounting: `wall_time`, kill cứng `time_limit + 30 seconds` |",
             "| R3 — input validation raise `ValueError` | closed | `src/exact/common.py::validate_exact_input`; 3 solver mới gọi hàm này, CP-SAT giữ validation nội bộ |",
             "| R4 — warning field Config bị bỏ qua | closed | `src/exact/common.py::warn_ignored_config`; gọi ở `gurobi_mip.py`, `cplex_mip.py`, `cplex_cp.py` |",
             "| R5 — `ub` khi TO ở CP-SAT | closed | `src/exact/cp_sat_solver.py::_safe_upper_bound` trả `n - 1` khi `UNKNOWN`/non-finite |",
@@ -1737,9 +1732,9 @@ def _paper_sections(
             "2. Không claim thứ tự kích thước CNF như định lý; đó là đo đạc "
             "instance-dependent.",
             f"3. Không claim bảo đảm bộ nhớ: `memory_limit` không được solver "
-            "enforce trong process; `canonical_sat_config(memory_limit=…)` bắt "
-            "buộc cap hữu hạn > 0 cho run official, `allow_unbounded_memory=True` "
-            "chỉ cho dev/test; MO chỉ từ `MemoryError` ngoài process.",
+            "enforce trong process; `canonical_sat_config()` mặc định cap "
+            "`12.0` GiB và từ chối `None`/giá trị không hợp lệ cho run official; "
+            "MO chỉ từ `MemoryError` ngoài process.",
             "4. Không claim timeout cứng: deadline kiểm giữa các pha nên `t_total` "
             "có thể vượt `time_limit`.",
             "5. Không claim từ symmetry/warm start: chưa cài đặt, đặt khác mặc "

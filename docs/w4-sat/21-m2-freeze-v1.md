@@ -17,12 +17,12 @@ CANONICAL_SAT_CONFIG = Config(
     warm_start=False,
     seed=0,
     time_limit=1800.0,
-    memory_limit=None,
+    memory_limit=12.0,
 )
 ```
 
 - Đã cập nhật `_warn_ignored_config` trong `src/sat/solve.py`: không phát cảnh báo giả khi `search_mode="multi"` (vì `multi` là chế độ duy nhất đã cài đặt của vòng dò K).
-- `canonical_sat_config()` từ nay **bắt buộc** `memory_limit` tường minh (số hữu hạn > 0) cho run official: `memory_limit=None` raise `ValueError` trừ khi caller truyền escape hatch `allow_unbounded_memory=True` (chỉ dùng cho dev/unit test). Hằng số `CANONICAL_SAT_CONFIG.memory_limit` vẫn là `None`; số cap cuối cùng (candidate `12.0` GiB = `12288.0` MB) do P1/P3 chốt — xem `docs/canonical_sat_config.md`.
+- `canonical_sat_config()` mặc định `memory_limit=12.0` GiB cho run official và từ chối `memory_limit=None`/giá trị không hợp lệ (`ValueError` nhắc `memory_limit`). Hằng số `CANONICAL_SAT_CONFIG.memory_limit` cũng là `12.0`; cap này chỉ hợp lệ trên host candidate đã preflight và P3 phải xác nhận host/Job Object — xem `docs/canonical_sat_config.md`.
 - Lý do chọn và bảng số liệu chi tiết (OPT coverage, PAR2, median `peak_memory`, median `clauses`) được lưu tại `docs/canonical_sat_config.md`.
 
 ## 2. Correctness Suite & Test Matrix

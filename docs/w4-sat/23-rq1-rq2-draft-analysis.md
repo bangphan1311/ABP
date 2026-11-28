@@ -1,3 +1,5 @@
+> **SUPERSEDED — DO NOT USE THE G3 PASS BELOW.** This report was generated before the G3 denominator and RQ-axis fixes. Its `70 / 70 PASS` was calculated from the observed record count and included non-Core pilot rows; it is not valid evidence that the frozen 40-run Core pilot plan was completed. Regenerate this report with the current `experiments/analyze_rq1_rq2.py --expected-runs 40` after the 40 Core raw JSON records are available and triaged. The pilot tables below remain historical pilot observations only.
+
 # Nháp phân tích RQ1 / RQ2 và kiểm tra cổng G3 (W4, issue #23 / #30)
 
 > **Lưu ý:** File này được sinh tự động bằng `python -m experiments.analyze_rq1_rq2`, không chỉnh sửa tay.

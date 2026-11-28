@@ -35,6 +35,17 @@ def validate_exact_input(instance: Instance, config: Config) -> None:
         raise ValueError("time_limit phải là số hữu hạn lớn hơn 0.")
 
 
+def remaining_time_budget(total_limit: float | None, elapsed: float) -> float | None:
+    """Return the remaining whole-run time budget after build/model construction.
+
+    None means unlimited. elapsed is measured from the beginning of the
+    solver run, rather than from the moment the optimizer starts.
+    """
+    if total_limit is None:
+        return None
+    return max(0.0, float(total_limit) - max(0.0, float(elapsed)))
+
+
 def warn_ignored_config(config: Config, *, supported: tuple[str, ...] = ("seed",)) -> None:
     """Warn when a non-default shared Config field is ignored by this solver."""
     defaults = Config(method=config.method)

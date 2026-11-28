@@ -1,0 +1,191 @@
+# AI handoff — ABP project (2026-11-17)
+
+Purpose: continue the project from the current GitHub state without redoing the review or treating pending gates as completed.
+
+## Repository and branch snapshot
+- Repository: https://github.com/bangphan1311/ABP
+- PR #50: https://github.com/bangphan1311/ABP/pull/50 — P1 protocol / benchmark integration, open; branch `p1/w3-experimental-protocol-rc`; latest tested source/workflow candidate: `c03659beedbb5f69c9f2af3930f40baba614df88`; later commits update audit/readiness/handoff documentation only. Current head at last verification: `7f6a9f295c3d3617e93ba9e0dbd1fa7782f72a3f`; compare vs main: 110 ahead / 0 behind.
+- PR #52: https://github.com/bangphan1311/ABP/pull/52 — P2 SAT W4 implementation/analysis, open; branch `p2/w4-sat`; current head at last verification `02f225578b0b3cba0e325d856d3835934f826881`; compare vs main: 29 ahead / 0 behind; P1 review APPROVED for code review only, P3 reviewer ENEIT still requested.
+- Do not force-push or reset either branch. Reconcile P1 with main only after reviewing/merging P2, then rerun affected tests.
+
+## Work added in this review round
+
+### On `p2/w4-sat` (PR #52)
+- Fixed the six review topics raised by P1 in PR #52: G3 expected denominator, RQ1/RQ2 axis separation, canonical memory cap, missing-instance triage, freeze evidence wording and PR blast-radius disclosure.
+- RQ1 analysis now isolates CaDiCaL across the three distinct CNFs; RQ2 isolates canonical order/pairwise with Core CaDiCaL/Glucose. It does not treat order/seqcounter as a fourth distinct CNF.
+- The analysis requires `--expected-runs`, no longer auto-reads official `results/runs.csv` as pilot input, and defaults to the two separate pilot CSVs. G3 only counts unique Core IDs with matching triaged raw evidence; absent raw evidence prevents a pass.
+- Canonical SAT config records `order / pairwise / glucose4`, 1800 s official per-run time, and 12.0 GiB memory cap. Helper rejects explicit null/invalid caps. Shared runner/OS—not `solve_sat`—must enforce the hard cap.
+- Triage classifies missing/unresolvable benchmark instances as `ENV_ERROR`, including TO/ERR records without a solution.
+- Memory sampling was made importable on Linux (RSS fallback for tests/CI); Linux fallback is not official memory-cap enforcement.
+- The legacy generated report saying `70/70 G3 PASS` is explicitly marked SUPERSEDED.
+- Added tests for split axes, 40 unique pilot Core IDs, expected G3 denominator, missing raw records, memory cap and missing-instance triage.
+- Updated W4 freeze/analysis docs, canonical config proposal and PR #52 description.
+
+Important commits added during this round include `48b020b`, `1aa3caa`, `b0c32eb`, `f35081c`, `21b299d`, `15bfc74`, `e99c515`, `4ebbf8f`, `1f59a91`, `1bd9f65`; P2 then added `acd9dd0` to install OR-Tools in CI. Always inspect the live branch head before applying changes.
+
+### On `p1/w3-experimental-protocol-rc` (PR #50)
+- Updated official plan-only dry-run to SAT `order / pairwise / glucose4`, with planned 12.0 GiB cap as metadata only; added tests for the official plan and distinct RQ1/RQ2 solver choices.
+- Added `paper/p2_sat_methodology.tex`: modular SAT methods section plus tables from the historical synthetic W3 pilot.
+- Added `paper/p2_sat_appendix.tex`: proof sketches for pairwise/order encoding equivalence, AMO faithfulness and K-search completeness; includes the UNSAT trust boundary.
+- Updated `paper/README.md` to say drafts are modular, not an integrated master paper.
+- Added `docs/p1/sat-cross-review-2026-11-17.md` covering code/spec/paper consistency and unresolved gates.
+- Updated PR #50 and issue #49 descriptions to show protocol status, host/dataset/budget blockers and review requests.
+
+## CI evidence — do not overstate
+
+### P1
+- P1 full-suite workflow #44037909768 on source/test SHA `c03659beedbb5f69c9f2af3930f40baba614df88`: **539 passed on Ubuntu and 539 passed on Windows**; focused runner/HB/Exact jobs also passed.
+- The current P1 branch tip is later documentation/handoff-only commits; source/tests are unchanged from the tested SHA above.
+
+### P2
+- Older P2 workflow #44010144573 on `acd9dd00` was `action_required`; it is obsolete and must not be cited as current validation.
+- The P2 workflow was corrected and now runs both focused SAT/W4 tests and full `python -m pytest tests -q` on Ubuntu + Windows.
+- Latest P2 code/test SHA: `a5d58821393448cc1f019e7860c6546a4bedd907`; workflow [#44040260149](https://github.com/bangphan1311/ABP/actions/runs/44040260149) completed successfully:
+  - Ubuntu: SAT/W4 **452 passed**; full suite **556 passed**.
+  - Windows: SAT/W4 **452 passed**; full suite **556 passed**.
+- P2 branch tip `02f225578b0b3cba0e325d856d3835934f826881` adds only the W4 freeze-doc evidence after the tested code/test SHA; no source/test changes followed `a5d58821`.
+- These tests do not provide the missing raw pilot JSON, resolve the historical pilot budget, establish solver license entitlement or replace P3's official-host/queue sign-off.
+
+## Unresolved methodology and data blockers
+
+1. **Pilot time-budget mismatch:** committed `results/pilot_rq1.csv` and `results/pilot_rq2.csv` run IDs say `time_limit=60.0`, while current Experimental Protocol §6.2 specifies 1800 seconds for RQ1/RQ2 pilots. The paper and canonical-config docs disclose this. The group must either explicitly approve the historic 60 s pilot and amend the protocol, or rerun the pilots at 1800 s and revisit canonical selection. Do not quietly reconcile the difference.
+2. **G3 raw evidence:** the planned Core pilot contains 40 unique IDs (30 RQ1 distinct-CNF runs plus 10 additional Glucose runs; CaDiCaL order/pairwise is shared). The matching 40 raw JSON records were not found in the Git tree. The CSV rows alone do not establish G3. Locate/obtain raw records, triage all 40, regenerate with `--expected-runs 40`; otherwise keep G3 pending.
+3. **Official HB dataset:** the actual 24 Harwell–Boeing `.mtx.rnd` files were not available in the reviewed Git tree; inventory/manifest placeholders are not the dataset. Do not start official runs or report RQ3 until real files, hashes, headers and manifest validation are present on the selected host.
+4. **P3 official-run ownership:** P3 must confirm the actual official host (candidate P1 snapshot: Windows build 10.0.26200, RAM 15.21 GiB), 12 GiB Windows Job Object kill/MO evidence, one-worker execution, checkpoint incumbent, hard-kill/resume, attempt history, raw JSON → validation → `runs.csv`, expected-run manifest, dry-run/budget and actual queue operation.
+5. **Manuscript integration:** the SAT method and appendix now exist as modular `.tex` files, but no master manuscript root file was present in the repository. P3's experimental setup/results/discussion/conclusion/English editing and final LaTeX rendering are unavailable for review.
+
+## Remaining open issues at review time
+- #25 canonical SAT config: provisional choice documented; pilot budget decision and P3 host/cap sign-off pending.
+- #26 correctness suite + appendix: GitHub currently shows this issue as **closed**, but its body still has unchecked items for rerunning the suite and P2 proof sign-off. Verify why it was closed; reopen it if those acceptance gates were not actually met.
+- #28 M2 freeze: not frozen; needs fresh tests, pilot-budget resolution, P3 hard-cap/runner sign-off and all PR review/integration gates.
+- #29 SAT incident response: triage tool/tests exist, but latest tests and real official raw incidents are still pending.
+- #30 RQ1/RQ2 draft + G3: pilot tables exist; corrected G3 is pending raw evidence; official results still absent.
+- #31–32 RQ1/RQ2 final: blocked on validated official data.
+- #33 cross-review: P1 review note exists; P2 reciprocal review and final integrated consistency pass are pending.
+- #34 SAT paper v0.9: modular draft exists; official figures/results, integrated master document and G4 remain pending.
+- #35–36 proofread/claim verification/appendix final: partial terminology pass and proof-sketch appendix only; P2 sign-off and integrated LaTeX build pending.
+- #37 P3 section cross-read/final LaTeX: blocked on P3 material and master manuscript.
+- #38 M3 technical sign-off: NOT READY.
+- #49 protocol review: P2/P3 review and freeze sign-off pending.
+
+## Recommended next actions for the next AI
+
+1. Fetch live PR #52 head. Approve/re-run CI workflow run #2 (`44010144573`) and inspect logs. Fix all failures on Ubuntu and Windows; do not settle for only the workflow being queued or action-required.
+2. Review every code change on PR #52 for correctness, especially the G3 logic and raw-run-ID matching. Run a full project suite, not just the focused SAT workflow, and publish fresh counts tied to the exact tested SHA.
+3. Check whether P2 added the OR-Tools CI dependency commit `acd9dd0` or later. Do not duplicate it.
+4. Review PR #52 with P2 and then merge only when its tests and P1 review conditions are satisfied. After merge, update P1 branch from main using a safe merge/update-branch operation (no force push), resolve any path/document conflicts and rerun the P1 tests.
+5. Close issues only when their acceptance evidence exists. Do not close #28/#29/#30/#31–38/#49 just to reduce the issue count.
+6. Obtain the team decision on 60 s vs 1800 s W3 pilot budget. If 1800 s is required, rerun the appropriate pilot and reassess canonical SAT choice.
+7. Obtain the 40 Core pilot raw JSONs, validate/triage them and regenerate the analysis; no raw evidence means G3 remains pending.
+8. Obtain the 24 real HB files and P3 sign-off, then run the benchmark queue under the frozen protocol, perform P1 exact spot checks, validate every record and build final RQ1/RQ2/RQ3 analyses.
+9. Integrate modular P1/P2/P3 LaTeX into the actual master manuscript, compile, cross-read, validate all claims/citations and obtain M3 sign-off.
+
+## Non-negotiable guardrails
+- Never fabricate raw results, hashes, timings, memory measurements, dataset availability or member sign-offs.
+- Do not present synthetic W3 pilot data as official HB RQ3 data.
+- Do not call a 12 GiB config value proof that the OS-level cap is enforced.
+- Do not tag `v1.0` or close freeze/sign-off issues until Protocol §12 evidence exists.
+- Keep P1/P2/P3 ownership boundaries explicit. P1 can prepare code/docs/reviews but cannot invent P3's actual benchmark execution or host confirmation.
+
+## Latest P1 GitHub update — 2026-11-17 (after initial handoff)
+
+### P1 Exact implementation follow-up
+- New branch head: `857cbfc7ce238d92bb37933e2ae4e6e72b56ee60`.
+- Commit: `fix(exact): resolve CP Optimizer status and extraction review findings`.
+- Changed:
+  - `src/exact/cplex_cp.py`: memory-stop with a retained verified incumbent is classified as `MO`; the incumbent/bounds remain in the result. A genuine no-incumbent result (`get_solution() is None`) is distinguished from partial/invalid extraction or verification failures, which become `ERR`.
+  - `src/exact/cp_sat_solver.py`: non-default shared Config fields ignored by CP-SAT now trigger the same warning mechanism used by the other Exact adapters.
+  - `tests/exact/test_solver_status.py`: regression coverage for memory stop with incumbent, absent/partial/invalid incumbent, and CP-SAT ignored-field warning.
+  - `.github/workflows/w3-checkpoint-tests.yml`: focused workflow triggers on exact source/tests, installs OR-Tools, and runs Exact status/time-budget tests together with the existing HB-loader/checkpoint/runner tests.
+  - Updated `docs/p1/exact-methodology-review.md`, `docs/p1/w3-w4-exact-readiness.md`, and `docs/ENV.md` to record the fixes and distinguish the development Conda Python 3.11.17 from the candidate preflight Python 3.11.16. The latter must still be recorded from the actual execution interpreter before official runs.
+- Focused cross-platform CI on the new SHA:
+  - Run #44036964092: Ubuntu **39 passed**; Windows **39 passed**.
+  - Run #44036956857: workflow rerun also completed successfully on Ubuntu/Windows.
+  - These are focused tests, **not** the full project suite and not solver/license benchmark evidence.
+- E5 (commercial license/entitlement, Gurobi/CPLEX scale capability) remains owned by P1's local environment verification; the pilot's original raw errors were not edited.
+
+### Latest P1 re-review of P2 PR #52 — corrected and approved
+
+- PR #52 branch `p2/w4-sat` latest tip: `02f225578b0b3cba0e325d856d3835934f826881`; compare vs main: **29 ahead / 0 behind**. PR remains open and GitHub reports it mergeable.
+- P1's 17 Nov review claiming global dedup removed shared CaDiCaL rows was a **false positive**. The combined source rows are deduplicated once, then the same retained row is filtered independently into RQ1 and RQ2. Re-check against the actual pilot CSVs confirmed RQ1=30, RQ2=20, shared CaDiCaL rows=10, union=40. That erroneous review was dismissed with an explicit correction comment.
+- The six P1 findings from 06/11 have been fixed/clarified. P1's latest review on PR #52 is **APPROVED** (review ID `5934659898`) for code review only.
+- Additional G3 safeguards on the P2 branch:
+  - expected denominator is mandatory, integer, and cannot be smaller than observed unique Core run IDs;
+  - `completed_runs` must not exceed expected and must equal the unique triage-report count;
+  - duplicate/conflicting CSV payloads or triage reports are rejected;
+  - Core rows with malformed status remain in G3's run-ID set so triage can classify them as `CODE_BUG`, rather than silently dropping them;
+  - duplicate test definition was removed; regression tests cover shared RQ axes, conflicting IDs, missing IDs, denominator errors, malformed statuses and unrecognized triage categories.
+- P2 workflow #44040260149 passed on implementation/test SHA `a5d58821393448cc1f019e7860c6546a4bedd907`:
+  - Ubuntu: SAT/W4 **452 passed**; full `pytest tests -q` **556 passed**.
+  - Windows: SAT/W4 **452 passed**; full `pytest tests -q` **556 passed**.
+  - The current P2 branch tip `02f22557` adds only freeze-document evidence after the tested code/test SHA.
+- P2 issue #28 records the full-suite evidence but remains **NOT FROZEN**. Issue #29 has its current triage/SAT test evidence checked, but remains open for P3's real runner/raw handoff. Issue #30 remains **G3 PENDING** because the 40 Core pilot raw JSON files are not present.
+- P3 reviewer `ENEIT` remains requested on PR #52. P1 approval does not substitute for P3 operational review.
+
+### Remaining P2/P3 and methodology gates
+
+1. **60-second versus 1800-second pilot budget:** the committed W3 pilot run IDs record 60 s; current Experimental Protocol §6.2 specifies 1800 s. The group must explicitly approve/amend the historical budget or rerun the pilot and revisit canonical selection. Do not silently reconcile it.
+2. **G3 raw evidence:** matching 40 Core pilot raw JSON records are not in the Git tree. Keep G3 pending; CSV rows alone are not triage evidence.
+3. **P3 official-run validation:** P3 must confirm official host, Windows Job Object 12 GiB hard-cap kill/MO, checkpoint/hard-kill/resume/attempt history, raw → validation → `runs.csv`, expected-run plan, dry-run/budget and official queue operation.
+4. **P2/P3 manuscript sign-off:** the modular SAT method and proof appendix exist, but P2 proof wording/sign-off and integrated master paper build/cross-read are still distinct acceptance tasks.
+5. Do not tag `v1.0`, close freeze issues or launch official RQ3 until Experimental Protocol §12 gates have evidence and all three owners sign off.
+
+### Issue #26 re-opened
+- Issue #26 had been closed even though its body still leaves the final current-suite rerun, P2 proof sign-off, and 60s-vs-1800s pilot-budget decision unchecked.
+- Reopen it and preserve those acceptance gates. Do not treat the modular appendix draft as proof of a completed correctness/freeze review.
+
+### Current integration guardrails
+- PR #50 remains open, head at last verification `eb2dc062`, **111 ahead / 0 behind** `main`; branch already synchronized with main. No force-push was used.
+- Do not merge either PR or tag `v1.0` based on focused CI alone.
+- Official RQ3, 24 HB raw inputs, 12 GiB official-host kill/MO enforcement, queue and raw→validation→`runs.csv` remain P3 gates. P1's 10-run Exact spot-check plan applies when P3 generates the corresponding official run records; it is not a completed pilot verification.
+
+
+## Latest final integration and full-suite evidence — 2026-11-17
+
+### P1 branch synchronized with main
+- Main head at sync: `276c6c010102e4836eb8bc3af4c6705a3f1cb3d2`.
+- The 11 commits missing from P1 touched 22 paths. Path comparison found only one overlap, `AGENTS.md`; P1's file was byte-identical to the merge-base, so the upstream Core Rules addition was retained. The remaining 21 files were added from main without overlap.
+- Created a normal two-parent merge commit `47ffc1a564b63e4c8ba1577d278e2c4f73544a8d` with parents P1 `d53e5118...` and main `276c6c0...`. The branch update was fast-forward from the old P1 head; no force-push.
+- P1 is now **110 ahead / 0 behind** main at the current branch tip. PR #50 remains open and GitHub reports it mergeable.
+
+### CI workflow expanded
+- The P1 W3 workflow now includes the pilot script tests, Exact status/time-budget tests and a separate full-suite matrix on Ubuntu + Windows.
+- Full-suite job installs pinned dependencies from `requirements.txt` and runs `python -m pytest tests -q`.
+- Path filters cover `src/**`, `tests/**`, `experiments/**`, `scripts/**`, benchmark inputs, pilot CSVs and requirements changes.
+
+### Full test evidence
+- Workflow run #44037863787 on commit `b2e2d4efe2330a2a9eabea032174f30403dd6a64` completed successfully:
+  - Ubuntu full suite: **539 passed in 11.73s**.
+  - Windows full suite: **539 passed in 22.01s**.
+  - Focused runner/HB/Exact jobs on both platforms also passed.
+- Workflow run #44037909768 on latest P1 head `c03659beedbb5f69c9f2af3930f40baba614df88`:
+  - Ubuntu full suite: **539 passed in 11.73s**.
+  - Windows full suite: **539 passed in 22.75s**.
+  - Focused jobs on Ubuntu and Windows passed.
+- These results are full repository tests (`pytest tests -q`) on the P1 branch. They do not demonstrate commercial license entitlement or benchmark-scale solver availability, and do not replace P3's official-host/kill/resume validation.
+
+### PR #50 status update
+- P1 posted a status comment on PR #50 (comment ID `6941464871`) recording the Exact fixes and focused CI. The current full-suite evidence is in runs above.
+- Latest P1 branch head is `cc8f3687` (documentation/handoff-only commits after tested code SHA `c03659be`); PR #50 remains open and mergeable. Do not merge/tag until P3 operational and protocol freeze gates have evidence.
+
+### P2 PR #52 — code-review approval and current state
+- PR #52 current head: `02f225578b0b3cba0e325d856d3835934f826881`; compare vs main: **29 ahead / 0 behind**. PR is open and mergeable.
+- P1's earlier 17 Nov finding claiming global dedup removed shared CaDiCaL rows was a false positive. The shared CaDiCaL `order/pairwise` runs remain in both RQ outputs; verified actual split: RQ1=30, RQ2=20, shared IDs=10, union=40. The erroneous review was dismissed and corrected in a PR comment.
+- The six original P1 review findings have been addressed. P1 review **APPROVED** (review ID `5934659898`) for code review only.
+- G3 safeguards and regression tests are implemented: required frozen denominator; denominator cannot be smaller than observed unique Core IDs; completed count must match unique triage report count; conflicting duplicate CSV/triage payloads rejected; malformed-status Core rows remain in the denominator and are reported as CODE_BUG.
+- Workflow [#44040260149](https://github.com/bangphan1311/ABP/actions/runs/44040260149) on implementation/test SHA `a5d58821393448cc1f019e7860c6546a4bedd907` passed:
+  - Ubuntu: SAT/W4 **452 passed**, full suite **556 passed**.
+  - Windows: SAT/W4 **452 passed**, full suite **556 passed**.
+- Branch tip `02f22557` only adds the M2 freeze-doc evidence after that tested source/test SHA. P3 reviewer `ENEIT` remains requested.
+- PR #52 remains open; do not merge/tag until the team resolves the pilot budget mismatch and P3's operational review/evidence is available.
+
+### Issue #26 and freeze
+- Issue #26 has been reopened because full-suite evidence, P2 proof sign-off and pilot-budget resolution are required for the shared/freeze candidate. The 539-pass P1 branch run does not by itself certify the unmerged P2 head.
+- Keep #26, #28, #29, #30, #31–38 and #49 open while their respective acceptance gates remain.
+- License entitlement verification remains with P1 (user). Official queue, official host, 12 GiB Job Object enforcement/kill/MO, checkpoint/resume/attempt history, real HB raw inputs and raw→validation→`runs.csv` remain P3 responsibilities.
+
+
+### Documentation synchronization after full-suite CI
+- After full-suite verification, P1 updated `docs/p1/exact-methodology-review.md` and `docs/p1/w3-w4-exact-readiness.md` to replace the stale "CI verification pending" note for E1–E3 with the actual focused/full-suite evidence.
+- The code/test candidate used for the full-suite result remains `c03659be`; subsequent commits only update the audit, readiness and handoff documents. They do not modify solver source or tests.
+- Current P2 branch is `02f22557`; the false-positive global-dedup finding was dismissed, the six original P1 review items are addressed, P1 code review is approved, and P2 CI passes 452 focused + 556 full tests on both OS. The historical pilot-budget decision, missing raw JSON G3 evidence and P3 operational sign-off remain unresolved.

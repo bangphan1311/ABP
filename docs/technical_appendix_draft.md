@@ -225,10 +225,9 @@ OPT claim that is too high, not as an invalid labeling.
 3. No memory guarantee: `Result.peak_memory` is the maximum of sampled working
    sets, not peak RSS and not an enforced cap (`solve.py:131-135`, 164, 182,
    341-350; `docs/sat_tooling.md`). The solver never enforces `memory_limit`
-   in-process. `canonical_sat_config(memory_limit=...)` requires an explicit
-   finite cap for an official run (`memory_limit=None` raises `ValueError`
-   naming `memory_limit`); `allow_unbounded_memory=True` (dev/unit tests) is the
-   only escape hatch that yields `None`. Status `MO` can only come from an
+   in-process. `canonical_sat_config()` defaults to a `12.0` GiB cap and rejects
+   `memory_limit=None` or any non-finite/non-positive value with a `ValueError`
+   naming `memory_limit`. Status `MO` can only come from an
    out-of-process `MemoryError` mapping (`src/runner/worker.py`), and official
    memory caps are enforced by the runner (Protocol §6.3).
 4. No timeout guarantee: the deadline is checked between phases and inside the

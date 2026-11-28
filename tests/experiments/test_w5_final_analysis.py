@@ -360,12 +360,12 @@ def test_consistency_perturb_reported(monkeypatch):
 
 
 def test_canonical_memory_contract():
+    assert canonical_sat_config().memory_limit == 12.0
     with pytest.raises(ValueError, match="memory_limit"):
         canonical_sat_config(memory_limit=None)
-    config = canonical_sat_config(
-        memory_limit=None, allow_unbounded_memory=True
-    )
-    assert config.memory_limit is None
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(memory_limit=0)
+    assert canonical_sat_config(memory_limit=12288.0).memory_limit == 12288.0
 
 
 def test_cli_writes_four_docs_and_exit_zero(tmp_path):
@@ -397,7 +397,7 @@ def test_p1_r1_to_r6_source_evidence():
     assert "_skip_if_backend_unavailable" in tests
     assert "pytest.skip" in tests
     assert "cpoptimizer.exe" in tests
-    assert "Timing and memory-limit scope" in models
+    assert "## Time accounting" in models
     assert "wall_time" in models
     assert "time_limit + 30 seconds" in models
     assert "def validate_exact_input" in common and "raise ValueError" in common

@@ -1,0 +1,1 @@
+{"status": "UNSAT", "solve_s": 1.3931149999998524, "restarts": 1140, "conflicts": 19604, "decisions": 32834, "propagations": 2066729, "instance": "impcol_b", "optimum": 8, "k": 10, "encoding": "order", "solver": "cadical195", "limit_s": 120}

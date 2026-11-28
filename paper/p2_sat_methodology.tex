@@ -1,0 +1,285 @@
+\section{SAT Method}
+\label{sec:sat-method}
+
+\subsection{Decision formulation}
+Let $G=(V,E)$ be a simple undirected graph, with $n=|V|$ and $m=|E|$. A
+labeling is a bijection $f:V\rightarrow\{1,\ldots,n\}$. Its antibandwidth is
+\begin{equation}
+  B(f)=\min_{\{u,v\}\in E}|f(u)-f(v)|,
+\end{equation}
+and the optimization problem is to maximize $B(f)$. For a fixed threshold
+$K\geq 1$, the SAT decision problem asks whether there exists a bijection
+satisfying
+\begin{equation}
+  |f(u)-f(v)|\geq K
+  \qquad \forall\,\{u,v\}\in E.
+  \label{eq:sat-decision}
+\end{equation}
+The implementation uses two alternative encodings of this same decision
+problem: a pairwise assignment encoding and an order encoding. Both include
+constraints for vertex assignment, label permutation, and edge distance.
+They differ in their representation of a vertex label.
+
+\subsection{Pairwise assignment encoding}
+For each vertex $v\in V$ and label $p\in\{1,\ldots,n\}$, introduce a Boolean
+variable $x_{v,p}$, where $x_{v,p}=1$ means that vertex $v$ receives label $p$.
+The encoding contains three groups of clauses.
+
+\paragraph{Assignment.}
+Each vertex receives at least one label (ALO), and no vertex receives two
+different labels (AMO):
+\begin{align}
+  &\bigvee_{p=1}^{n}x_{v,p}
+      &&\forall v\in V,\\
+  &\neg x_{v,p}\vee\neg x_{v,q}
+      &&\forall v\in V,\;1\leq p<q\leq n.
+\end{align}
+
+\paragraph{Permutation.}
+Each label is assigned to at least one vertex and to at most one vertex:
+\begin{align}
+  &\bigvee_{v\in V}x_{v,p}
+      &&\forall p\in\{1,\ldots,n\},\\
+  &\neg x_{u,p}\vee\neg x_{v,p}
+      &&\forall p\in\{1,\ldots,n\},\;u<v.
+\end{align}
+Together, assignment and permutation make the labeling a bijection.
+
+\paragraph{Edge distance.}
+For every edge $\{u,v\}\in E$, every label pair $(p,q)$ whose separation is
+strictly smaller than $K$ is forbidden:
+\begin{equation}
+  \neg x_{u,p}\vee\neg x_{v,q}
+  \qquad
+  \forall\{u,v\}\in E,\quad
+  1\leq |p-q|\leq K-1.
+  \label{eq:pairwise-distance}
+\end{equation}
+For $1\leq K<n$, the number of edge-distance clauses is
+\begin{equation}
+  2m\sum_{d=1}^{K-1}(n-d).
+\end{equation}
+With pairwise AMO, the assignment and permutation groups each contain
+$n+n\binom{n}{2}$ clauses. The pairwise encoding uses $n^2$ primary variables;
+an alternative AMO encoding may introduce auxiliary variables.
+
+\subsection{Order encoding}
+The order encoding uses Boolean variables $o_{v,p}$ for
+$v\in V$ and $p\in\{1,\ldots,n-1\}$, with the meaning
+\begin{equation}
+  o_{v,p}=1 \quad\Longleftrightarrow\quad f(v)\leq p.
+  \label{eq:order-variable}
+\end{equation}
+The boundary values are implicit: $o_{v,0}=0$ and $o_{v,n}=1$. For every
+vertex, monotonicity is enforced by
+\begin{equation}
+  \neg o_{v,p}\vee o_{v,p+1}
+  \qquad
+  \forall v\in V,\;p=1,\ldots,n-2.
+  \label{eq:order-chain}
+\end{equation}
+A monotone chain uniquely determines one label: the smallest index $p$ for
+which $o_{v,p}=1$, or $n$ if all variables are false.
+
+To express that a vertex does not receive label $q$, define the disjunction
+\begin{equation}
+  N(v,q)=
+  \begin{cases}
+    \neg o_{v,1}, & q=1,\\
+    \neg o_{v,q}\vee o_{v,q-1}, & 1<q<n,\\
+    o_{v,n-1}, & q=n.
+  \end{cases}
+  \label{eq:not-label}
+\end{equation}
+For every pair of distinct vertices $u<v$ and every label $q$, the
+permutation constraint is
+\begin{equation}
+  N(u,q)\vee N(v,q).
+  \label{eq:order-permutation}
+\end{equation}
+Thus, two vertices cannot receive the same label. Since there are $n$ vertices
+and $n$ available labels, injectivity also implies surjectivity.
+
+The edge-distance constraints use the same no-good construction:
+\begin{equation}
+  N(u,p)\vee N(v,q)
+  \qquad
+  \forall\{u,v\}\in E,\quad
+  1\leq |p-q|\leq K-1.
+  \label{eq:order-distance}
+\end{equation}
+The order encoding has $n(n-1)$ variables, $n(n-2)$ chain clauses, and
+$n\binom{n}{2}$ permutation clauses. Its edge-distance clause count is the
+same as in the pairwise encoding, although the clauses can contain up to four
+literals. The order encoding does not use a separate AMO constraint: the
+monotone chain replaces the ALO/AMO pair. Therefore, changing the AMO metadata
+for the order encoding does not change its CNF.
+
+\subsection{AMO variants}
+For the pairwise assignment encoding, the default AMO formulation adds
+$\binom{r}{2}$ binary clauses for a group of $r$ literals and introduces no
+auxiliary variables. The sequential-counter variant instead delegates the
+at-most-one constraint to \texttt{pysat.card} and adds auxiliary variables to
+reduce the number of clauses. Both variants preserve the same feasible
+labelings when the auxiliary variables are existentially eliminated. AMO is
+not an experimental factor for the order encoding, because the order chain
+already represents one label per vertex.
+
+\subsection{SAT backend and optimization search}
+The SAT implementation uses the PySAT interface and supports CaDiCaL
+(\texttt{cadical195}) and Glucose (\texttt{glucose4}) as the Protocol Core
+solver candidates. Kissat is excluded from the Core after the tested PySAT
+binding exhibited incorrect model/assumption behavior and process failures.
+A fresh backend is created for each threshold probe.
+
+The optimization procedure solves a sequence of decision problems. It keeps
+$\ell$, the best verified antibandwidth found so far, and $h$, a threshold
+already known to be infeasible. Initially $\ell=0$ and $h=n$, because no
+labeling can have a difference of $n$ or greater. While $\ell+1<h$, the next
+threshold is $K=\ell+1$:
+\begin{itemize}
+  \item If the SAT solver returns SAT, the model is decoded and independently
+    verified. If its actual antibandwidth is $B$, the algorithm sets
+    $\ell=B$ and starts the next probe at $B+1$.
+  \item If the solver returns UNSAT, it sets $h=K$. Since $K=\ell+1$, the
+    current verified labeling is optimal.
+  \item If the solver returns UNKNOWN or the run budget expires, the search
+    stops. A verified incumbent is reported as FEAS; without one, the result is
+    TO.
+\end{itemize}
+A SAT labeling with value $B\geq K$ also satisfies every threshold between
+$K$ and $B$. Jumping directly to $B+1$ therefore skips only thresholds already
+known to be feasible. The first infeasible threshold, when found, proves
+optimality. The initial counting bound also proves optimality if a labeling
+reaches $n-1$.
+
+The time budget covers CNF construction, clause loading, all solver probes,
+decoding, and verification for the entire K-search sequence. Each probe
+receives the remaining budget. The shared runner adds a hard process timeout
+and is responsible for enforcing the configured OS-level memory limit.
+
+For the SAT-versus-Exact comparison in RQ3, the primary end-to-end runtime
+must be the shared runner's 	exttt{wall\_time} for every method. The
+solver-level 	exttt{t\_total} fields do not have identical scopes across
+solver families (for example, process startup and model-construction
+boundaries differ), so they are diagnostic fields and must not be ranked
+against one another across SAT and Exact.
+\texttt{peak\_memory} is a sampled process-memory measurement, not a
+continuous high-water mark; the official protocol fixes one Windows host so
+that the reported memory measurements are taken under a consistent
+environment.
+
+\subsection{Decoding, verification, and result semantics}
+A SAT model is not accepted directly as a solution. The encoding-specific
+decoder must reconstruct a permutation of $\{1,\ldots,n\}$. The shared
+\texttt{verify} routine then independently checks the labeling and recomputes
+\[
+  B(f)=\min_{\{u,v\}\in E}|f(u)-f(v)|.
+\]
+The recomputed value must meet the probed threshold and agree with the
+reported lower bound. The project uses the following status semantics:
+\texttt{OPT} denotes a verified incumbent with an optimality proof;
+\texttt{FEAS} denotes a verified incumbent without a proof at termination;
+\texttt{TO} denotes termination without a verified incumbent; \texttt{MO}
+denotes a confirmed memory-limit event; and \texttt{ERR} denotes an execution,
+backend, license, malformed-output, or correctness error. In particular, a
+license failure is not reported as a timeout.
+
+\subsection{Correctness evidence}
+The W2 correctness matrix evaluated the two ABP encodings, two AMO variants,
+and two SAT solvers (eight configurations) against a brute-force oracle on
+small graphs. The test suite also checks SAT/UNSAT decisions over thresholds,
+model decoding, model counts, and the AMO contract. The empirical matrix is
+evidence for the tested finite instances, not a proof that the SAT backends
+always answer UNSAT correctly. The proof argument for the encodings and the
+K-search invariants is provided in Appendix~\ref{app:sat-correctness}.
+
+
+\subsection{W3 pilot observations}
+\label{subsec:sat-pilot-observations}
+
+The committed W3 pilot evaluated ten deterministic synthetic instances
+($n=8$--$50$), not the official 24-instance Harwell--Boeing benchmark. Each
+pilot run used a 60-second limit. The values below are therefore preliminary
+engineering evidence used to choose the Core SAT configuration; they are not
+the final RQ1/RQ2 results and must not be pooled with the official RQ3 queue.
+The source records are \texttt{results/pilot\_rq1.csv} and
+\texttt{results/pilot\_rq2.csv}; the selection rationale is recorded in
+\texttt{docs/canonical\_sat\_config.md}.
+
+The run identifiers in both CSVs record a 60-second limit. The current
+Experimental Protocol v1.0-rc §6.2 specifies 1,800 seconds for RQ1/RQ2 pilot
+runs. This budget mismatch is unresolved: these tables describe the historical
+60-second run only and cannot be presented as evidence from an 1,800-second
+pilot. The group must approve the historical budget or repeat the pilot before
+M2 freeze.
+
+Table~\ref{tab:sat-rq1-pilot} summarizes the RQ1 pilot. The two order rows
+produce the same CNF because the order encoding has no separate AMO group;
+they are shown as a consistency check, not as two distinct encodings.
+
+\begin{table}[t]
+\centering
+\caption{W3 synthetic pilot: ABP encoding and AMO (10 instances).}
+\label{tab:sat-rq1-pilot}
+\begin{tabular}{llrrrrrr}
+\hline
+ABP encoding & AMO & OPT & FEAS & $\sum t_{\mathrm{total}}$ (s) &
+Median clauses & Max clauses & Max memory (MB)\\
+\hline
+order & pairwise & 10/10 & 0 & 23.24 & 8,840 & 196,450 & 111.4\\
+order & seqcounter$^\ast$ & 10/10 & 0 & 23.12 & 8,840 & 196,450 & 113.0\\
+pairwise & seqcounter & 9/10 & 1 & 88.50 & 7,548 & 147,500 & 87.6\\
+pairwise & pairwise & 9/10 & 1 & 86.43 & 11,444 & 255,400 & 126.5\\
+\hline
+\end{tabular}
+\par\smallskip
+\footnotesize $^\ast$The order encoding does not use AMO; the clause and
+variable counts are identical to order/pairwise. The row is retained only as
+a metadata/identity consistency check.
+\end{table}
+
+Both pairwise-ABP variants returned FEAS on \texttt{randconn40}, whereas the
+order variant proved OPT on that instance. Over this pilot set, the order
+configuration also had a lower aggregate runtime than either pairwise-ABP
+variant. However, the sequential-counter AMO produced fewer clauses and a
+lower maximum sampled memory value than order on this particular set. These
+observations do not establish that one encoding is universally superior:
+CNF size, solver runtime, and memory are separate measurements, and the
+sample is small and synthetic.
+
+Table~\ref{tab:sat-rq2-pilot} summarizes the solver comparison on the selected
+order/pairwise encoding.
+
+\begin{table}[t]
+\centering
+\caption{W3 synthetic pilot: SAT solver comparison on order/pairwise
+(10 instances).}
+\label{tab:sat-rq2-pilot}
+\begin{tabular}{lrrrr}
+\hline
+Solver & Role & OPT & $\sum t_{\mathrm{total}}$ (s) &
+Max memory (MB)\\
+\hline
+glucose4 & Protocol Core & 10/10 & 17.13 & 100.3\\
+cadical195 & Protocol Core & 10/10 & 23.24 & 111.4\\
+minisat22 & Extra PySAT baseline & 10/10 & 16.61 & 99.3\\
+glucose42 & Extra PySAT baseline & 10/10 & 17.49 & 99.9\\
+\hline
+\end{tabular}
+\end{table}
+
+Within the Protocol Core candidate set
+$\{\texttt{cadical195},\texttt{glucose4}\}$, both solvers proved OPT on all ten
+instances, while Glucose had lower aggregate runtime and lower maximum
+sampled memory. MiniSat22 was faster in the broader four-solver pilot, but it
+was an additional PySAT baseline rather than a member of the predeclared Core
+set. The canonical Core choice is therefore
+\texttt{order/pairwise/glucose4}. Kissat was excluded because the tested
+PySAT binding did not pass the project's model/assumption and process-safety
+checks.
+
+The results above are not official benchmark evidence. The 24 raw
+Harwell--Boeing \texttt{.mtx.rnd} files and the official run records are not
+present in the repository snapshot used to prepare this draft. Accordingly,
+no conclusion about SAT versus Exact on the official instances is stated here.

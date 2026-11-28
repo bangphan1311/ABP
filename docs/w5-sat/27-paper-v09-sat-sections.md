@@ -115,7 +115,7 @@ Invariants `lo ≤ B*` và `hi > B*`; mỗi vòng `k = lo + 1`; SAT tăng `lo`, 
 
 1. Không claim UNSAT proof đúng (trust boundary).
 2. Không claim thứ tự kích thước CNF như định lý; đó là đo đạc instance-dependent.
-3. Không claim bảo đảm bộ nhớ: `memory_limit` không được solver enforce trong process; `canonical_sat_config(memory_limit=…)` bắt buộc cap hữu hạn > 0 cho run official, `allow_unbounded_memory=True` chỉ cho dev/test; MO chỉ từ `MemoryError` ngoài process.
+3. Không claim bảo đảm bộ nhớ: `memory_limit` không được solver enforce trong process; `canonical_sat_config()` mặc định cap `12.0` GiB và từ chối `None`/giá trị không hợp lệ cho run official; MO chỉ từ `MemoryError` ngoài process.
 4. Không claim timeout cứng: deadline kiểm giữa các pha nên `t_total` có thể vượt `time_limit`.
 5. Không claim từ symmetry/warm start: chưa cài đặt, đặt khác mặc định thì warning; `search_mode="multi"` là mode duy nhất đã cài đặt và không warning.
 

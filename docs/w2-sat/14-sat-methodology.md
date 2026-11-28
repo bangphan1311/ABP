@@ -197,10 +197,9 @@ Phân loại kết quả theo CONTRACT §5, từ trạng thái vòng dò (`summa
   (giá trị verify khác ngưỡng đã chứng minh, hoặc ≥ ngưỡng UNSAT); không có
   nghiệm verify được dù chưa hết giờ; lỗi backend/giấy phép (`BackendError`).
 - `MO` (hết bộ nhớ) theo CONTRACT §5. Solver không enforce `memory_limit`
-  trong process: `canonical_sat_config(memory_limit=…)` bắt buộc cap hữu hạn
-  > 0 cho run official (`memory_limit=None` → `ValueError` nhắc
-  `memory_limit`); escape hatch `allow_unbounded_memory=True` chỉ dành cho
-  dev/unit test. `MO` chỉ đến từ ánh xạ `MemoryError` ngoài process, cap
+  trong process: `canonical_sat_config()` mặc định cap `12.0` GiB và từ chối
+  `memory_limit=None`/giá trị không hợp lệ bằng `ValueError` nhắc
+  `memory_limit`. `MO` chỉ đến từ ánh xạ `MemoryError` ngoài process, cap
   official do runner áp (Protocol §6.3). `search_mode="multi"` là mode duy nhất
   đã cài đặt và không phát warning; field khác mặc định thì pipeline phát
   warning, không bỏ qua im lặng (`_warn_ignored_config`).

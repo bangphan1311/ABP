@@ -82,7 +82,7 @@ Each anchor is live-derived from code + cross-checked against doc text. § numbe
 - `C4` K-search: `grep` `k = lo + 1`, `lo, best_solution, best_cnf = value` (lo ← B đã verify), `hi, unsat_source = k` in `src/sat/solve.py`; assert `S §5` + `A §A.5` both state `K ← B + 1` and first-UNSAT stop.
 - `C5` `trivial_unsat`: assert `pairwise.trivial_unsat(n, k)` is `k >= n`, and `_probe` checks it before `build_cnf`; assert `S §1` + `M §3.1` + `A` Corollary A.3.1 describe "UNSAT before CNF build".
 - `C6` canonical config: `CANONICAL_SAT_CONFIG` fields (`method="sat"`, `abp_encoding="order"`, `amo_encoding="pairwise"`, `sat_solver="glucose4"`, `search_mode="multi"`, `symmetry=False`, `warm_start=False`, `seed=0`) equal `C` proposal table and `docs/w4-sat/21-m2-freeze-v1.md` code block.
-- `C7` memory contract: `canonical_sat_config(memory_limit=None)` raises `ValueError` containing `memory_limit`; `allow_unbounded_memory=True` returns `memory_limit=None`. Assert `C` and `21-m2-freeze-v1.md` and `S/M` describe the same escape hatch.
+- `C7` memory contract: `canonical_sat_config()` defaults to `memory_limit=12.0` GiB and `canonical_sat_config(memory_limit=None)` raises `ValueError` containing `memory_limit`. Assert `C` and `21-m2-freeze-v1.md` and `S/M` state the same default cap and rejection rule.
 - `C8` P1 R1–R6 closure: source-text checks over `src/exact/*` + `tests/exact/*` + `docs/exact_models.md`, per `docs/w2-sat/13-review-p1-formulation.md`:
   - R1 → `tests/exact/test_exact_solvers.py` contains `_skip_if_backend_unavailable` + `pytest.skip` + `cpoptimizer.exe` engine guard.
   - R2 → `docs/exact_models.md` "Timing and memory-limit scope" mentions runner `wall_time` and `time_limit + 30 seconds`.
@@ -122,7 +122,7 @@ All assertions must NOT require network/licensed backends. `project_cnf_growth` 
 - `test_solver_sensitivity_winner_and_cv`: synthetic 4-solver rows → correct winner, ratio, `cv` bounds.
 - `test_consistency_c_anchors_pass`: `verify_code_spec_paper_consistency()` returns all `status=="ok"` for C1–C10 on clean repo (skip C9 doc-existence if `docs/w5-sat` outputs not yet generated: guard with `pytest.skip` when files absent).
 - `test_consistency_perturb_reported`: monkeypatch `src.sat.order._not_value` boundary branch (or patch a returned formula constant) → checker reports a FAIL finding with BR-9 message (file + symbol + mismatch).
-- `test_canonical_memory_contract`: `canonical_sat_config(memory_limit=None)` raises ValueError; `allow_unbounded_memory=True` returns `memory_limit is None`.
+- `test_canonical_memory_contract`: `canonical_sat_config()` returns `memory_limit == 12.0`; `canonical_sat_config(memory_limit=None)` raises ValueError.
 - `test_cli_writes_four_docs_and_exit_zero`: `main(["--check-only"])` on repo fixtures writes ≥4 files to tmp `--out-dir`, exits `0`, banners present, no `TODO/TBD/FIXME`, no `docs/handoff/` in emitted text.
 - `test_p1_r1_to_r6_source_evidence`: each exact-source check (`src/exact/common.py`, `cp_sat_solver.py`, `tests/exact/test_exact_solvers.py`) matches its expected token/substring.
 
@@ -133,4 +133,4 @@ All assertions must NOT require network/licensed backends. `project_cnf_growth` 
 - OQ-3 canonical solver (`minisat22` eligibility) and OQ-4 final `memory_limit` (candidate `12288.0` MB) remain P1/P3 decisions; projection baseline parameterized via `--cap-mb`.
 - OQ-5: any R1–R6 recheck found open → report, do not patch (per scope). Risk tracked in `26-*.md` findings table.
 - Windows-only import risk: consistency checker must not `import src.exact.cp_sat_solver` (Ortools) or CPLEX/Gurobi; use `ast`/`Path.read_text` + `re` only.
-- `allow_unbounded_memory` and `--cap-mb` are dev-only knobs; production G4 statement always uses a finite capped projection baseline.
+- `--cap-mb` is a dev-only knob; production G4 statement always uses a finite capped projection baseline. The canonical SAT config always carries the `12.0` GiB cap and never `None`.

@@ -168,6 +168,22 @@ def test_inspect_record_classifies_mo_and_hard_kill_as_env_error():
     assert report_kill.category == "ENV_ERROR"
 
 
+
+@pytest.mark.parametrize("status", ["TO", "ERR"])
+def test_missing_instance_is_environment_error_even_without_solution(status):
+    record = _valid_path4_record()
+    record["instance"] = "not-present-in-benchmark"
+    record["status"] = status
+    record["solution"] = None
+    record["lb"] = None
+    record["ub"] = None
+
+    report = inspect_record(record, search_dirs=())
+
+    assert report.category == "ENV_ERROR"
+    assert report.is_anomaly is True
+    assert any("Không tìm thấy" in reason for reason in report.reasons)
+
 def test_inspect_raw_file_handles_corrupt_json(tmp_path):
     corrupt = tmp_path / "broken_run.json"
     corrupt.write_text("{not valid json", encoding="utf-8")
