@@ -48,8 +48,17 @@ def _row(**overrides) -> dict:
     return normalize_row(raw)
 
 
-def _ok_triage() -> list[TriageReport]:
-    return [
+def test_normalize_row_keeps_derived_search_mode():
+    # RQ3 rows record search_mode=null with an `__na__` token: the run_id derivation
+    # must win, not a silent "multi" default.
+    row = _row(run_id="can_715__sat__order__pairwise__glucose4__na__sym0__ws0__s0", search_mode=None)
+    assert row["search_mode"] == ""
+
+    row = _row(search_mode="multi")
+    assert row["search_mode"] == "multi"
+
+
+def _ok_triage() -> list[TriageReport]:    return [
         TriageReport(
             run_id="r1",
             instance_id="p4",
@@ -444,7 +453,7 @@ def test_analyze_cli_supports_single_runs_csv(tmp_path):
         writer.writeheader()
         writer.writerow(
             {
-                "run_id": "i1__sat__order__pairwise__glucose4",
+                "run_id": "i1__sat__order__pairwise__glucose4__multi__sym0__ws0__s0",
                 "instance": "i1",
                 "method": "sat",
                 "abp_encoding": "order",
@@ -465,7 +474,7 @@ def test_analyze_cli_supports_single_runs_csv(tmp_path):
         )
         writer.writerow(
             {
-                "run_id": "i1__sat__pairwise__pairwise__cadical195",
+                "run_id": "i1__sat__pairwise__pairwise__cadical195__multi__sym0__ws0__s0",
                 "instance": "i1", "method": "sat",
                 "abp_encoding": "pairwise", "amo_encoding": "pairwise",
                 "solver": "cadical195", "status": "OPT", "lb": 2, "ub": 2,

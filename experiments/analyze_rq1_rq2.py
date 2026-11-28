@@ -109,7 +109,6 @@ def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
         "clauses": _to_int(raw.get("clauses")),
         "peak_memory": _to_float(raw.get("peak_memory")),
         "time_limit": _to_float(raw.get("time_limit")) or 60.0,
-        "search_mode": str(raw.get("search_mode") or "multi"),
         "error": str(raw.get("error") or ""),
     }
 
