@@ -202,11 +202,12 @@ def test_markdown_tables_ok_and_broken_row(tmp_path):
     assert "dòng 4" in broken[0].symbol
 
 
-def test_deferred_items_five_entries():
+def test_deferred_items_are_explicit():
     items = record_deferred_items()
-    assert len(items) == 5
+    assert len(items) == 6
     assert all(entry["status"] == "deferred" for entry in items)
-    assert {entry["owner"] for entry in items} == {"P3", "P2+P1"}
+    assert {entry["owner"] for entry in items} == {"P1", "P1+P2", "P3"}
+    assert any("runs.csv" in entry["item"] for entry in items)
 
 
 def test_w1_w6_checkbox_edits_and_evidence_paths():

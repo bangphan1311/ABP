@@ -43,7 +43,7 @@ Ticket 30 kết luận: **PASS** (W6-L1 correlation≠causation, W6-L2 Markdown 
 - Frozen triage: `70` run, `CODE_BUG = 0` (`src/sat/triage.py`, `results/raw/*.json`).
 - Audit W6 FR-1..FR-8: **PASS** (12 finding, bảng BR-9 ở mục 6).
 - Checkbox W1 01–07 + W6 28–31: **PASS**.
-- **Statement:** P2 SAT Technical Sign-off = PASS (in-repo SAT scope). Triage 70/70 run frozen (CODE_BUG=0); consistency W5 C1–C10 PASS (15 finding); audit W6 PASS (12 finding); checkbox W1/W6 PASS. Deferred/external (không blocking): P3 LaTeX sections (P3, deferred); final English copy-edit (P3, deferred); paper/LaTeX prose (P2+P1, deferred); P3 official 24-instance runs.csv (P3, deferred); P3 manuscript merge (P3, deferred).
+- **Statement:** P2 SAT Technical Sign-off = PASS (in-repo SAT scope). Triage 70/70 run frozen (CODE_BUG=0); consistency W5 C1–C10 PASS (15 finding); audit W6 PASS (12 finding); checkbox W1/W6 PASS. Deferred/external (không blocking): P3 LaTeX sections (P3, deferred); final English copy-edit (P3, deferred); paper/LaTeX prose (P1 writing the manuscript) (P1, deferred); paper/p2_sat_*.tex drafts from main (not audited by W6) (P1+P2, deferred); P3 official 24-instance runs.csv (P3, deferred); P3 manuscript merge (P3, deferred).
 
 ### Finding tổng hợp W6-M3
 
@@ -57,7 +57,8 @@ Ticket 30 kết luận: **PASS** (W6-L1 correlation≠causation, W6-L2 Markdown 
 |---|---|---|
 | P3 LaTeX sections | P3 | deferred |
 | final English copy-edit | P3 | deferred |
-| paper/LaTeX prose | P2+P1 | deferred |
+| paper/LaTeX prose (P1 writing the manuscript) | P1 | deferred |
+| paper/p2_sat_*.tex drafts from main (not audited by W6) | P1+P2 | deferred |
 | P3 official 24-instance runs.csv | P3 | deferred |
 | P3 manuscript merge | P3 | deferred |
 

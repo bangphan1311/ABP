@@ -689,7 +689,8 @@ def record_deferred_items() -> list[dict[str, str]]:
     return [
         {"item": "P3 LaTeX sections", "owner": "P3", "status": "deferred"},
         {"item": "final English copy-edit", "owner": "P3", "status": "deferred"},
-        {"item": "paper/LaTeX prose", "owner": "P2+P1", "status": "deferred"},
+        {"item": "paper/LaTeX prose (P1 writing the manuscript)", "owner": "P1", "status": "deferred"},
+        {"item": "paper/p2_sat_*.tex drafts from main (not audited by W6)", "owner": "P1+P2", "status": "deferred"},
         {"item": "P3 official 24-instance runs.csv", "owner": "P3", "status": "deferred"},
         {"item": "P3 manuscript merge", "owner": "P3", "status": "deferred"},
     ]
