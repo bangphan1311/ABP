@@ -7,6 +7,8 @@
 
 ## 1. Phân tích RQ1 — Encoding × AMO
 
+> **Lát cắt cố định:** solver = `cadical195`, `search_mode` ∈ {`multi`, rỗng}, `symmetry = false`, `warm_start = false`. Bảng dưới chỉ khác nhau ở `(abp_encoding, amo_encoding)`.
+
 ### 1.1. Bảng tổng hợp theo cấu hình `(abp_encoding, amo_encoding)`
 
 | `abp_encoding` | `amo_encoding` | Runs | OPT | FEAS | TO | PAR2 (s) | Σ `t_encode` (s) | Σ `t_solve` (s) | Σ `t_total` (s) | Median Vars | Max Vars | Median Clauses | Max Clauses | Median Mem (MB) | Max Mem (MB) |
@@ -34,6 +36,8 @@
   - Trên `randconn40-seed20261026`: `pairwise/seqcounter` chỉ có **82160 clauses** (4720 biến) nhưng mất **77.684s** (`FEAS`), chậm hơn `order/pairwise` dù cấu hình sau có tới **105520 clauses** (1560 biến) và chỉ mất **16.249s** (`OPT`).
 
 ## 2. Phân tích RQ2 — So sánh SAT Solver
+
+> **Lát cắt cố định:** `abp_encoding = order`, `amo_encoding = pairwise`, `search_mode` ∈ {`multi`, rỗng}, `symmetry = false`, `warm_start = false`. Bảng dưới chỉ khác nhau ở `solver`.
 
 ### 2.1. Bảng tổng hợp theo Solver (Coverage, PAR2, Memory)
 
@@ -67,10 +71,10 @@
 
 ## 3. Kiểm tra cổng G3 (Gate 3 Readiness & Incident Triage)
 
-- **Số run SAT đã hoàn thành / kỳ vọng:** `70 / 70` (`100.0%`, yêu cầu G3 ≥ `80.0%`) → **PASS**.
+- **Số run SAT đã hoàn thành / kỳ vọng:** `70` → **PENDING (chưa truyền --expected-runs từ kế hoạch đã khóa)**.
 - **Tổng số file raw JSON đã kiểm tra qua `src.sat.triage`:** `70`.
 - **Số run bất thường (`status != OPT` hoặc lỗi):** `2` (chưa phân loại: `0`, lỗi correctness `CODE_BUG`: `0`).
-- **Kết luận cổng G3 (trên tập dữ liệu hiện có):** **PASS**.
+- **Kết luận cổng G3 (trên tập dữ liệu hiện có):** **PENDING**.
 
 ### Bảng phân loại các run bất thường
 

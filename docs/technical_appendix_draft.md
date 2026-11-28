@@ -1,10 +1,12 @@
 # Technical appendix (draft) — SAT formulation for the Antibandwidth Problem
 
-Status: draft for P1/P3 review (W3, issue #26). Applies to the code on `main` at
-W3 (`src/sat/pairwise.py`, `src/sat/order.py`, `src/sat/solve.py`,
-`src/common/verify.py`). Proofs are sketches: each lemma names the code that
-implements it and the test that exercises it. Nothing here is copied from the
-2DBMP write-up; the ABP formulation is derived from the definitions below.
+Status: draft for P1/P3 review (W3, issue #26; refreshed at W5, issue #26). Applies to the code on `main` at
+W5 (`src/sat/pairwise.py`, `src/sat/order.py`, `src/sat/solve.py`,
+`src/common/verify.py`) with the M2 freeze v1.0 canonical configuration
+(`docs/canonical_sat_config.md`, `docs/w4-sat/21-m2-freeze-v1.md`). Proofs are
+sketches: each lemma names the code that implements it and the test that
+exercises it. Nothing here is copied from the 2DBMP write-up; the ABP
+formulation is derived from the definitions below.
 
 Notation: `G = (V, E)` is a finite undirected simple graph with `n = |V| >= 1`
 and `m = |E| >= 1`; vertices are `0..n-1`. A *labeling* is a bijection
@@ -16,7 +18,8 @@ labeling with `B(f) >= K`.
 ## A.1 Pairwise encoding (`src/sat/pairwise.py`)
 
 Variables `x[v][p]`, id `v*n + p`, meaning "vertex `v` receives label `p`"
-(`pairwise.py:110`). Clauses (`pairwise.py:114-134`):
+(`pairwise.py:110`); that is `n²` main variables. Clauses
+(`pairwise.py:114-134`):
 
 * **assignment** — one ALO clause `(x[v][1] or ... or x[v][n])` per vertex, plus
   AMO clauses `(-x[v][p] or -x[v][q])` for `p < q`.
@@ -55,8 +58,8 @@ a bijection into `{1..n}` uses all labels, so the largest possible difference is
 ## A.2 Order encoding (`src/sat/order.py`)
 
 Variables `o[v][p]` for `p in 1..n-1`, id `v*(n-1) + p`, meaning
-"`f(v) <= p`" (`order.py:62`). The boundaries `p = 0` (always false) and
-`p = n` (always true) need no variable. Clauses (`order.py:64-82`):
+"`f(v) <= p`" (`order.py:62`); that is `n(n-1)` main variables. The boundaries
+`p = 0` (always false) and `p = n` (always true) need no variable. Clauses (`order.py:64-82`):
 
 * **chain** — `(-o[v][p] or o[v][p+1])` for `p in 1..n-2`.
 * **permutation** — for every vertex pair `u < w` and every `q in 1..n`:
@@ -193,10 +196,10 @@ is the only branch that reports OPT (`solve.py:199-201`, `summarise_result`,
 the optimal labeling.
 
 **No threshold is skipped.** After SAT at `k` with value `v`, the next threshold
-is `v + 1`, not `k + 1` (`solve.py:198`). Every `t` with `k < t <= v` is
-satisfiable by the same labeling, so skipping them cannot hide a satisfiable
-frontier; the first UNSAT threshold — the thing the loop is looking for — is
-unchanged. Jumping to `v + 1` therefore removes only thresholds already known
+is `v + 1`, not `k + 1` (`solve.py:198`); equivalently the loop advances as
+`K ← B + 1`. Every `t` with `k < t <= v` is satisfiable by the same labeling, so
+skipping them cannot hide a satisfiable frontier; the first UNSAT threshold — the
+thing the loop is looking for — is unchanged. Jumping to `v + 1` therefore removes only thresholds already known
 to be SAT.
 
 **Termination.** Each iteration either strictly increases `lo` (bounded above by
@@ -221,15 +224,22 @@ OPT claim that is too high, not as an invalid labeling.
    (`order` has no AMO group, but wider permutation/distance clauses).
 3. No memory guarantee: `Result.peak_memory` is the maximum of sampled working
    sets, not peak RSS and not an enforced cap (`solve.py:131-135`, 164, 182,
-   341-350; `docs/sat_tooling.md`). `Config.memory_limit` is not implemented
-   (`solve.py:39-45`), so status MO can only come from an out-of-process
-   `MemoryError` mapping (`src/runner/worker.py:34-35`).
+   341-350; `docs/sat_tooling.md`). The solver never enforces `memory_limit`
+   in-process. `canonical_sat_config()` defaults to a `12.0` GiB cap and rejects
+   `memory_limit=None` or any non-finite/non-positive value with a `ValueError`
+   naming `memory_limit`. Status `MO` can only come from an
+   out-of-process `MemoryError` mapping (`src/runner/worker.py`), and official
+   memory caps are enforced by the runner (Protocol §6.3).
 4. No timeout guarantee: the deadline is checked between phases and inside the
    solver, so `t_total` may exceed `Config.time_limit` slightly
    (`solve.py:125-129`; conflict-budget loop in `src/sat/backend.py:238-254`).
-5. No claims from symmetry breaking, warm start or search modes: they are not
-   implemented and are rejected with a warning (`solve.py:39-67`); all pilot and
-   benchmark runs use the plain multi-run loop above.
+5. No claims from symmetry breaking, warm start or search modes: `search_mode`
+   `"multi"` is the only implemented mode and is warning-free
+   (`_IMPLEMENTED_SEARCH_MODES`, `solve.py:124`); any other mode warns instead of
+   being silently ignored. `symmetry` and `warm_start` are not implemented and
+   warn when set to a non-default value (`_warn_ignored_config`,
+   `solve.py:127-146`). All pilot and benchmark runs use the plain multi-run loop
+   above.
 
 ## A.7 Empirical anchors
 

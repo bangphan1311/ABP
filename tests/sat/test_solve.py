@@ -379,7 +379,6 @@ def test_canonical_sat_config_emits_no_warning_and_matches_oracle(recwarn):
     assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]
 
 
-
 def test_canonical_sat_config_defaults_to_protocol_memory_cap():
     cfg = canonical_sat_config()
     assert cfg.memory_limit == 12.0
@@ -387,10 +386,9 @@ def test_canonical_sat_config_defaults_to_protocol_memory_cap():
 
 
 def test_canonical_sat_config_rejects_missing_or_invalid_memory_cap():
-    with pytest.raises(ValueError, match="memory_limit phải được truyền rõ"):
-        canonical_sat_config(memory_limit=None)
-    with pytest.raises(ValueError, match="memory_limit phải được truyền rõ"):
-        canonical_sat_config(memory_limit=0)
+    for value in (None, 0, 0.0, -1.0, True, "12288"):
+        with pytest.raises(ValueError, match="memory_limit"):
+            canonical_sat_config(memory_limit=value)
 
 def test_self_loop_instance_raises_value_error():
     instance = Instance(

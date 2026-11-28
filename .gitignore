@@ -11,5 +11,6 @@ results/raw/
 .DS_Store
 .pytest_cache/
 .codegraph/
+uv.lock
 
 .superpowers/

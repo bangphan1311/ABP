@@ -42,7 +42,7 @@ DEFAULT_BENCHMARK_DIRS: tuple[Path, ...] = (
     REPO_ROOT / "benchmark" / "large",
     REPO_ROOT / "benchmark" / "toy",
     REPO_ROOT / "benchmark" / "hb",
-    REPO_ROOT / "docs" / "handoff" / "sat-g1" / "instances",
+    REPO_ROOT / "docs" / "sat-g1" / "instances",
 )
 
 TriageCategory = Literal["OK", "SOLVER_BEHAVIOR", "ENV_ERROR", "CODE_BUG"]
@@ -167,6 +167,20 @@ def inspect_record(
             ],
         )
 
+    # Thiếu file instance thì không đối chiếu được nghiệm: ENV_ERROR thắng mọi
+    # phân loại TO/ERR/MO/OPT/FEAS phía dưới. Chạy trước khi đọc/decode solution.
+    if instance is None:
+        return TriageReport(
+            run_id=run_id,
+            instance_id=instance_id if isinstance(instance_id, str) else None,
+            status=status,
+            category="ENV_ERROR",
+            is_anomaly=True,
+            recorded_lb=lb,
+            recorded_ub=ub,
+            reasons=[f"Thiếu file instance '{instance_id}' để đối chiếu."],
+        )
+
     # Kiểm tra nghiệm nếu có hoặc nếu status đòi hỏi phải có nghiệm.
     verified_obj: int | None = None
     raw_sol = record.get("solution")
@@ -183,17 +197,6 @@ def inspect_record(
                 recorded_lb=lb,
                 recorded_ub=ub,
                 reasons=[f"Giải mã định dạng solution thất bại: {exc}"],
-            )
-        if instance is None:
-            return TriageReport(
-                run_id=run_id,
-                instance_id=instance_id,
-                status=status,
-                category="ENV_ERROR",
-                is_anomaly=True,
-                recorded_lb=lb,
-                recorded_ub=ub,
-                reasons=[f"Thiếu file instance '{instance_id}' để chạy verify()."],
             )
         try:
             verified_obj = verify(instance, solution)

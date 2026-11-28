@@ -1,6 +1,8 @@
 # Canonical SAT configuration — proposal (W3, issue #18 / #25)
 
 Status: **provisional P1 acceptance** of the Core choice; pilot/protocol budget mismatch and P3 host sign-off remain before M2 freeze.
+**W5 final:** số liệu final sinh tự động tại `docs/w5-sat/24-rq1-final.md` +
+`docs/w5-sat/25-rq2-final.md`; bảng frozen bên dưới giữ nguyên.
 Decision is taken **before any official run**: only the two W3 pilots
 (`results/pilot_rq1.csv`, `results/pilot_rq2.csv`) were read. No RQ3 / official
 result exists yet, and none was inspected.
@@ -209,10 +211,17 @@ with no warning and no error, so there is nothing to classify.
 3. FEAS rows carry a loose `ub`: when the run times out before any UNSAT,
    `ub = hi - 1` is still the counting bound `n - 1` (e.g. `randconn40`:
    `lb = 14, ub = 39`). Report FEAS bounds as bounds, not as near-optimal gaps.
-4. The canonical config passes `memory_limit=12.0` GiB to the shared runner; the runner must enforce it at OS process/job level. This value is valid only for the preflighted candidate host and must be reconfirmed by P3 before official execution.\n5. `time_limit` is a budget for the whole K chain, and the CaDiCaL budget loop can
+4. The canonical config passes `memory_limit=12.0` GiB to the shared runner; the runner must enforce it at OS process/job level. This value is valid only for the preflighted candidate host and must be reconfirmed by P3 before official execution.
+5. `time_limit` is a budget for the whole K chain, and the CaDiCaL budget loop can
    overshoot it (72.67 s observed at a 60 s limit for
    `pairwise/pairwise` on `n = 40`). If the protocol needs a hard wall-clock
    ceiling per run, that must be enforced by the runner, not by the solver.
+6. `memory_limit`: `canonical_sat_config()` defaults to a `12.0` GiB cap and refuses
+   `None` or any non-finite/non-positive value (`ValueError` mentioning
+   `memory_limit`). The solver itself still does not enforce the cap in-process —
+   `MO` never comes from the solver — so the runner layer applies it
+   (Protocol §6.3). `12288.0` MB (`12.0` GiB) is the candidate recorded from P1's
+   protocol; P3 confirms the official host.
 
 ## Reproduction
 

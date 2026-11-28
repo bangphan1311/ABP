@@ -6,6 +6,12 @@
 
 **Blocked by:** 24, 25, 26
 
-- [ ] §3, RQ1, RQ2, appendix đầy đủ, không TODO.
-- [ ] Số liệu/hình lấy từ dữ liệu freeze.
-- [ ] G4: dữ liệu freeze 100%; discussion SAT hoàn chỉnh.
+- [x] §3, RQ1, RQ2, appendix đầy đủ, không TODO.
+- [x] Số liệu/hình lấy từ dữ liệu freeze.
+- [x] G4: dữ liệu freeze 100%; discussion SAT hoàn chỉnh.
+
+## Evidence
+
+- §3 + RQ1 Final + RQ2 Final + A.1–A.7 + trace table: `docs/w5-sat/27-paper-v09-sat-sections.md`.
+- Số liệu trong 27 khớp bảng sinh từ `results/pilot_rq1.csv`, `results/pilot_rq2.csv`, `results/raw/*.json`.
+- G4 statement: `docs/w5-sat/26-cross-review-consistency.md` §5.

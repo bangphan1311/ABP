@@ -8,7 +8,7 @@ chốt phương án nào** (ticket 15 là quyết định của nhóm).
 
 ## 1. Trạng thái Core SAT (bằng chứng từ test matrix)
 
-Nguồn: `docs/handoff/w2-sat/12-test-matrix.md`, lần chạy thật 2026-10-20,
+Nguồn: `docs/w2-sat/12-test-matrix.md`, lần chạy thật 2026-10-20,
 branch `p2/w2-sat`.
 
 - Lệnh chạy thật: `tests/sat/test_matrix.py` → **213 passed in 3.48s**; toàn
@@ -40,7 +40,7 @@ branch `p2/w2-sat`.
 | Mọi cấu hình khớp oracle trên small instances | 10 instance × 8 cấu hình: OPT, `lb == ub ==` B oracle, nghiệm verify đúng B |
 | Model counting bằng blocking clause: không thừa, không thiếu | 6 cặp, bằng đúng `itertools` ở 8/8 cấu hình, gồm cả UNSAT = 0 |
 | Random graph nhỏ: edge case (rời rạc, đỉnh cô lập, bậc lạ) | `disconnected`, `isolated`, `random8-seed42` nằm trong `MATRIX_INSTANCES` |
-| Output: bảng pass/fail theo cấu hình | Bảng ma trận trong `docs/handoff/w2-sat/12-test-matrix.md` |
+| Output: bảng pass/fail theo cấu hình | Bảng ma trận trong `docs/w2-sat/12-test-matrix.md` |
 
 Kết luận của mục này (mức bằng chứng, không phải quyết định gate): checklist
 "Core SAT khớp oracle" — mục đầu của ticket 15 — có bằng chứng **ĐẠT**: 8/8
@@ -51,7 +51,7 @@ cấu hình xanh, model counting khớp, AMO closure PASS, toàn suite 422 xanh.
 Danh sách theo ticket 15: **staircase, incremental, symmetry, AMO phụ
 (commander/product)**; phạm vi thực hiện nếu GO là W3 ticket 20: "Staircase
 hoặc incremental ở mức prototype và test nhỏ". Thứ tự cắt khi chậm theo WORK
-BREAKDOWN (`docs/handoff/abp-sat-encoding/README.md`): Staircase →
+BREAKDOWN (`docs/abp-sat-encoding/README.md`): Staircase →
 commander/product AMO → binary search theo K → Bonus; không cắt: pairwise,
 order, correctness, RQ1/RQ2, tái lập.
 
@@ -316,15 +316,15 @@ Customer quyết định tại gate M1: **NO-GO** — chọn phương án B.
 
 ## Nguồn
 
-- `docs/handoff/w2-sat/12-test-matrix.md` — kết quả matrix thật 2026-10-20.
-- `docs/handoff/abp-sat-encoding/issues/W2/15-m1-gate-bonus-decision.md` —
+- `docs/w2-sat/12-test-matrix.md` — kết quả matrix thật 2026-10-20.
+- `docs/abp-sat-encoding/issues/W2/15-m1-gate-bonus-decision.md` —
   checklist của gate.
-- `docs/handoff/abp-sat-encoding/issues/W2/08-amo-pairwise-seqcounter.md`,
+- `docs/abp-sat-encoding/issues/W2/08-amo-pairwise-seqcounter.md`,
   `09-glucose-kissat-backend.md`, `10-multi-run-k-search.md` — phạm vi Core,
   Kissat, ngân sách time_limit.
-- `docs/handoff/abp-sat-encoding/issues/W3/16-pilot-rq1.md`, `17-pilot-rq2.md`,
+- `docs/abp-sat-encoding/issues/W3/16-pilot-rq1.md`, `17-pilot-rq2.md`,
   `20-bonus-sat-prototype.md` — phạm vi pilot và Bonus W3.
-- `docs/handoff/abp-sat-encoding/README.md` — mốc M1, bậc cắt khi chậm.
+- `docs/abp-sat-encoding/README.md` — mốc M1, bậc cắt khi chậm.
 - `docs/sat_spec.md` §5, `docs/sat_tooling.md` — K-search, tooling, kissat,
   glucose caveat.
 - `src/sat/solve.py`, `src/sat/pairwise.py`, `src/sat/backend.py` —

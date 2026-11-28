@@ -6,6 +6,6 @@
 
 **Blocked by:** 27
 
-- [ ] Thuật ngữ SAT, ký hiệu encoding, định nghĩa biến, ký hiệu clause, ngữ nghĩa ngưỡng.
-- [ ] Tên và version solver.
-- [ ] OPT / FEAS / TO / MO / ERR dùng nhất quán.
+- [x] Thuật ngữ SAT, ký hiệu encoding, định nghĩa biến, ký hiệu clause, ngữ nghĩa ngưỡng. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Tên và version solver. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] OPT / FEAS / TO / MO / ERR dùng nhất quán. (evidence: `tests/experiments/test_w6_signoff.py`)

@@ -17,11 +17,12 @@ CANONICAL_SAT_CONFIG = Config(
     warm_start=False,
     seed=0,
     time_limit=1800.0,
-    memory_limit=None,
+    memory_limit=12.0,
 )
 ```
 
 - Đã cập nhật `_warn_ignored_config` trong `src/sat/solve.py`: không phát cảnh báo giả khi `search_mode="multi"` (vì `multi` là chế độ duy nhất đã cài đặt của vòng dò K).
+- `canonical_sat_config()` mặc định `memory_limit=12.0` GiB cho run official và từ chối `memory_limit=None`/giá trị không hợp lệ (`ValueError` nhắc `memory_limit`). Hằng số `CANONICAL_SAT_CONFIG.memory_limit` cũng là `12.0`; cap này chỉ hợp lệ trên host candidate đã preflight và P3 phải xác nhận host/Job Object — xem `docs/canonical_sat_config.md`.
 - Lý do chọn và bảng số liệu chi tiết (OPT coverage, PAR2, median `peak_memory`, median `clauses`) được lưu tại `docs/canonical_sat_config.md`.
 
 ## 2. Correctness Suite & Test Matrix
@@ -30,7 +31,7 @@ CANONICAL_SAT_CONFIG = Config(
   - Unit tests cho `pairwise` encoding, `order` encoding, AMO (`pairwise`, `seqcounter`, và các biến thể `pysat.card`), `SatBackend` (`cadical195`, `glucose4`, `glucose42`, `minisat22`, chặn vĩnh viễn `kissat404`).
   - Test đối chiếu với `solve_oracle` trên đồ thị toy, đồ thị không liên thông có đỉnh cô lập, và đồ thị ngẫu nhiên (`n <= 9`).
   - Test công cụ trực lỗi SAT (`tests/sat/test_triage.py`) và bộ sinh phân tích RQ1/RQ2 + G3 (`tests/experiments/test_analyze_rq1_rq2.py`).
-- Tất cả các test đều xanh (**512 passed, 3 skipped**).
+- Tất cả các test đều xanh (**568 passed, 3 skipped**; 3 skip là test CPLEX CP engine vì `cpoptimizer.exe`/license không có trên máy, không phải fail).
 
 ## 3. Công cụ trực lỗi SAT (`src/sat/triage.py`, Issue #29 / ticket 22)
 
@@ -40,10 +41,13 @@ CANONICAL_SAT_CONFIG = Config(
 
 ## 4. Nháp phân tích RQ1/RQ2 + Cổng G3 (`experiments/analyze_rq1_rq2.py`, Issue #30 / ticket 23)
 
-- Tự động đọc từ `results/runs.csv` (hoặc `results/pilot_rq1.csv` + `results/pilot_rq2.csv` + `results/raw/*.json`) và sinh báo cáo `docs/handoff/w4-sat/23-rq1-rq2-draft-analysis.md`.
+- Tự động đọc từ `results/runs.csv` (hoặc `results/pilot_rq1.csv` + `results/pilot_rq2.csv` + `results/raw/*.json`) và sinh báo cáo `docs/w4-sat/23-rq1-rq2-draft-analysis.md`.
+- RQ1/RQ2 chỉ tính trên lát cắt một trục: RQ1 cố định `solver` (`--rq1-solver`, mặc định `cadical195`); RQ2 cố định cặp `abp_encoding`/`amo_encoding` (`--rq2-abp-encoding`/`--rq2-amo-encoding`, mặc định `order`/`pairwise`); cả hai cố định `search_mode ∈ {"", "multi"}`, `symmetry = false`, `warm_start = false`.
+- Cổng G3 chỉ `PASS`/`FAIL` khi có `--expected-runs` từ kế hoạch đã khóa; bỏ trống flag thì cổng báo `PENDING` (không fallback về số run quan sát được).
 - Chỉ rõ bằng chứng thực nghiệm **CNF nhỏ hơn (ít mệnh đề hơn) không đồng nghĩa solver nhanh hơn**, bảng so sánh solver theo instance, và kiểm tra cổng G3 (≥ 80% run hoàn thành, 100% run bất thường đã phân loại, 0 `CODE_BUG`).
 
 ## 5. Chính sách Freeze `v1.0`
 
 - Từ mốc M2 này, nhánh SAT không tự ý thay đổi encoding, AMO hay chiến lược tìm kiếm K. Mọi thay đổi chỉ giới hạn ở sửa lỗi crash/bug correctness nếu phát sinh trong đợt chạy chính thức; nếu buộc phải đổi cấu hình hoặc encoding thì phải ghi quyết định nhóm và tăng version mới.
-- Tag `v1.0` sẵn sàng bấm ngay khi cả nhóm (P1, P2, P3) hoàn tất đồng bộ PR #50 vào `main`.
+- **Điều kiện tag `v1.0` (Experimental Protocol §12):** chỉ tag khi **tất cả** freeze gate cùng đạt — dataset (subset đã khóa), host (môi trường chạy thống nhất), solver (backend + phiên bản), resource enforcement (memory cap do runner áp, Protocol §6.3), cross-review (P1/P3 đã review) và evidence (mọi link bằng chứng trong checklist resolve tại commit đóng). Thiếu một gate → chưa tag.
+- Tham chiếu chéo: `docs/sat_spec.md` (contract), `docs/w2-sat/14-sat-methodology.md` (methodology §3), `docs/technical_appendix_draft.md` (chứng minh completeness), `docs/canonical_sat_config.md` (config + số liệu pilot), `docs/w4-sat/23-rq1-rq2-draft-analysis.md` (bảng RQ1/RQ2 + G3 sinh tự động).

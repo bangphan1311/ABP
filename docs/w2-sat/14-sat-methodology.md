@@ -6,7 +6,7 @@ Bản nháp nội bộ của §3 "SAT methodology" cho paper. Quy ước biên s
 
 - Mọi khẳng định kỹ thuật trace được về `CONTRACT.md`, `docs/sat_spec.md`,
   `docs/sat_tooling.md`, `src/sat/*.py` hoặc kết quả test trong
-  `docs/handoff/w2-sat/12-test-matrix.md`. Bảng trace § → nguồn ở cuối file.
+  `docs/w2-sat/12-test-matrix.md`. Bảng trace § → nguồn ở cuối file.
 - **Không sao chép chứng minh của 2DBMP** (yêu cầu ticket 14): toàn bộ §3 viết
   từ đặc tả và code của repo này; khi nói về lựa chọn thiết kế thì chỉ nêu
   quyết định của repo, không trích dẫn hay tái lập chứng minh bên ngoài.
@@ -141,7 +141,7 @@ Contract dùng chung: `amo(literals, encoding, pool)` (`src/sat/pairwise.py`),
   literal (64 tập con, gồm cả tập 0/1 literal), mọi assignment — 729 lần kiểm
   mỗi encoding; assignment có ≤ 1 literal true phải thỏa toàn bộ clause AMO,
   > 1 true phải bị chặn. Cả hai encoding PASS
-  (`docs/handoff/w2-sat/12-test-matrix.md`, test
+  (`docs/w2-sat/12-test-matrix.md`, test
   `tests/sat/test_matrix.py::test_amo_exhaustive_closure_over_all_subsets`).
 - **Order không dùng AMO**: chuỗi đơn điệu thay ALO + AMO, nên `amo_encoding`
   được chấp nhận và ghi nhận trong `CNF` nhưng không đổi clause, không đổi kết
@@ -196,11 +196,13 @@ Phân loại kết quả theo CONTRACT §5, từ trạng thái vòng dò (`summa
   `K` không đạt ngưỡng khi `verify`; nghiệm OPT/FEAS mâu thuẫn bằng chứng dò
   (giá trị verify khác ngưỡng đã chứng minh, hoặc ≥ ngưỡng UNSAT); không có
   nghiệm verify được dù chưa hết giờ; lỗi backend/giấy phép (`BackendError`).
-- `MO` (hết bộ nhớ) theo CONTRACT §5 nhưng pipeline W2 chưa cài
-  `memory_limit` nên MO không bao giờ xuất hiện; đặt field khác mặc định thì
-  pipeline phát warning, không bỏ qua im lặng (`_warn_ignored_config`,
-  `IGNORED_CONFIG_FIELDS = (memory_limit, search_mode, symmetry, warm_start,
-  seed)`).
+- `MO` (hết bộ nhớ) theo CONTRACT §5. Solver không enforce `memory_limit`
+  trong process: `canonical_sat_config()` mặc định cap `12.0` GiB và từ chối
+  `memory_limit=None`/giá trị không hợp lệ bằng `ValueError` nhắc
+  `memory_limit`. `MO` chỉ đến từ ánh xạ `MemoryError` ngoài process, cap
+  official do runner áp (Protocol §6.3). `search_mode="multi"` là mode duy nhất
+  đã cài đặt và không phát warning; field khác mặc định thì pipeline phát
+  warning, không bỏ qua im lặng (`_warn_ignored_config`).
 - UNKNOWN của solver không dùng làm bằng chứng theo cả hai chiều
   (`docs/sat_spec.md` §4).
 
@@ -258,7 +260,7 @@ Metric theo CONTRACT §4 (`Result`) và ticket 10; cách đo trong
   (`docs/sat_tooling.md`).
 - So sánh với exact solver: dùng runner `wall_time` của P3, không so `t_total`
   giữa hai family vì phạm vi import khác nhau (khuyến nghị R2 trong
-  `docs/handoff/w2-sat/13-review-p1-formulation.md`).
+  `docs/w2-sat/13-review-p1-formulation.md`).
 
 ## §3.8 Decode và kiểm chứng nghiệm
 
@@ -276,7 +278,7 @@ Metric theo CONTRACT §4 (`Result`) và ticket 10; cách đo trong
 
 ## §3.9 Bằng chứng đúng đắn hiện có (W2)
 
-Từ lần chạy thật 2026-10-20, chi tiết trong `docs/handoff/w2-sat/12-test-matrix.md`:
+Từ lần chạy thật 2026-10-20, chi tiết trong `docs/w2-sat/12-test-matrix.md`:
 
 - Ma trận 2 abp_encoding × 2 amo_encoding × 2 solver = **8 cấu hình**, 213
   test trong `tests/sat/test_matrix.py`, toàn suite 422 test xanh trong
@@ -317,5 +319,5 @@ Từ lần chạy thật 2026-10-20, chi tiết trong `docs/handoff/w2-sat/12-te
 | §3.6 | src/sat/backend.py (SatBackend, INTERRUPTIBLE_FAMILIES, BUDGETED_FAMILIES, PYSAT_KISSAT_FAMILIES, KISSAT_LIMITATION, CONFLICT_BUDGET_START); docs/sat_tooling.md (Kissat, kết luận W2); src/sat/solve.py (_validate_solver); ticket 09 |
 | §3.7 | src/sat/solve.py (working_set_mb, solve_sat, _probe); docs/sat_tooling.md (đo t_encode/t_solve/peak_memory, kết luận W2 ticket 10); 13-review-p1-formulation.md (R2) |
 | §3.8 | src/sat/pairwise.py (decode_model); src/sat/order.py (decode_model); CONTRACT.md §6; docs/sat_spec.md §4 |
-| §3.9 | docs/handoff/w2-sat/12-test-matrix.md; tests/sat/test_matrix.py |
+| §3.9 | docs/w2-sat/12-test-matrix.md; tests/sat/test_matrix.py |
 | §3.10 | docs/sat_spec.md §5; src/sat/solve.py (IGNORED_CONFIG_FIELDS); ticket 16 |

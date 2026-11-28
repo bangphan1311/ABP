@@ -9,6 +9,8 @@ import pytest
 from src.sat import generator
 from src.sat.loader import write_instance
 from src.sat.triage import (
+    DEFAULT_BENCHMARK_DIRS,
+    REPO_ROOT,
     inspect_raw_file,
     inspect_record,
     reproduce_on_dev,
@@ -235,3 +237,55 @@ def test_triage_cli_returns_zero_when_no_code_bugs(tmp_path):
 
     exit_code = triage_main(["--raw-dir", str(raw_dir), "--anomalies-only"])
     assert exit_code == 0
+
+
+def _missing_instance_record(status: str, instance_id: str = "missing-1") -> dict:
+    rec = _valid_path4_record()
+    rec["instance"] = instance_id
+    rec["status"] = status
+    rec["solution"] = None
+    rec["lb"] = None
+    rec["ub"] = None
+    return rec
+
+
+def test_inspect_record_missing_instance_is_env_error_before_classification():
+    report = inspect_record(_missing_instance_record("TO"), search_dirs=())
+
+    assert report.category == "ENV_ERROR"
+    assert report.is_anomaly is True
+    assert any("missing-1" in r for r in report.reasons)
+
+
+def test_inspect_record_err_missing_instance_is_env_error():
+    report = inspect_record(_missing_instance_record("ERR"), search_dirs=())
+
+    assert report.category == "ENV_ERROR"
+    assert report.is_anomaly is True
+    assert any("missing-1" in r for r in report.reasons)
+
+
+def test_inspect_record_mo_missing_instance_still_env_error_with_reason():
+    report = inspect_record(_missing_instance_record("MO"), search_dirs=())
+
+    assert report.category == "ENV_ERROR"
+    assert any("missing-1" in r for r in report.reasons)
+
+
+def test_inspect_record_resolvable_instance_keeps_solver_behavior(tmp_path):
+    write_instance(tmp_path / "path4.json", generator.path(4))
+    report = inspect_record(
+        _missing_instance_record("TO", instance_id="path4"),
+        search_dirs=(tmp_path,),
+    )
+
+    assert report.category == "SOLVER_BEHAVIOR"
+    assert not any("Thiếu file instance" in r for r in report.reasons)
+
+
+def test_default_benchmark_dirs_points_to_docs_sat_g1():
+    assert REPO_ROOT / "docs" / "sat-g1" / "instances" in DEFAULT_BENCHMARK_DIRS
+    assert (
+        REPO_ROOT / "docs" / "handoff" / "sat-g1" / "instances"
+        not in DEFAULT_BENCHMARK_DIRS
+    )
