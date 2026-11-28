@@ -1,0 +1,2 @@
+results/rq3_official/*.json -diff
+results/rq3_official/**/*.json -diff
