@@ -358,7 +358,9 @@ def test_default_config_fields_emit_no_warning(recwarn):
 
 
 def test_canonical_sat_config_emits_no_warning_and_matches_oracle(recwarn):
-    cfg = canonical_sat_config(time_limit=10.0)
+    # Dev/unit-test path: solver W1 chưa enforce memory_limit nên cap tường minh sẽ
+    # sinh cảnh báo "bỏ qua field"; test này giữ đúng nghĩa "canonical config sạch".
+    cfg = canonical_sat_config(time_limit=10.0, allow_unbounded_memory=True)
     assert cfg.method == "sat"
     assert cfg.abp_encoding == "order"
     assert cfg.amo_encoding == "pairwise"
@@ -374,6 +376,50 @@ def test_canonical_sat_config_emits_no_warning_and_matches_oracle(recwarn):
     assert result.status == "OPT"
     assert result.lb == 2
     assert not [w for w in recwarn.list if "bỏ qua" in str(w.message)]
+
+
+def test_canonical_sat_config_requires_positive_memory_limit():
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(time_limit=10.0)
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(memory_limit=0.0)
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(memory_limit=-1.0)
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(memory_limit=True)
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(memory_limit="12288")
+
+
+def test_canonical_sat_config_accepts_explicit_cap():
+    cfg = canonical_sat_config(memory_limit=12288.0)
+
+    assert cfg.memory_limit == 12288.0
+    assert cfg.abp_encoding == "order"
+    assert cfg.amo_encoding == "pairwise"
+    assert cfg.sat_solver == "glucose4"
+    assert cfg.search_mode == "multi"
+    assert cfg.symmetry is False
+    assert cfg.warm_start is False
+    assert cfg.seed == 0
+    # Hằng số freeze giữ nguyên memory_limit=None; chỉ hàm dựng mới bắt buộc cap.
+    assert CANONICAL_SAT_CONFIG.memory_limit is None
+
+
+def test_canonical_sat_config_unbounded_escape_hatch():
+    cfg = canonical_sat_config(allow_unbounded_memory=True)
+
+    assert cfg.memory_limit is None
+
+
+def test_canonical_sat_config_unbounded_still_validates_provided_limit():
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(memory_limit=True, allow_unbounded_memory=True)
+    with pytest.raises(ValueError, match="memory_limit"):
+        canonical_sat_config(memory_limit=0.0, allow_unbounded_memory=True)
+
+    cfg = canonical_sat_config(memory_limit=12288.0, allow_unbounded_memory=True)
+    assert cfg.memory_limit == 12288.0
 
 
 def test_self_loop_instance_raises_value_error():

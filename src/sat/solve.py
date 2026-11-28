@@ -9,6 +9,7 @@ UNSAT thì ``K - 1 = B`` là tối ưu. Mọi nghiệm đều qua ``verify()`` t
 from __future__ import annotations
 
 import ctypes
+import math
 import warnings
 from ctypes import wintypes
 from time import perf_counter
@@ -56,8 +57,16 @@ def canonical_sat_config(
     time_limit: float | None = 1800.0,
     memory_limit: float | None = None,
     sat_solver: str = "glucose4",
+    allow_unbounded_memory: bool = False,
 ) -> Config:
-    """Trả bản sao ``Config`` chuẩn cho SAT (M2 freeze, ticket 21)."""
+    """Trả bản sao ``Config`` chuẩn cho SAT (M2 freeze, ticket 21).
+
+    Run official phải mang ``memory_limit`` tường minh (số hữu hạn > 0): solver không
+    tự enforce cap trong process (runner làm ở Protocol §6.3), nhưng cấu hình official
+    không được phép bỏ trống cap. ``allow_unbounded_memory=True`` là escape hatch chỉ
+    dành cho dev/unit test khi cần ``memory_limit=None``.
+    """
+    _validate_memory_limit(memory_limit, allow_unbounded_memory=allow_unbounded_memory)
     return Config(
         method=METHOD,
         abp_encoding=CANONICAL_SAT_CONFIG.abp_encoding,
@@ -70,6 +79,35 @@ def canonical_sat_config(
         time_limit=time_limit,
         memory_limit=memory_limit,
     )
+
+
+def _validate_memory_limit(
+    memory_limit: float | None, *, allow_unbounded_memory: bool
+) -> None:
+    """Chặn ``memory_limit`` thiếu/không hợp lệ ở biên cấu hình official.
+
+    Raises:
+        ValueError: Nếu ``memory_limit is None`` mà không bật escape hatch, hoặc giá trị
+            không phải số hữu hạn > 0 (``bool`` bị loại dù là subclass của ``int``).
+    """
+    if memory_limit is None:
+        if allow_unbounded_memory:
+            return
+        raise ValueError(
+            "memory_limit phải là số hữu hạn > 0 (int|float, không phải bool): "
+            "None. Run official cần cap tường minh; dev/unit test dùng "
+            "allow_unbounded_memory=True."
+        )
+    if (
+        isinstance(memory_limit, bool)
+        or not isinstance(memory_limit, (int, float))
+        or not math.isfinite(memory_limit)
+        or memory_limit <= 0
+    ):
+        raise ValueError(
+            "memory_limit phải là số hữu hạn > 0 (int|float, không phải bool): "
+            f"{memory_limit!r}."
+        )
 
 
 # Field Config mà W1 chưa cài đặt: đặt khác mặc định thì cảnh báo, không bỏ qua im lặng.

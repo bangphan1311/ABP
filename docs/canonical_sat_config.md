@@ -1,6 +1,9 @@
 # Canonical SAT configuration — proposal (W3, issue #18 / #25)
 
 Status: proposed by P2, to be confirmed by P1/P3 before M2 freeze.
+**W5 final:** config đã khóa và số liệu final sinh tự động tại
+`docs/w5-sat/24-rq1-final.md` + `docs/w5-sat/25-rq2-final.md`; bảng frozen
+bên dưới giữ nguyên.
 Decision is taken **before any official run**: only the two W3 pilots
 (`results/pilot_rq1.csv`, `results/pilot_rq2.csv`) were read. No RQ3 / official
 result exists yet, and none was inspected.
@@ -17,7 +20,7 @@ result exists yet, and none was inspected.
 | `symmetry` | `false` |
 | `warm_start` | `false` |
 | `seed` | `0` |
-| `memory_limit` | `null` (not implemented in solver; enforced by runner in Protocol §6.3) |
+| `memory_limit` | Official run: **explicit cap bắt buộc** — candidate host cap `12.0` GiB = `12288.0` MB (P1's protocol); solver **không** enforce trong process (runner áp cap, Protocol §6.3); số cuối cùng do P1/P3 chốt. `null` chỉ còn qua escape hatch `allow_unbounded_memory=True` (dev/unit test) |
 
 Concretely, the canonical run under the Experimental Protocol Core solver set (`{CaDiCaL, Glucose}` when Kissat is excluded) is
 
@@ -32,6 +35,7 @@ Config(
     warm_start=False,
     seed=0,
     time_limit=<protocol value>,
+    memory_limit=12288.0,  # candidate 12.0 GiB host cap; official config bắt buộc cap
 )
 ```
 
@@ -213,6 +217,13 @@ with no warning and no error, so there is nothing to classify.
    overshoot it (72.67 s observed at a 60 s limit for
    `pairwise/pairwise` on `n = 40`). If the protocol needs a hard wall-clock
    ceiling per run, that must be enforced by the runner, not by the solver.
+5. `memory_limit`: `canonical_sat_config()` refuses to build an official config
+   without an explicit positive cap (`ValueError` mentioning `memory_limit`); only
+   `allow_unbounded_memory=True` (dev/unit tests) yields `None`. The solver itself
+   still does not enforce the cap in-process — `MO` never comes from the solver —
+   so the runner layer applies it (Protocol §6.3). The number to record is a
+   P1/P3 decision; `12288.0` MB (`12.0` GiB) is the candidate from P1's protocol,
+   not a P2 choice.
 
 ## Reproduction
 

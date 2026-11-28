@@ -14,7 +14,7 @@ Nội dung sinh tự động:
   - G3 Gate: kiểm tra tỷ lệ hoàn thành các run Core (≥ 80%) và phân loại toàn bộ
     các run bất thường qua ``src.sat.triage``.
 
-    python -m experiments.analyze_rq1_rq2 --out docs/handoff/w4-sat/23-rq1-rq2-draft-analysis.md
+    python -m experiments.analyze_rq1_rq2 --out docs/w4-sat/23-rq1-rq2-draft-analysis.md
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ DEFAULT_RUNS_CSV = REPO_ROOT / "results" / "runs.csv"
 DEFAULT_RQ1_CSV = REPO_ROOT / "results" / "pilot_rq1.csv"
 DEFAULT_RQ2_CSV = REPO_ROOT / "results" / "pilot_rq2.csv"
 DEFAULT_REPORT_PATH = (
-    REPO_ROOT / "docs" / "handoff" / "w4-sat" / "23-rq1-rq2-draft-analysis.md"
+    REPO_ROOT / "docs" / "w4-sat" / "23-rq1-rq2-draft-analysis.md"
 )
 G3_THRESHOLD = 0.80
 
@@ -55,20 +55,52 @@ def _to_float(val: Any) -> float | None:
     return float(val)
 
 
+def _to_bool(val: Any) -> bool:
+    """Đọc cột bool của CSV (``true``/``1``/``yes``...); ``None``/rỗng -> ``False``."""
+    if val in (None, ""):
+        return False
+    if isinstance(val, bool):
+        return val
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+
 def normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
-    """Chuẩn hóa một hàng từ ``runs.csv`` hoặc ``pilot_rq*.csv``."""
+    """Chuẩn hóa một hàng từ ``runs.csv`` hoặc ``pilot_rq*.csv``.
+
+    Pilot CSV không có cột ``search_mode``/``symmetry``/``warm_start``: ba trục điều
+    khiển được suy từ token trong ``run_id`` (``__multi__``, ``__sym0__``, ``__ws0__``).
+    """
     lb = _to_int(raw.get("lb"))
     ub = _to_int(raw.get("ub"))
     gap = _to_int(raw.get("gap"))
     if gap is None and lb is not None and ub is not None:
         gap = ub - lb
+    run_id = str(raw.get("run_id") or "")
+    raw_search_mode = raw.get("search_mode")
+    if raw_search_mode in (None, ""):
+        search_mode = "multi" if "__multi__" in run_id else ""
+    else:
+        search_mode = str(raw_search_mode)
+    raw_symmetry = raw.get("symmetry")
+    symmetry = (
+        "__sym1__" in run_id if raw_symmetry in (None, "") else _to_bool(raw_symmetry)
+    )
+    raw_warm_start = raw.get("warm_start")
+    warm_start = (
+        "__ws1__" in run_id
+        if raw_warm_start in (None, "")
+        else _to_bool(raw_warm_start)
+    )
     return {
-        "run_id": str(raw.get("run_id") or ""),
+        "run_id": run_id,
         "instance": str(raw.get("instance") or ""),
         "method": str(raw.get("method") or "sat"),
         "abp_encoding": str(raw.get("abp_encoding") or ""),
         "amo_encoding": str(raw.get("amo_encoding") or ""),
         "solver": str(raw.get("solver") or raw.get("sat_solver") or ""),
+        "search_mode": search_mode,
+        "symmetry": symmetry,
+        "warm_start": warm_start,
         "status": str(raw.get("status") or ""),
         "lb": lb,
         "ub": ub,
@@ -135,14 +167,15 @@ class RQ2SolverSummary:
 @dataclass
 class G3GateSummary:
     completed_runs: int
-    expected_runs: int
-    completion_ratio: float
+    expected_runs: int | None
+    completion_ratio: float | None
     passed_completion: bool
     total_triaged: int
     anomalies_count: int
     unclassified_anomalies: int
     code_bugs_count: int
     passed_gate: bool
+    gate_status: str
 
 
 def _compute_par2(
@@ -160,11 +193,56 @@ def _compute_par2(
     )
 
 
+def _is_control_row(row: dict[str, Any]) -> bool:
+    """Trục điều khiển cố định của cả RQ1 lẫn RQ2: multi-run, symmetry/warm start OFF."""
+    return (
+        row.get("search_mode", "") in ("", "multi")
+        and row.get("symmetry") is False
+        and row.get("warm_start") is False
+    )
+
+
+def _filter_rq1_rows(
+    rows: Sequence[dict[str, Any]], solver: str | None = "cadical195"
+) -> list[dict[str, Any]]:
+    """Lát cắt RQ1: một solver, chỉ đổi ``(abp_encoding, amo_encoding)``."""
+    return [
+        r
+        for r in rows
+        if r.get("method", "sat") == "sat"
+        and (solver is None or r.get("solver") == solver)
+        and _is_control_row(r)
+    ]
+
+
+def _filter_rq2_rows(
+    rows: Sequence[dict[str, Any]],
+    abp_encoding: str | None = "order",
+    amo_encoding: str | None = "pairwise",
+) -> list[dict[str, Any]]:
+    """Lát cắt RQ2: một cặp encoding cố định, chỉ đổi ``solver``."""
+    return [
+        r
+        for r in rows
+        if r.get("method", "sat") == "sat"
+        and (abp_encoding is None or r.get("abp_encoding") == abp_encoding)
+        and (amo_encoding is None or r.get("amo_encoding") == amo_encoding)
+        and _is_control_row(r)
+    ]
+
+
 def summarize_rq1(
-    rows: Sequence[dict[str, Any]], *, default_time_limit: float = 60.0
+    rows: Sequence[dict[str, Any]],
+    *,
+    default_time_limit: float = 60.0,
+    solver: str | None = "cadical195",
 ) -> list[RQ1ConfigSummary]:
-    """Tổng hợp bảng RQ1 theo cặp ``(abp_encoding, amo_encoding)``."""
-    sat_rows = [r for r in rows if r.get("method", "sat") == "sat"]
+    """Tổng hợp bảng RQ1 theo cặp ``(abp_encoding, amo_encoding)`` trên lát cắt một solver.
+
+    Hàng khác ``solver`` hoặc lệch trục điều khiển (multi/symmetry/warm start) bị loại
+    để bảng chỉ trả lời đúng một câu hỏi RQ1.
+    """
+    sat_rows = _filter_rq1_rows(rows, solver)
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in sat_rows:
         key = (row["abp_encoding"], row["amo_encoding"])
@@ -204,11 +282,14 @@ def summarize_rq1(
 
 
 def find_smaller_cnf_slower_solve_cases(
-    rows: Sequence[dict[str, Any]],
+    rows: Sequence[dict[str, Any]], *, solver: str | None = "cadical195"
 ) -> list[dict[str, Any]]:
-    """Tìm các instance mà cấu hình có ít clause hơn nhưng giải chậm hơn (CNF nhỏ ≠ solver nhanh)."""
+    """Tìm các instance mà cấu hình có ít clause hơn nhưng giải chậm hơn (CNF nhỏ ≠ solver nhanh).
+
+    Chỉ xét lát cắt RQ1 (một solver, trục điều khiển cố định) để so sánh không trộn solver.
+    """
     by_inst: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for r in rows:
+    for r in _filter_rq1_rows(rows, solver=solver):
         if r.get("clauses") is not None and r.get("t_total") is not None:
             by_inst[r["instance"]].append(r)
 
@@ -250,10 +331,14 @@ def find_smaller_cnf_slower_solve_cases(
 
 
 def summarize_rq2(
-    rows: Sequence[dict[str, Any]], *, default_time_limit: float = 60.0
+    rows: Sequence[dict[str, Any]],
+    *,
+    default_time_limit: float = 60.0,
+    abp_encoding: str | None = "order",
+    amo_encoding: str | None = "pairwise",
 ) -> list[RQ2SolverSummary]:
-    """Tổng hợp bảng RQ2 theo ``solver``."""
-    sat_rows = [r for r in rows if r.get("method", "sat") == "sat"]
+    """Tổng hợp bảng RQ2 theo ``solver`` trên lát cắt một cặp encoding cố định."""
+    sat_rows = _filter_rq2_rows(rows, abp_encoding, amo_encoding)
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in sat_rows:
         grouped[row["solver"]].append(row)
@@ -289,17 +374,16 @@ def summarize_rq2(
 
 def evaluate_g3_gate(
     completed_runs: int,
-    expected_runs: int,
+    expected_runs: int | None,
     triage_reports: Sequence[TriageReport],
     *,
     threshold: float = G3_THRESHOLD,
 ) -> G3GateSummary:
-    """Đánh giá điều kiện G3 (ticket 23): ≥ 80% run Core xong & mọi run bất thường đã phân loại."""
-    if expected_runs <= 0:
-        raise ValueError("expected_runs phải > 0.")
-    ratio = completed_runs / expected_runs
-    passed_completion = ratio >= threshold
+    """Đánh giá điều kiện G3 (ticket 23): ≥ 80% run Core xong & mọi run bất thường đã phân loại.
 
+    ``expected_runs is None`` nghĩa là chưa có kế hoạch run đã khóa: cổng trả ``PENDING``,
+    không fallback về số run quan sát được (fallback sẽ tự "đạt" cổng).
+    """
     anomalies = [r for r in triage_reports if r.is_anomaly]
     unclassified = [
         r
@@ -308,6 +392,26 @@ def evaluate_g3_gate(
         or not r.reasons
     ]
     code_bugs = [r for r in triage_reports if r.category == "CODE_BUG"]
+
+    if expected_runs is None:
+        return G3GateSummary(
+            completed_runs=completed_runs,
+            expected_runs=None,
+            completion_ratio=None,
+            passed_completion=False,
+            total_triaged=len(triage_reports),
+            anomalies_count=len(anomalies),
+            unclassified_anomalies=len(unclassified),
+            code_bugs_count=len(code_bugs),
+            passed_gate=False,
+            gate_status="PENDING",
+        )
+
+    if isinstance(expected_runs, bool) or expected_runs <= 0:
+        raise ValueError("expected_runs phải > 0.")
+    ratio = completed_runs / expected_runs
+    passed_completion = ratio >= threshold
+
     passed_gate = (
         passed_completion and len(unclassified) == 0 and len(code_bugs) == 0
     )
@@ -322,6 +426,7 @@ def evaluate_g3_gate(
         unclassified_anomalies=len(unclassified),
         code_bugs_count=len(code_bugs),
         passed_gate=passed_gate,
+        gate_status="PASS" if passed_gate else "FAIL",
     )
 
 
@@ -332,16 +437,22 @@ def render_markdown_report(
     *,
     expected_core_runs: int | None = None,
     source_note: str = "",
+    rq1_solver: str | None = "cadical195",
+    rq2_abp_encoding: str | None = "order",
+    rq2_amo_encoding: str | None = "pairwise",
 ) -> str:
     """Sinh báo cáo Markdown hoàn chỉnh cho RQ1, RQ2 và G3."""
-    rq1_summaries = summarize_rq1(rq1_rows)
-    rq2_summaries = summarize_rq2(rq2_rows)
-    counterexamples = find_smaller_cnf_slower_solve_cases(rq1_rows)
+    rq1_summaries = summarize_rq1(rq1_rows, solver=rq1_solver)
+    rq2_summaries = summarize_rq2(
+        rq2_rows, abp_encoding=rq2_abp_encoding, amo_encoding=rq2_amo_encoding
+    )
+    counterexamples = find_smaller_cnf_slower_solve_cases(
+        rq1_rows, solver=rq1_solver
+    )
 
     unique_run_ids = {r["run_id"] for r in rq1_rows} | {r["run_id"] for r in rq2_rows}
     completed_count = len(unique_run_ids)
-    expected_count = expected_core_runs or max(completed_count, 1)
-    g3 = evaluate_g3_gate(completed_count, expected_count, triage_reports)
+    g3 = evaluate_g3_gate(completed_count, expected_core_runs, triage_reports)
 
     lines: list[str] = [
         "# Nháp phân tích RQ1 / RQ2 và kiểm tra cổng G3 (W4, issue #23 / #30)",
@@ -356,6 +467,8 @@ def render_markdown_report(
     lines.extend(
         [
             "## 1. Phân tích RQ1 — Encoding × AMO",
+            "",
+            f"> **Lát cắt cố định:** solver = `{rq1_solver}`, `search_mode` ∈ {{`multi`, rỗng}}, `symmetry = false`, `warm_start = false`. Bảng dưới chỉ khác nhau ở `(abp_encoding, amo_encoding)`.",
             "",
             "### 1.1. Bảng tổng hợp theo cấu hình `(abp_encoding, amo_encoding)`",
             "",
@@ -403,6 +516,8 @@ def render_markdown_report(
             "",
             "## 2. Phân tích RQ2 — So sánh SAT Solver",
             "",
+            f"> **Lát cắt cố định:** `abp_encoding = {rq2_abp_encoding}`, `amo_encoding = {rq2_amo_encoding}`, `search_mode` ∈ {{`multi`, rỗng}}, `symmetry = false`, `warm_start = false`. Bảng dưới chỉ khác nhau ở `solver`.",
+            "",
             "### 2.1. Bảng tổng hợp theo Solver (Coverage, PAR2, Memory)",
             "",
             "| Solver | Runs | OPT | FEAS | TO | MO | ERR | PAR2 (s) | Σ `t_solve` (s) | Σ `t_total` (s) | Median `t_total` (s) | Median Mem (MB) | Max Mem (MB) |",
@@ -416,10 +531,10 @@ def render_markdown_report(
             f"{s.median_time_s:.4f} | {s.median_memory_mb:.2f} | {s.max_memory_mb:.2f} |"
         )
 
-    # Bảng chi tiết theo từng instance cho RQ2
+    # Bảng chi tiết theo từng instance cho RQ2 (cùng lát cắt encoding với bảng 2.1)
     solvers = [s.solver for s in rq2_summaries]
     by_inst_solver: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
-    for r in rq2_rows:
+    for r in _filter_rq2_rows(rq2_rows, rq2_abp_encoding, rq2_amo_encoding):
         by_inst_solver[r["instance"]][r["solver"]] = r
 
     if solvers and by_inst_solver:
@@ -461,15 +576,27 @@ def render_markdown_report(
 
     # --- Phần 3: Cổng G3 ---
     anomalies = [r for r in triage_reports if r.is_anomaly]
+    if g3.expected_runs is None:
+        completion_line = (
+            f"- **Số run SAT đã hoàn thành / kỳ vọng:** `{g3.completed_runs}` → "
+            "**PENDING (chưa truyền --expected-runs từ kế hoạch đã khóa)**."
+        )
+    else:
+        completion_line = (
+            f"- **Số run SAT đã hoàn thành / kỳ vọng:** "
+            f"`{g3.completed_runs} / {g3.expected_runs}` "
+            f"(`{g3.completion_ratio * 100:.1f}%`, yêu cầu G3 ≥ `80.0%`) → "
+            f"**{'PASS' if g3.passed_completion else 'FAIL'}**."
+        )
     lines.extend(
         [
             "",
             "## 3. Kiểm tra cổng G3 (Gate 3 Readiness & Incident Triage)",
             "",
-            f"- **Số run SAT đã hoàn thành / kỳ vọng:** `{g3.completed_runs} / {g3.expected_runs}` (`{g3.completion_ratio * 100:.1f}%`, yêu cầu G3 ≥ `80.0%`) → **{'PASS' if g3.passed_completion else 'PENDING'}**.",
+            completion_line,
             f"- **Tổng số file raw JSON đã kiểm tra qua `src.sat.triage`:** `{g3.total_triaged}`.",
             f"- **Số run bất thường (`status != OPT` hoặc lỗi):** `{g3.anomalies_count}` (chưa phân loại: `{g3.unclassified_anomalies}`, lỗi correctness `CODE_BUG`: `{g3.code_bugs_count}`).",
-            f"- **Kết luận cổng G3 (trên tập dữ liệu hiện có):** **{'PASS' if g3.passed_gate else 'FAIL'}**.",
+            f"- **Kết luận cổng G3 (trên tập dữ liệu hiện có):** **{g3.gate_status}**.",
             "",
             "### Bảng phân loại các run bất thường",
             "",
@@ -506,6 +633,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--rq2-csv", type=Path, default=DEFAULT_RQ2_CSV)
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
     parser.add_argument("--expected-runs", type=int, default=None)
+    parser.add_argument(
+        "--rq1-solver",
+        default="cadical195",
+        help="Solver cố định cho lát cắt RQ1 (mặc định cadical195).",
+    )
+    parser.add_argument(
+        "--rq2-abp-encoding",
+        default="order",
+        help="abp_encoding cố định cho lát cắt RQ2 (mặc định order).",
+    )
+    parser.add_argument(
+        "--rq2-amo-encoding",
+        default="pairwise",
+        help="amo_encoding cố định cho lát cắt RQ2 (mặc định pairwise).",
+    )
     parser.add_argument("--out", type=Path, default=DEFAULT_REPORT_PATH)
     args = parser.parse_args(argv)
 
@@ -535,6 +677,9 @@ def main(argv: list[str] | None = None) -> int:
         triage_reports,
         expected_core_runs=args.expected_runs,
         source_note=source_note,
+        rq1_solver=args.rq1_solver,
+        rq2_abp_encoding=args.rq2_abp_encoding,
+        rq2_amo_encoding=args.rq2_amo_encoding,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(markdown, encoding="utf-8")
