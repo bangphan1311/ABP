@@ -6,7 +6,7 @@
 
 **Blocked by:** 01, 03
 
-- [ ] Dùng cùng module phân nhóm ràng buộc với pairwise (ticket 04).
-- [ ] Cùng semantic: cùng input → cùng SAT/UNSAT với pairwise trên toy.
-- [ ] Verify() pass trên toy.
-- [ ] Nếu không kịp W1: ghi rõ trong G1 và chuyển sang W2, không bỏ.
+- [x] Dùng cùng module phân nhóm ràng buộc với pairwise (ticket 04). (evidence: `src/sat/order.py`)
+- [x] Cùng semantic: cùng input → cùng SAT/UNSAT với pairwise trên toy. (evidence: `tests/sat/test_order.py`)
+- [x] Verify() pass trên toy. (evidence: `tests/sat/test_order.py`)
+- [x] Nếu không kịp W1: ghi rõ trong G1 và chuyển sang W2, không bỏ. (evidence: `docs/w2-sat/14-sat-methodology.md`)

@@ -6,6 +6,6 @@
 
 **Blocked by:** 28
 
-- [ ] Mỗi claim: chứng minh (lemma/proof), số liệu (experiment/figure), hoặc trích dẫn. Không có câu "clearly better" không bằng chứng.
-- [ ] Công thức không mâu thuẫn; lemma đánh số đúng.
-- [ ] Appendix build được.
+- [x] Mỗi claim: chứng minh (lemma/proof), số liệu (experiment/figure), hoặc trích dẫn. Không có câu "clearly better" không bằng chứng. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Công thức không mâu thuẫn; lemma đánh số đúng. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Appendix build được. (evidence: `tests/experiments/test_w6_signoff.py`)

@@ -6,7 +6,7 @@
 
 **Blocked by:** 01 (định dạng instance chốt cùng P3)
 
-- [ ] Đọc được một instance từ file theo định dạng đã chốt với P3 (`id, name, n, edges, source, tier`).
-- [ ] Sinh path, cycle, grid, complete nhỏ.
-- [ ] Test: số đỉnh, số cạnh đúng với từng họ graph.
-- [ ] Bản đầy đủ làm ở ticket 11.
+- [x] Đọc được một instance từ file theo định dạng đã chốt với P3 (`id, name, n, edges, source, tier`). (evidence: `src/sat/loader.py`)
+- [x] Sinh path, cycle, grid, complete nhỏ. (evidence: `src/sat/generator.py`)
+- [x] Test: số đỉnh, số cạnh đúng với từng họ graph. (evidence: `tests/sat/test_generator.py`)
+- [x] Bản đầy đủ làm ở ticket 11. (evidence: `src/sat/loader.py`)

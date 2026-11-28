@@ -6,6 +6,6 @@
 
 **Blocked by:** 29, 30
 
-- [ ] SAT methodology chính xác; claim đã đối chiếu; appendix hoàn chỉnh.
-- [ ] Code và paper thống nhất; cross-review xong.
-- [ ] Sign-off trước deadline ít nhất 2 ngày.
+- [x] SAT methodology chính xác; claim đã đối chiếu; appendix hoàn chỉnh. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Code và paper thống nhất; cross-review xong. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Sign-off trước deadline ít nhất 2 ngày. (evidence: `docs/w6-sat/signoff_report.md`)

@@ -6,8 +6,8 @@
 
 **Blocked by:** 01, 03
 
-- [ ] Tách nhóm ràng buộc: assignment, uniqueness/permutation, ABP distance, threshold.
-- [ ] Trả Result theo contract P1 (status, lb/ub, t_encode, t_solve, variables, clauses, peak_memory).
-- [ ] Decode model → labeling; verify() pass.
-- [ ] Test toy: số biến, số clause, assignment hợp lệ, SAT/UNSAT đúng.
-- [ ] Mô tả semantic khớp `sat_spec.md`.
+- [x] Tách nhóm ràng buộc: assignment, uniqueness/permutation, ABP distance, threshold. (evidence: `src/sat/pairwise.py`)
+- [x] Trả Result theo contract P1 (status, lb/ub, t_encode, t_solve, variables, clauses, peak_memory). (evidence: `src/common/models.py`)
+- [x] Decode model → labeling; verify() pass. (evidence: `tests/sat/test_pairwise.py`)
+- [x] Test toy: số biến, số clause, assignment hợp lệ, SAT/UNSAT đúng. (evidence: `tests/sat/test_pairwise.py`)
+- [x] Mô tả semantic khớp `sat_spec.md`. (evidence: `docs/sat_spec.md`)

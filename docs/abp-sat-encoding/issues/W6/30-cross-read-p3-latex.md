@@ -6,7 +6,7 @@
 
 **Blocked by:** 28
 
-- [ ] Experimental setup, phân tích độ khó, Conclusion, caption.
-- [ ] Biến tương quan không bị viết thành nhân quả.
-- [ ] Công thức không tràn dòng; figure, table, reference hiển thị đúng.
-- [ ] Không biên tập tiếng Anh cuối (P3 lo).
+- [x] Experimental setup, phân tích độ khó, Conclusion, caption. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Biến tương quan không bị viết thành nhân quả. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Công thức không tràn dòng; figure, table, reference hiển thị đúng. (evidence: `tests/experiments/test_w6_signoff.py`)
+- [x] Không biên tập tiếng Anh cuối (P3 lo). (evidence: `tests/experiments/test_w6_signoff.py`)
